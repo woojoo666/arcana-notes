@@ -1,0 +1,78 @@
+<html>
+
+<body ng-app="MyApp" ng-controller="MyCtrl">
+	<h1>{{title}}</h1>
+	<p>{{description}}</p>
+	<ul>
+		<li>{{test1results}}</li>
+		<li>{{test2results}}</li>
+		<li>{{test3results}}</li>
+	</ul>
+	<br>
+	<br>
+	<ul>
+		<li>{{li1}}</li>
+		<li>{{li2}}</li>
+		<li>{{li3}}</li>
+		<li>{{li4}}</li>
+		<li>{{li5}}</li>
+		<li>{{li6}}</li>
+		<li>{{li7}}</li>
+		<li>{{li8}}</li>
+		<li>{{li9}}</li>
+		<li>{{li10}}</li>
+		<li>{{li11}}</li>
+		<li>{{li12}}</li>
+		<li>{{li13}}</li>
+		<li>{{li14}}</li>
+		<li>{{li15}}</li>
+	</ul>
+	<div ng-repeat="n in ar track by $index" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
+		{{n}}
+	</div>
+	<button ng-click="start()">{{buttonTitle}}</button>
+	<script src="angular.min.js"></script>
+	<script>
+	angular.module('MyApp', [])
+		.controller('MyCtrl', function($scope) {
+			$scope.title = 'Comparing Data-Binding Methods: Angular (polling)';
+			$scope.description = 'Angular uses polling to update the elements, while DOMstate uses listeners. Supposedly, DOMstate should use less memory while idle because it doesn\'t continuously poll the data for changes, which Angular calls its \"digest\" loop. According to my tests, Angular used about 17k while DOMstate used about 13k. Randomizing the numbers (using the \"randomize!!\" button) doesn\'t really change memory usage for either method. Note that Angular\'s ng-repeat has a reputation for being slow, so I did 3 tests (making sure to restart the browser before each test to clear the cache!). Notice how DOMstate\'s memory barely increases (because it is actually idle), while Angular\'s increases marginally (because the polling loop gets slower). The difference is noticable, but really not significant (only 4k more memory used at 1000 repeats).';
+			$scope.test1results = 'No repeat: Angular - 16k, DOMstate - 15k';
+			$scope.test2results = '100 repeats: Angular - 17k, DOMstate - 15k';
+			$scope.test3results = '1000 repeats: Angular - 21k, DOMstate - 17k';
+			$scope.li1 = 'test 1';
+			$scope.li2 = 'test 2';
+			$scope.li3 = 'test 3';
+			$scope.li4 = 'test 4';
+			$scope.li5 = 'test 5';
+			$scope.li6 = 'test 6';
+			$scope.li7 = 'test 7';
+			$scope.li8 = 'test 8';
+			$scope.li9 = 'test 9';
+			$scope.li10 = 'test 10';
+			$scope.li11 = 'test 11';
+			$scope.li12 = 'test 12';
+			$scope.li13 = 'test 13';
+			$scope.li14 = 'test 14';
+			$scope.li15 = 'test 15';
+
+			$scope.buttonTitle = 'randomize!!';
+
+			$scope.ar = [];
+			var size = 1000;
+			for (var i = 0; i < size; i++) {
+				$scope.ar.push(Math.floor(1000*Math.random()));
+			}
+
+			$scope.start = function () {
+				setInterval(function() {
+					$scope.ar[Math.floor(size*Math.random())] = Math.floor(1000*Math.random());
+					$scope.$apply();
+				}, 50);
+			};
+
+		});
+	</script>
+</body>
+
+</html>

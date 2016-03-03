@@ -1,0 +1,189 @@
+<html>
+
+<body>
+	<h1>{{title}}</h1>
+	<p>{{description}}</p>
+	<ul>
+		<li>{{test1results}}</li>
+		<li>{{test2results}}</li>
+		<li>{{test3results}}</li>
+	</ul>
+	<br>
+	<br>
+	<ul>
+		<li>{{li1}}</li>
+		<li>{{li2}}</li>
+		<li>{{li3}}</li>
+		<li>{{li4}}</li>
+		<li>{{li5}}</li>
+		<li>{{li6}}</li>
+		<li>{{li7}}</li>
+		<li>{{li8}}</li>
+		<li>{{li9}}</li>
+		<li>{{li10}}</li>
+		<li>{{li11}}</li>
+		<li>{{li12}}</li>
+		<li>{{li13}}</li>
+		<li>{{li14}}</li>
+		<li>{{li15}}</li>
+	</ul>
+	<div class="repeat" data-array="ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;"></div>
+	<button onclick="start();">{{buttonTitle}}</button>
+	<script>
+
+	$scope = {};
+
+	DOMstate = {
+		listeners: {},
+		set: function (key, value) {
+			$scope[key] = value;
+			var elems = this.listeners[key];
+			if (elems) {
+				for (var i = 0 ; i < elems.length; i++) {
+					elems[i].innerHTML = $scope[key];
+				}
+			}
+		},
+		render: function (protoText, elem) {
+			elem.innerHTML = replaceHandlerbars(protoText, $scope);
+		},
+		register: function (key, element) {
+			if (!this.listeners[key]) this.listeners[key] = [];
+			this.listeners[key].push(element);
+			if ($scope[key]) element.innerHTML = $scope[key];
+		},
+		extractKey: function (elem) {
+			if (elem.innerHTML.indexOf('<') >= 0) return null;
+			var start = elem.innerHTML.indexOf('{{');
+			var end = elem.innerHTML.indexOf('}}');
+			if (start >= 0 && end >= 0) return elem.innerHTML.substring(start+2, end);
+			else return null;
+		},
+		arrayOp: function(key) {
+			var mArray = $scope[key];
+			var listeners = this.listeners[key];
+			var parentThis = this;
+			// {container: element, template: element, items: []}
+			return {
+				register: function (element) {
+					var parent = element.parentNode;
+					var container = document.createElement('div');
+					parent.insertBefore(container, element);
+					parent.removeChild(element);
+					if (!listeners) {
+						parentThis.listeners[key] = [];
+						listeners = parentThis.listeners[key];
+					}
+					listeners.push({container: container, template: element, items: []});
+					if (mArray) this.setAll(mArray);
+				},
+				setAll: function (array) {
+					$scope[key] = array;
+					if (listeners) {
+						for (var i = 0 ; i < listeners.length; i++) {
+							var container = listeners[i].container;
+							var template = listeners[i].template;
+							while (container.firstChild) {
+								container.removeChild(container.firstChild);
+							}
+							listeners[i].items = []; // clear array
+							for (var j = 0; j < array.length; j++) {
+								var elem = template.cloneNode(true);
+								elem.innerHTML = array[j];
+								container.appendChild(elem);
+								listeners[i].items.push(elem);
+							}
+						}
+					}
+				},
+				set: function (index, value) {
+					if (index >= mArray.length) {
+						console.log("index out of bounds");
+						return;
+					}
+
+					mArray[index] = value;
+
+					if (listeners) {
+						for (var i = 0 ; i < listeners.length; i++) {
+							listeners[i].items[index].innerHTML = value;
+						}
+					}
+				},
+				push: function (value) {
+					mArray.push(value);
+					if (listeners) {
+						for (var i = 0 ; i < listeners.length; i++) {
+							var elem = listeners[i].template.cloneNode(true);
+							elem.innerHTML = value;
+							listeners[i].container.appendChild(elem);
+							listeners[i].items.push(elem);
+						}
+					}
+				},
+				pop: function () {
+
+				},
+				remove: function (value) {
+
+				},
+			};
+		},
+	};
+
+	var elements = document.getElementsByTagName('*');
+	for (var i = 0; i < elements.length; i++) {
+		var elem = elements[i];
+		if (elem.tagName == 'SCRIPT') {
+			continue;
+		}
+		if (elem.classList.contains('repeat')) {
+			var key = elem.dataset.array;
+			DOMstate.arrayOp(key).register(elem);
+			continue;
+		}
+		var key = DOMstate.extractKey(elem);
+		console.log(key);
+		if (key) DOMstate.register(key, elem);
+	}
+
+	DOMstate.set('title','Comparing Data-Binding Methods: DOMstate (listeners)');
+	DOMstate.set('description','Angular uses polling to update the elements, while DOMstate uses listeners. Supposedly, DOMstate should use less memory while idle because it doesn\'t continuously poll the data for changes, which Angular calls its \"digest\" loop. According to my tests, Angular used about 17k while DOMstate used about 13k. Randomizing the numbers (using the \"randomize!!\" button) doesn\'t really change memory usage for either method. Note that Angular\'s ng-repeat has a reputation for being slow, so I did 3 tests (making sure to restart the browser before each test to clear the cache!). Notice how DOMstate\'s memory barely increases (because it is actually idle), while Angular\'s increases marginally (because the polling loop gets slower). The difference is noticable, but really not significant (only 4k more memory used at 1000 repeats).');
+	DOMstate.set('test1results','No repeat: Angular - 16k, DOMstate - 15k');
+	DOMstate.set('test2results','100 repeats: Angular - 17k, DOMstate - 15k');
+	DOMstate.set('test3results','1000 repeats: Angular - 21k, DOMstate - 17k');
+
+	DOMstate.set('li1','test 1');
+	DOMstate.set('li2','test 2');
+	DOMstate.set('li3','test 3');
+	DOMstate.set('li4','test 4');
+	DOMstate.set('li5','test 5');
+	DOMstate.set('li6','test 6');
+	DOMstate.set('li7','test 7');
+	DOMstate.set('li8','test 8');
+	DOMstate.set('li9','test 9');
+	DOMstate.set('li10','test 10');
+	DOMstate.set('li11','test 11');
+	DOMstate.set('li12','test 12');
+	DOMstate.set('li13','test 13');
+	DOMstate.set('li14','test 14');
+	DOMstate.set('li15','test 15');
+
+	DOMstate.arrayOp('ar').setAll([]);
+	var size = 1000;
+	for (var i = 0; i < size; i++) {
+		DOMstate.arrayOp('ar').push(Math.floor(1000*Math.random()));
+	}
+
+	DOMstate.set('buttonTitle','Randomize!!');
+
+	function start() {
+		setInterval(function() {
+			DOMstate.arrayOp('ar').set(Math.floor(size*Math.random()), Math.floor(1000*Math.random()));
+		}, 50);
+	}
+
+	</script>
+</body>
+
+</html>
