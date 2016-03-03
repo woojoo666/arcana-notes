@@ -27,9 +27,18 @@
 		<li>{{li14}}</li>
 		<li>{{li15}}</li>
 	</ul>
-	<div class="repeat" data-array="ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;"></div>
+	<div class="repeat" data-array="ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
+		<span>hi</span>
+		<button>{{item}}</button>
+	</div>
 	<button onclick="start();">{{buttonTitle}}</button>
 	<script>
+
+	function replaceHandlerbars (str, scope) {
+		return str.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, function (match, group1) {
+			return scope[group1];
+		});
+	}
 
 	$scope = {};
 
@@ -88,13 +97,20 @@
 							}
 							listeners[i].items = []; // clear array
 							for (var j = 0; j < array.length; j++) {
-								var elem = template.cloneNode(true);
-								elem.innerHTML = array[j];
+								var elem = this.render(template, array[j]);
 								container.appendChild(elem);
 								listeners[i].items.push(elem);
 							}
 						}
 					}
+				},
+				render: function (template, value) {
+					var elem = template.cloneNode(true);
+					this.renderInnerHTML(elem, template, value);
+					return elem;
+				},
+				renderInnerHTML: function (elem, template, value) {
+					elem.innerHTML = template.innerHTML.replace(/\{\{item\}\}/g, value);
 				},
 				set: function (index, value) {
 					if (index >= mArray.length) {
@@ -106,7 +122,7 @@
 
 					if (listeners) {
 						for (var i = 0 ; i < listeners.length; i++) {
-							listeners[i].items[index].innerHTML = value;
+							this.renderInnerHTML(listeners[i].items[index], listeners[i].template, value);
 						}
 					}
 				},
@@ -114,8 +130,7 @@
 					mArray.push(value);
 					if (listeners) {
 						for (var i = 0 ; i < listeners.length; i++) {
-							var elem = listeners[i].template.cloneNode(true);
-							elem.innerHTML = value;
+							var elem = this.render(listeners[i].template, value);
 							listeners[i].container.appendChild(elem);
 							listeners[i].items.push(elem);
 						}
