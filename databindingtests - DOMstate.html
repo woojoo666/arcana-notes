@@ -34,106 +34,164 @@
 	<button onclick="start();">{{buttonTitle}}</button>
 	<script>
 
-	function replaceHandlerbars (str, scope) {
-		return str.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, function (match, group1) {
-			return scope[group1];
-		});
-	}
+	/*
+	 *	Structure:
+	 *
+	 *	root = {
+	 *		repeaters: [ {template, container}, ... ],
+	 *		listeners: [ {template, elem, property}, ... ],
+	 *		value: {
+	 *			key1: {
+	 *				repeaters: [...],
+	 *				listeners: [...],
+	 *				value: "hello"
+	 *			},
+	 *			key2: {
+	 *				repeaters: [...],
+	 *				listeners: [...],
+	 *				value: {
+	 *					subkey1: {...},
+	 *				},
+	 *			},
+	 *			mArray: {
+	 *				repeaters: [...],
+	 *				listeners: [...],
+	 *				value: {
+	 *					0: {...},
+	 *					1: {...},
+	 *					2: {...},
+	 *				},
+	 *			},
+	 *		},
+	 *	};
+	 */
 
-	$scope = {};
+	 function newPath (base, key) {
+	 	return base ? base + '.' + key : key;
+	 }
 
 	DOMstate = {
-		listeners: {},
-		set: function (key, value) {
-			$scope[key] = value;
-			var elems = this.listeners[key];
-			if (elems) {
-				for (var i = 0 ; i < elems.length; i++) {
-					elems[i].innerHTML = $scope[key];
+		root: {},
+		handlebarsMatcher: /\{\{([\.\w]+)\}\}/g, // allow for '.' to delimit keys
+		getScope: function (path) {
+			if (!path) path = '';
+
+			return (function getNestedValue (keys, obj) {
+				if (keys.length <= 0) return obj;
+				var head = keys.shift();
+				obj = obj.value || (obj.value = {});
+				return getNestedValue(keys, obj[head] || (obj[head] = {}));
+			})(path.split('.'), this.root);
+		},
+		get: function (path) {
+			return this.getScope(path).value;
+		},
+		getListeners: function (path) {
+			var scope = this.getScope(path);
+			return scope.listeners || (scope.listeners = []);
+		},
+		getRepeaters: function (path) {
+			var scope = this.getScope(path);
+			return scope.repeaters || (scope.repeaters = []);
+		},
+		parse: function (rootelement, rootpath) {
+			var self = this;
+			var elements = rootelement.getElementsByTagName('*');
+
+			for (var i = 0; i < elements.length; i++) {
+				var elem = elements[i];
+
+				if (elem.classList.contains('repeat')) {
+					this.parseRepeat(elem, rootpath);
+					// TODO: how do I skip all elements created and handled by parseRepeat?
+					continue;
 				}
+
+				if (elem.firstElementChild || elem.tagName == "SCRIPT") continue;
+				// element is a plaintext node
+				var template = elem.innerHTML;
+				var matcherCopy = new RegExp(this.handlebarsMatcher);
+				var match;
+				var listener = { elem: elem, template: template };
+
+				while (match = matcherCopy.exec(template)) {
+					var key = match[1];
+					this.getListeners(newPath(rootpath, key)).push(listener);
+				}
+				this.update(listener);
 			}
 		},
-		render: function (protoText, elem) {
-			elem.innerHTML = replaceHandlerbars(protoText, $scope);
+		parseRepeat: function (elem, rootpath) {
+			var container = document.createElement('div');
+			elem.parentNode.insertBefore(container, elem);
+			elem.remove();
+
+			var path = newPath(rootpath, elem.dataset.array);
+			this.getRepeaters(path).push({ container: container, template: elem });
+
+			var initialArray = this.get(path);
+			if (initialArray) this.arrayOp(key).setAll(initialArray);
 		},
-		register: function (key, element) {
-			if (!this.listeners[key]) this.listeners[key] = [];
-			this.listeners[key].push(element);
-			if ($scope[key]) element.innerHTML = $scope[key];
+		set: function (path, value) {
+			var scope = this.getScope(path);
+			scope.value = value;
+			var listeners = this.getListeners(path);
+			for (var i = 0; i < listeners.length; i++)
+				this.update(listeners[i]);
+			return this; // for chaining
 		},
-		extractKey: function (elem) {
-			if (elem.innerHTML.indexOf('<') >= 0) return null;
-			var start = elem.innerHTML.indexOf('{{');
-			var end = elem.innerHTML.indexOf('}}');
-			if (start >= 0 && end >= 0) return elem.innerHTML.substring(start+2, end);
-			else return null;
+		update: function (listener) {
+			self = this;
+			listener.elem[listener.property || 'innerHTML'] = listener.template.replace(this.handlebarsMatcher, function (match, group1) {
+				return self.get(group1);
+			});
 		},
-		arrayOp: function(key) {
-			var mArray = $scope[key];
-			var listeners = this.listeners[key];
+		arrayOp: function(path) {
+			var scope = this.getScope(path);
+			var repeaters = this.getRepeaters(path);
 			var parentThis = this;
-			// {container: element, template: element, items: []}
+
 			return {
-				register: function (element) {
-					var parent = element.parentNode;
-					var container = document.createElement('div');
-					parent.insertBefore(container, element);
-					parent.removeChild(element);
-					if (!listeners) {
-						parentThis.listeners[key] = [];
-						listeners = parentThis.listeners[key];
-					}
-					listeners.push({container: container, template: element, items: []});
-					if (mArray) this.setAll(mArray);
-				},
-				setAll: function (array) {
-					$scope[key] = array;
-					if (listeners) {
-						for (var i = 0 ; i < listeners.length; i++) {
-							var container = listeners[i].container;
-							var template = listeners[i].template;
-							while (container.firstChild) {
-								container.removeChild(container.firstChild);
-							}
-							listeners[i].items = []; // clear array
-							for (var j = 0; j < array.length; j++) {
-								var elem = this.render(template, array[j]);
-								container.appendChild(elem);
-								listeners[i].items.push(elem);
-							}
+				clear: function () {
+					for (var i = 0; i < repeaters.length; i++) {
+						var repeater = repeaters[i];
+						var container = repeater.container;
+						while (container.firstChild) {
+							container.removeChild(container.firstChild);
 						}
 					}
+					scope.value = [];
 				},
-				render: function (template, value) {
-					var elem = template.cloneNode(true);
-					this.renderInnerHTML(elem, template, value);
-					return elem;
-				},
-				renderInnerHTML: function (elem, template, value) {
-					elem.innerHTML = template.innerHTML.replace(/\{\{item\}\}/g, value);
+				setAll: function (array) {
+					this.clear();
+					for (var i = 0; i < array.length; i++) {
+						this.push(array[i]);
+					}
 				},
 				set: function (index, value) {
-					if (index >= mArray.length) {
+					if (index >= scope.value.length) {
 						console.log("index out of bounds");
 						return;
 					}
 
-					mArray[index] = value;
-
-					if (listeners) {
-						for (var i = 0 ; i < listeners.length; i++) {
-							this.renderInnerHTML(listeners[i].items[index], listeners[i].template, value);
-						}
-					}
+					var childPath = newPath(path, index);
+					parentThis.set(childPath, value);
+					return this; // for chaining
 				},
 				push: function (value) {
-					mArray.push(value);
-					if (listeners) {
-						for (var i = 0 ; i < listeners.length; i++) {
-							var elem = this.render(listeners[i].template, value);
-							listeners[i].container.appendChild(elem);
-							listeners[i].items.push(elem);
-						}
+					scope.value.push({value: value});
+					var index = scope.value.length-1;
+					var childPath = newPath(path, index);
+
+					for (var i = 0; i < repeaters.length; i++) {
+						var repeater = repeaters[i];
+						var elem = repeater.template.cloneNode(true);
+						// replace {{item}} with {{$arrayPath.$index}} so it gets parsed like any other subscope
+						elem.innerHTML = elem.innerHTML.replace(parentThis.handlebarsMatcher, function (match, group1) {
+							return group1 == 'item' ? '{{' + childPath + '}}' : match;
+						});
+						parentThis.parse(elem);
+						repeater.container.appendChild(elem);
 					}
 				},
 				pop: function () {
@@ -146,21 +204,7 @@
 		},
 	};
 
-	var elements = document.getElementsByTagName('*');
-	for (var i = 0; i < elements.length; i++) {
-		var elem = elements[i];
-		if (elem.tagName == 'SCRIPT') {
-			continue;
-		}
-		if (elem.classList.contains('repeat')) {
-			var key = elem.dataset.array;
-			DOMstate.arrayOp(key).register(elem);
-			continue;
-		}
-		var key = DOMstate.extractKey(elem);
-		console.log(key);
-		if (key) DOMstate.register(key, elem);
-	}
+	DOMstate.parse(document.body);
 
 	DOMstate.set('title','Comparing Data-Binding Methods: DOMstate (listeners)');
 	DOMstate.set('description','Angular uses polling to update the elements, while DOMstate uses listeners. Supposedly, DOMstate should use less memory while idle because it doesn\'t continuously poll the data for changes, which Angular calls its \"digest\" loop. According to my tests, Angular used about 17k while DOMstate used about 13k. Randomizing the numbers (using the \"randomize!!\" button) doesn\'t really change memory usage for either method. Note that Angular\'s ng-repeat has a reputation for being slow, so I did 3 tests (making sure to restart the browser before each test to clear the cache!). Notice how DOMstate\'s memory barely increases (because it is actually idle), while Angular\'s increases marginally (because the polling loop gets slower). The difference is noticable, but really not significant (only 4k more memory used at 1000 repeats).');
