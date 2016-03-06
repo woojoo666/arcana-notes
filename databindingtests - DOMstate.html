@@ -27,7 +27,7 @@
 		<li>{{li14}}</li>
 		<li>{{li15}}</li>
 	</ul>
-	<div class="repeat" data-array="ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
+	<div class="repeat" data-array="item in ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
 		<span>hi</span>
 		<button>{{item}}</button>
 	</div>
@@ -122,8 +122,10 @@
 			elem.parentNode.insertBefore(container, elem);
 			elem.remove();
 
-			var path = elem.dataset.array;
-			this.getRepeaters(path).push({ container: container, template: elem });
+			var match = elem.dataset.array.match(/(\w+)\s+in\s+(\w+)/);
+			var subscopeAlias = match[1];
+			var path = match[2];
+			this.getRepeaters(path).push({ container: container, template: elem, subscopeAlias: subscopeAlias });
 
 			var initialArray = this.get(path);
 			if (initialArray) this.arrayOp(key).setAll(initialArray);
@@ -176,13 +178,12 @@
 					parentThis.set(this.getPath(index), value);
 					return this; // for chaining
 				},
-				render: function (template, index) {
-					var elem = template.cloneNode(true);
+				render: function (repeater, index) {
+					var elem = repeater.template.cloneNode(true);
 					var path = this.getPath(index);
-					// replace {{item}} with {{$arrayPath.$index}} so it gets parsed like any other subscope
-					elem.innerHTML = elem.innerHTML.replace(parentThis.handlebarsMatcher, function (match, group1) {
-						return group1 == 'item' ? '{{' + path + '}}' : match;
-					});
+					var matcher = new RegExp('(\\{\\{(?:[^{}]*[^.\\w])?)' + repeater.subscopeAlias + '(?!\\w)([^{}]*\\}\\})', 'g');
+					// replace {{$subscopeAlias}} with {{$arrayPath.$index}} so it gets parsed like any other subscope
+					elem.innerHTML = elem.innerHTML.replace(matcher, '$1'+path+'$2');
 					return elem;
 				},
 				push: function (value) {
@@ -190,7 +191,7 @@
 					var index = scope.value.length-1;
 
 					for (var i = 0; i < repeaters.length; i++) {
-						var elem = this.render(repeaters[i].template, index);
+						var elem = this.render(repeaters[i], index);
 						parentThis.parse(elem);
 						repeaters[i].container.appendChild(elem);
 					}
