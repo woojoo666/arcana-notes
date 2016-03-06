@@ -66,10 +66,6 @@
 	 *	};
 	 */
 
-	 function newPath (base, key) {
-	 	return base ? base + '.' + key : key;
-	 }
-
 	DOMstate = {
 		root: {},
 		handlebarsMatcher: /\{\{([\.\w]+)\}\}/g, // allow for '.' to delimit keys
@@ -94,7 +90,7 @@
 			var scope = this.getScope(path);
 			return scope.repeaters || (scope.repeaters = []);
 		},
-		parse: function (rootelement, rootpath) {
+		parse: function (rootelement) {
 			var self = this;
 			var elements = rootelement.getElementsByTagName('*');
 
@@ -102,7 +98,7 @@
 				var elem = elements[i];
 
 				if (elem.classList.contains('repeat')) {
-					this.parseRepeat(elem, rootpath);
+					this.parseRepeat(elem);
 					// TODO: how do I skip all elements created and handled by parseRepeat?
 					continue;
 				}
@@ -115,18 +111,18 @@
 				var listener = { elem: elem, template: template };
 
 				while (match = matcherCopy.exec(template)) {
-					var key = match[1];
-					this.getListeners(newPath(rootpath, key)).push(listener);
+					var path = match[1];
+					this.getListeners(path).push(listener);
 				}
 				this.update(listener);
 			}
 		},
-		parseRepeat: function (elem, rootpath) {
+		parseRepeat: function (elem) {
 			var container = document.createElement('div');
 			elem.parentNode.insertBefore(container, elem);
 			elem.remove();
 
-			var path = newPath(rootpath, elem.dataset.array);
+			var path = elem.dataset.array;
 			this.getRepeaters(path).push({ container: container, template: elem });
 
 			var initialArray = this.get(path);
@@ -168,30 +164,35 @@
 						this.push(array[i]);
 					}
 				},
+				getPath: function (index) {
+					return path + '.' + index;
+				},
 				set: function (index, value) {
 					if (index >= scope.value.length) {
 						console.log("index out of bounds");
 						return;
 					}
 
-					var childPath = newPath(path, index);
-					parentThis.set(childPath, value);
+					parentThis.set(this.getPath(index), value);
 					return this; // for chaining
+				},
+				render: function (template, index) {
+					var elem = template.cloneNode(true);
+					var path = this.getPath(index);
+					// replace {{item}} with {{$arrayPath.$index}} so it gets parsed like any other subscope
+					elem.innerHTML = elem.innerHTML.replace(parentThis.handlebarsMatcher, function (match, group1) {
+						return group1 == 'item' ? '{{' + path + '}}' : match;
+					});
+					return elem;
 				},
 				push: function (value) {
 					scope.value.push({value: value});
 					var index = scope.value.length-1;
-					var childPath = newPath(path, index);
 
 					for (var i = 0; i < repeaters.length; i++) {
-						var repeater = repeaters[i];
-						var elem = repeater.template.cloneNode(true);
-						// replace {{item}} with {{$arrayPath.$index}} so it gets parsed like any other subscope
-						elem.innerHTML = elem.innerHTML.replace(parentThis.handlebarsMatcher, function (match, group1) {
-							return group1 == 'item' ? '{{' + childPath + '}}' : match;
-						});
+						var elem = this.render(repeaters[i].template, index);
 						parentThis.parse(elem);
-						repeater.container.appendChild(elem);
+						repeaters[i].container.appendChild(elem);
 					}
 				},
 				pop: function () {
