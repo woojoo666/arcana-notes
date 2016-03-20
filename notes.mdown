@@ -1,0 +1,337 @@
+
+### Structure
+
+```js
+root = {
+	repeaters: [ {template, container}, ... ],
+	listeners: [ {template, elem, property}, ... ],
+	value: {
+		key1: {
+			repeaters: [...],
+			listeners: [...],
+			value: "hello"
+		},
+		key2: {
+			repeaters: [...],
+			listeners: [...],
+			value: {
+				subkey1: {...},
+			},
+		},
+		mArray: {
+			repeaters: [...],
+			listeners: [...],
+			value: {
+				0: {...},
+				1: {...},
+				2: {...},
+			},
+		},
+	},
+};
+```
+
+Wijits
+-------
+
+### handlebars
+```html
+<div>{{foo}}</div>
+```
+* events:
+	* #updated
+		* default listeners: render()
+* triggers
+	* set() -> #updated
+* attach more listeners using `<div updated="myListener">{{foo}}</div>`, and `scope.myListener()` will be called when update is triggered
+* if your listener contains the call `this.preventDefault()`, it will prevent the default listener from being triggered (in this case, `render()`)
+
+### list wijit
+```html
+<repeat items="index, item in items">
+	<div>{{index}}: {{item}}</div>
+</repeat>
+```
+* events:
+	* #item_changed
+	* #index_changed
+* triggers:
+	* set() -> #item_changed
+	* insert(), remove() -> #index_changed
+* if an item is inserted to beginning of the list, then everything after gets its index changed
+	* each event will cause the entire element to re-render!
+	* thats a lot of rendering!! pretty expensive
+* thus, check if there are any #index_changed listeners in the first place, before sending out all the events
+* this should generalize to all events. For example, if there are no #item_changed listeners, no need to send out any events after set()
+
+### selection wijit
+```html
+<selection items="item, isSelected in items" selection="selection" onselectionchanged="onselectchanged">
+	<div class="{{isSelected}}">{{item}}</div>
+</selection>
+```
+* events
+	* #item_changed
+	* #item_selected
+	* #selection_changed
+* triggers
+	* select() -> #item_selected, #selection_changed
+* note that isSelected is NOT a property of item
+	* "item" is a data structure defined by the user, we don't wanna restrict them with reserved properties
+	* instead, we have a mirror array specifically for properties like these
+
+Scopes
+------
+
+* for things like the listwijit, that declare new variable names, I suspected that I would need to start dealing with creating new scopes and such
+* originally, my simple solution was to replace the new variable names with their absolute path
+* for example, if I had this (assuming `items` and `foo` are already declared in the root scope)
+
+```html
+<repeat items="item in items">
+	<p>{{item}} hello {{foo}}</p>
+</repeat>
+```
+* I could render it as something like this
+
+```html
+<container>
+	<p>{{items.0}} hello {{foo}}</p>
+	<p>{{items.1}} hello {{foo}}</p>
+	<p>{{items.2}} hello {{foo}}</p>
+	etc...
+</container>
+```
+* problem with this is that if I inserted an item at say, index 0, then all the items get their absolute path changed
+* another tempting solution is to walk up the tree to find the first match
+	* {{item}} will walk up all the way till the repeat wijit, where it finds a match
+	* {{foo}} will walk all the way up till the root scope
+* problem is when you have something like this
+
+```html
+<repeat items="item in [5,10,15]">
+	<p>{{item}} hello {{foo}}</p>
+</repeat>
+```
+* now the scope of the repeat wijit is completely separate from the root scope
+* thus, whenever we create a new scope we need to explicitly hold onto a reference to the parent scope
+* analagous to this
+
+```js
+repeat(items, function (item) {
+	return handlebars(item + foo);
+})
+```
+* more on scopes further down
+
+Data vs Function-Based
+------------------------
+
+* should I make it more like angular, where I directly modify data and the widgets "listen" to the data and change on their own
+	* allows me to attach multiple different widgets to the same piece of data
+or should I make it more function-based, where widgets have an API and an internal piece of data, and you call the widget's API to modify the data
+	* more object oriented, like `selectList[4].select()` instead of `selectList[4].isSelected = true;`
+	* however, this means that I can only have one type of widget attached to a piece of data, otherwise the different APIs might clash
+* example: music player
+
+### Angular
+```html
+<repeat for="song in songs">
+	<img src="song.cover"></img>
+	<button onclick="play(song)">{{song == currentlyPlaying && song.playing ? pause : play}}</button>
+	<p>{{song.title}}</p>
+</repeat>
+<script>
+var songs = retrieveSongs();
+var currentlyPlaying;
+
+function play (song) {
+	if (currentlyPlaying == song) {
+		if (song.playing) {
+			audioPlayer.pause();
+			song.playing = false;
+		} else {
+			audioPlayer.resume();
+			song.playing = true;
+		}
+	} else {
+		audioPlayer.play(song.src);
+		currentlyPlaying = song;
+		song.playing = true;
+	}
+}
+</script>
+```
+
+### Function Based
+```html
+<template name="song">
+	<img src="cover"></img>
+	<button onclick="events.play">{{playing ? pause : play}}</button>
+	<p>{{title}}</p>
+	<script>
+	setPlaying = function (bool) {
+		this.playing = bool;
+	}
+	</script>
+</template>
+<songlist for="song in songs">
+	<song data="song" onplay="play(song)"></song>
+</songlist>
+<script>
+scope.songs.setAll(retrieveSongs());
+
+scope.play = function (song) {
+	if (currentlyPlaying == song) {
+		if (song.playing) {
+			audioPlayer.pause();
+			song.setPlaying(false);
+		} else {
+			audioPlayer.resume();
+			song.setPlaying(true);
+		}
+	} else {
+		if (currentlyPlaying) {
+			currentlyPlaying.setPlaying(false);
+		}
+		audioPlayer.play(song.src);
+		currentlyPlaying = song;
+		song.setPlaying(true);
+	}
+}
+</script>
+```
+
+Wijit Model
+-------------
+
+```html
+<wijit name="song">
+	<img src="{{cover}}"></img>
+	<button onclick="{{onplay}}">{{active && playing ? pause : play}}</button>
+	<p>{{title}}</p>
+</wijit>
+<repeat for="song in songs">
+	<song data="song" active="song.src == audioPlayer.src" playing="audioPlayer.playing" onplay="(e) => play(song, e)"></song>
+</repeat>
+<script>
+audioPlayer = {
+	states: { loading, loaded, finished, error },
+	playing: false,
+	currentTime,
+	src,
+
+	play: function (src) {
+		this.src = src;
+		state = loading;
+	},
+
+	restart: function () {
+		this.currentTime = 0;
+		state = loaded;
+		playing = true;
+	},
+}
+
+songs = retrieveSongs();
+
+function play (song, e) {
+	if (song.active && song.state !== error) {
+		if (song.state == finished) audioPlayer.restart();
+		else audioPlayer.playing = !audioPlayer.playing;
+	} else {
+		audioPlayer.play(song.src);
+	}
+}
+</script>
+```
+
+### Wijit Binding
+
+* notice the `active="song.src == audioPlayer.src"` wiring, kind of like how in verilog you can do
+
+```
+SongModule song0 (
+	.data (song),
+	.active (song.src == audioPlayer.src),
+	.playing (audioPlayer.playing),
+	.onplay (play),
+);
+```
+
+* `onclick="{{onplay}}"` declaring an outgoing event, and `onplay="(e) => play(song, e)"` is where it is bound
+	* yeah I know arrow functions are for ES6, but it makes it way more concise
+	* there's really nothing special going on here, "onplay" is just a property of song, so onclick calls song.onplay(e)
+* note that handlebars are only needed with default html tags, and are implied in wijits
+
+### Bind Expressions
+
+```js
+scope.bind(scope.x, [scope.var1, scope.var2], function () {
+	return scope.var1 + scope.var2;
+})
+```
+* this example will bind the result of `scope.var1 + scope.var2` to `scope.x`
+* syntax for bind function: `bind(result_variable, [trigger_variables], evaluator)`
+* all wijits internally use these bind expressions
+* `<div>{{foo}}</div>` is just a special bind expression that, instead of setting a variable, sets the innerHTML of an element
+
+shorthand:
+
+```js
+scope.bind("x = var1+var2");
+```
+* right hand side must be simple expression (single statement of words and operators, no "," or ";" or "function")
+* also no function calls, because we can't determine which variables to watch from that (use long-form bind to manually specify trigger variables)
+* take out left-hand-side -> "var1+var2"
+* find all variables that consist of just letters and "."s: `[\w.]*`
+
+dynamic trigger variables:
+
+* problem: "x = a[b+c]", we shouldn't be watching if `a` changes, we have to watch if `a[b+c]` changes
+* `a[b+c]` defines the trigger variable
+* when it changes, we need to rebind this expression
+	* remove listener from old trigger variable
+	* attach to new trigger variable
+* this is a bit complicated, so I won't allow `[]` characters in bind expressions for now
+
+### Scopes and Binding
+
+* so we don't have to explicitly hold onto each scope and variable name, we let javascript closures do the work for us
+
+```js
+function parse (scope, elem) {
+	triggerVars = [];
+	expression = elem.innerHTML.replace(/[\w.]+/g, function (match) {
+		if (!match[0] || !isNaN(match[0])) return match; // skip names that start with a number (invalid)
+		triggerVars.push(match); // add name to triggers
+		return 'scope.' + match; // prepend "scope." to all variable names
+	});
+	var evaluator = eval('(function () {return ' + expression + ';})'); // enclose expression in a function, capturing the scope at the same time
+	scope.bindElem(elem, triggerVars, evaluator);
+}
+```
+
+* when you need to create new scopes
+
+```js
+function parseRepeater (scope, container, template) {
+	var repeatExpr = container.repeat.split(' in '), // given expression "item in items"
+		data = scope[repeatExpr[0]],
+		alias = repeatExpr[1]; // data: scope["items"], alias: "item"
+
+	data.forEach(function (item) {
+		var extendedScope = Object.create(scope); // create a new scope off the parent scope
+		extendedScope[alias] = item; // add the extra "item" variable
+		var elem = template.clone();
+		parse(extendedScope, template.clone()); // parse will create the listeners with the new scope, and bind listeners to the new element
+		container.append(element);
+	});
+}
+```
+
+* the function enclosure inside the `eval()` is the key to everything
+	* pre-compiles the expression, which has [up to 18x performance benefits](http://jsperf.com/eval-vs-pre-compiled/4)
+	* evaluates the expression for us so I don't have to make my own expression parser
+	* holds onto the scope so I don't have to manually store a reference to it
+	* leverages javascript's built in closure and scope mechanisms, ensuring consistency between my framework and doing everything in vanilla js
