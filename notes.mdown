@@ -267,8 +267,8 @@ SongModule song0 (
 ### Bind Expressions
 
 ```js
-scope.bind(scope.x, [scope.var1, scope.var2], function () {
-	return scope.var1 + scope.var2;
+scope.bind([scope.var1, scope.var2], function () {
+	scope.x = scope.var1 + scope.var2;
 })
 ```
 * this example will bind the result of `scope.var1 + scope.var2` to `scope.x`
@@ -279,7 +279,7 @@ scope.bind(scope.x, [scope.var1, scope.var2], function () {
 shorthand:
 
 ```js
-scope.bind("x = var1+var2");
+scope.bind('x = var1+var2');
 ```
 * right hand side must be simple expression (single statement of words and operators, no "," or ";" or "function")
 * also no function calls, because we can't determine which variables to watch from that (use long-form bind to manually specify trigger variables)
@@ -307,8 +307,8 @@ function parse (scope, elem) {
 		triggerVars.push(match); // add name to triggers
 		return 'scope.' + match; // prepend "scope." to all variable names
 	});
-	var evaluator = eval('(function () {return ' + expression + ';})'); // enclose expression in a function, capturing the scope at the same time
-	scope.bindElem(elem, triggerVars, evaluator);
+	var evaluator = eval('(function () { elem.innerHTML = ' + expression + ';})'); // enclose expression in a function, capturing the scope at the same time
+	scope.bind(triggerVars, evaluator);
 }
 ```
 

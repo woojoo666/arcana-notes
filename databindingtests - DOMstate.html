@@ -27,10 +27,10 @@
 		<li>{{li14}}</li>
 		<li>{{li15}}</li>
 	</ul>
-	<div class="repeat" data-array="item in ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
+<!-- 	<div class="repeat" data-array="item in ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
 		<span>hi</span>
 		<button>{{item}}</button>
-	</div>
+	</div> -->
 	<button onclick="start();">{{buttonTitle}}</button>
 	<script>
 
@@ -69,25 +69,26 @@
 	DOMstate = {
 		root: {},
 		handlebarsMatcher: /\{\{([\.\w]+)\}\}/g, // allow for '.' to delimit keys
-		getScope: function (path) {
-			if (!path) path = '';
+		getScope: function (path, parentscope) {
+			if (!parentscope) parentscope = this.root;
+			if (!path) return parentscope;
 
 			return (function getNestedValue (keys, obj) {
 				if (keys.length <= 0) return obj;
 				var head = keys.shift();
 				obj = obj.value || (obj.value = {});
 				return getNestedValue(keys, obj[head] || (obj[head] = {}));
-			})(path.split('.'), this.root);
+			})(path.split('.'), parentscope);
 		},
-		get: function (path) {
-			return this.getScope(path).value;
+		get: function (path, scope) {
+			return this.getScope(path, scope).value;
 		},
-		getListeners: function (path) {
-			var scope = this.getScope(path);
+		getListeners: function (path, parentscope) {
+			var scope = this.getScope(path, parentscope);
 			return scope.listeners || (scope.listeners = []);
 		},
-		getRepeaters: function (path) {
-			var scope = this.getScope(path);
+		getRepeaters: function (path, parentscope) {
+			var scope = this.getScope(path, parentscope);
 			return scope.repeaters || (scope.repeaters = []);
 		},
 		parse: function (rootelement) {
@@ -105,16 +106,9 @@
 
 				if (elem.firstElementChild || elem.tagName == "SCRIPT") continue;
 				// element is a plaintext node
-				var template = elem.innerHTML;
-				var matcherCopy = new RegExp(this.handlebarsMatcher);
-				var match;
-				var listener = { elem: elem, template: template };
+				if (elem.innerHTML.indexOf('{{') < 0) continue; // no handlebars
 
-				while (match = matcherCopy.exec(template)) {
-					var path = match[1];
-					this.getListeners(path).push(listener);
-				}
-				this.update(listener);
+				this.bindElem(this.root, elem);
 			}
 		},
 		parseRepeat: function (elem) {
@@ -130,19 +124,30 @@
 			var initialArray = this.get(path);
 			if (initialArray) this.arrayOp(key).setAll(initialArray);
 		},
-		set: function (path, value) {
-			var scope = this.getScope(path);
-			scope.value = value;
-			var listeners = this.getListeners(path);
-			for (var i = 0; i < listeners.length; i++)
-				this.update(listeners[i]);
-			return this; // for chaining
-		},
-		update: function (listener) {
-			self = this;
-			listener.elem[listener.property || 'innerHTML'] = listener.template.replace(this.handlebarsMatcher, function (match, group1) {
-				return self.get(group1);
+		bindElem: function (scope, elem) {
+			triggers = [];
+			var expression = elem.innerHTML.match(/\{\{(.*)\}\}/)[1];
+			var self = this;
+
+			expression = expression.replace(/[\w.]+/g, function (match) {
+				if (!match[0] || !isNaN(match[0])) return match; // skip names that start with a number (invalid)
+				triggers.push(self.getScope(match, scope)); // add match to triggers
+				return 'self.get(\"' + match + '\",scope)'; // prepend "scope." to all variable names
 			});
+			assignFn = eval('(function () { elem.innerHTML = ' + expression + '; })');
+
+			for (var i = 0; i < triggers.length; i++) {
+				this.getListeners(null, triggers[i]).push(assignFn);
+			}
+			assignFn(); // call it once
+		},
+		set: function (path, value, parentscope) {
+			var scope = this.getScope(path, parentscope);
+			scope.value = value;
+			var listeners = this.getListeners(null, scope);
+			for (var i = 0; i < listeners.length; i++)
+				listeners[i]();
+			return this; // for chaining
 		},
 		arrayOp: function(path) {
 			var scope = this.getScope(path);
