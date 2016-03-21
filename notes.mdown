@@ -339,8 +339,8 @@ function parseRepeater (scope, container, template) {
 		var extendedScope = Object.create(scope); // create a new scope off the parent scope
 		extendedScope[alias] = item; // add the extra "item" variable
 		var elem = template.clone();
-		parse(extendedScope, template.clone()); // parse will create the listeners with the new scope, and bind listeners to the new element
-		container.append(element);
+		parse(extendedScope, elem); // parse will create the listeners with the new scope, and bind listeners to the new element
+		container.append(elem);
 	});
 }
 ```
