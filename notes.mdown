@@ -131,6 +131,7 @@ Data vs Function-Based
 	* allows me to attach multiple different widgets to the same piece of data
 or should I make it more function-based, where widgets have an API and an internal piece of data, and you call the widget's API to modify the data
 	* more object oriented, like `selectList[4].select()` instead of `selectList[4].isSelected = true;`
+	* this makes sense with the "repeat" wijit, where you would have common array operations like "push" and "splice"
 	* however, this means that I can only have one type of widget attached to a piece of data, otherwise the different APIs might clash
 * example: music player
 
@@ -245,6 +246,20 @@ function play (song, e) {
 }
 </script>
 ```
+
+* originally I was writing array functions into the repeat wijit, like push() and insert()
+* this way I could trigger the correct element listeners after modifying the underlying array
+* also considered having <repeat> wijit like a library api, where you would pass in the array to modify, eg instead of push(item), do push(array, item)
+	* this way the array wasn't "internal" to the <repeat> wijit, and multiple wijits could bind to one array
+	* if other types of wijits wanted to use the push function, they could borrow the function: RepeatWijit.push.call(this, array, item)
+
+* in the end, its not whether or not it should be data based or function based, everything has data and functions
+* but for wijits, data is in the form of states, and functions are in the form of state transitions
+* for the underlying data structures, data is just data, while functions are used for transforming the data
+* the <repeat> wijit shouldn't have the push() or splice() functions because that is something inherent to the Array data structure
+	* something only the Array data structure should have control over
+* <repeat> wijit can attach listeners to the push() or splice() events to respond accordingly
+* the <repeat> wijit can still respond to user events and modify the underlying Array, but it has to do so through the Array's transformation api
 
 ### Wijit Binding
 
