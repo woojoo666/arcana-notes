@@ -27,10 +27,10 @@
 		<li>{{li14}}</li>
 		<li>{{li15}}</li>
 	</ul>
-<!-- 	<div class="repeat" data-array="item in ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
+	<div class="repeat" data-array="item in ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
 		<span>hi</span>
 		<button>{{item}}</button>
-	</div> -->
+	</div>
 	<button onclick="start();">{{buttonTitle}}</button>
 	<script>
 
@@ -93,7 +93,7 @@
 			var scope = this.getScope(path, parentscope);
 			return scope.repeaters || (scope.repeaters = []);
 		},
-		parse: function (rootelement) {
+		parse: function (rootelement, scope) {
 			var self = this;
 			var elements = rootelement.getElementsByTagName('*');
 
@@ -101,7 +101,7 @@
 				var elem = elements[i];
 
 				if (elem.classList.contains('repeat')) {
-					this.parseRepeat(elem);
+					new RepeatWijit(elem, scope);
 					// TODO: how do I skip all elements created and handled by parseRepeat?
 					continue;
 				}
@@ -110,21 +110,8 @@
 				// element is a plaintext node
 				if (elem.innerHTML.indexOf('{{') < 0) continue; // no handlebars
 
-				this.bindElem(this.root, elem);
+				this.bindElem(scope, elem);
 			}
-		},
-		parseRepeat: function (elem) {
-			var container = document.createElement('div');
-			elem.parentNode.insertBefore(container, elem);
-			elem.remove();
-
-			var match = elem.dataset.array.match(/(\w+)\s+in\s+(\w+)/);
-			var subscopeAlias = match[1];
-			var path = match[2];
-			this.getRepeaters(path).push({ container: container, template: elem, subscopeAlias: subscopeAlias });
-
-			var initialArray = this.get(path);
-			if (initialArray) this.arrayOp(key).setAll(initialArray);
 		},
 		bindElem: function (scope, elem) {
 			triggers = [];
@@ -159,11 +146,7 @@
 			return {
 				clear: function () {
 					for (var i = 0; i < repeaters.length; i++) {
-						var repeater = repeaters[i];
-						var container = repeater.container;
-						while (container.firstChild) {
-							container.removeChild(container.firstChild);
-						}
+						repeaters[i].onclear();
 					}
 					scope.value = [];
 				},
@@ -185,22 +168,12 @@
 					parentThis.set(this.getPath(index), value);
 					return this; // for chaining
 				},
-				render: function (repeater, index) {
-					var elem = repeater.template.cloneNode(true);
-					var path = this.getPath(index);
-					var matcher = new RegExp('(\\{\\{(?:[^{}]*[^.\\w])?)' + repeater.subscopeAlias + '(?!\\w)([^{}]*\\}\\})', 'g');
-					// replace {{$subscopeAlias}} with {{$arrayPath.$index}} so it gets parsed like any other subscope
-					elem.innerHTML = elem.innerHTML.replace(matcher, '$1'+path+'$2');
-					return elem;
-				},
 				push: function (value) {
-					scope.value.push({value: value});
-					var index = scope.value.length-1;
+					var item = {value: value};
+					scope.value.push(item);
 
 					for (var i = 0; i < repeaters.length; i++) {
-						var elem = this.render(repeaters[i], index);
-						parentThis.parse(elem);
-						repeaters[i].container.appendChild(elem);
+						repeaters[i].onpush(item);
 					}
 				},
 				pop: function () {
@@ -213,7 +186,50 @@
 		},
 	};
 
-	DOMstate.parse(document.body);
+	function RepeatWijit(elem, scope) {
+		this.scope = scope;
+
+		this.container = document.createElement('div');
+		elem.parentNode.insertBefore(this.container, elem);
+		elem.remove();
+
+		this.template = elem;
+
+		var match = elem.dataset.array.match(/(\w+)\s+in\s+(\w+)/);
+		this.subscopeAlias = match[1];
+		var path = match[2];
+
+		DOMstate.getRepeaters(path).push(this);
+
+		var intiialArray = DOMstate.get(path);
+		if (intiialArray) {
+			// if any intiial items, call this.onpush() for each of them
+			for (var i = 0; i < intiialArray.length; i++) {
+				this.onpush(intiialArray[i]);
+			}
+		}
+	}
+
+	RepeatWijit.prototype = {
+		onclear: function () {
+			var container = this.container;
+			while (container.firstChild) {
+				container.removeChild(container.firstChild);
+			}
+		},
+		extendScope: function (item) {
+			var extendedScope = Object.create(this.scope); // create a new scope off the parent scope
+			extendedScope.value[this.subscopeAlias] = item; // add the extra "item" variable
+			return extendedScope;
+		},
+		onpush: function (item) {
+			var elem = this.template.cloneNode(true);
+			DOMstate.parse(elem, this.extendScope(item)); // parse within the extended scope, bind listeners, etc
+			this.container.appendChild(elem);
+		},
+	};
+
+	DOMstate.parse(document.body, DOMstate.root);
 
 	DOMstate.set('title','Comparing Data-Binding Methods: DOMstate (listeners)');
 	DOMstate.set('description','Angular uses polling to update the elements, while DOMstate uses listeners. Supposedly, DOMstate should use less memory while idle because it doesn\'t continuously poll the data for changes, which Angular calls its \"digest\" loop. According to my tests, Angular used about 17k while DOMstate used about 13k. Randomizing the numbers (using the \"randomize!!\" button) doesn\'t really change memory usage for either method. Note that Angular\'s ng-repeat has a reputation for being slow, so I did 3 tests (making sure to restart the browser before each test to clear the cache!). Notice how DOMstate\'s memory barely increases (because it is actually idle), while Angular\'s increases marginally (because the polling loop gets slower). The difference is noticable, but really not significant (only 4k more memory used at 1000 repeats).');
