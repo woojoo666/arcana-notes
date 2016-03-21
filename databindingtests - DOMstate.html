@@ -73,12 +73,14 @@
 			if (!parentscope) parentscope = this.root;
 			if (!path) return parentscope;
 
-			return (function getNestedValue (keys, obj) {
-				if (keys.length <= 0) return obj;
+			var keys = path.split('.');
+			var obj = parentscope;
+			while (keys.length > 0) {
 				var head = keys.shift();
 				obj = obj.value || (obj.value = {});
-				return getNestedValue(keys, obj[head] || (obj[head] = {}));
-			})(path.split('.'), parentscope);
+				obj = obj[head] || (obj[head] = {});
+			}
+			return obj;
 		},
 		get: function (path, scope) {
 			return this.getScope(path, scope).value;
