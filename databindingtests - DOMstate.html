@@ -25,7 +25,7 @@
 		<li>{{li1 + li2}} || {{li3 + li4}}</li>
 	</ul>
 	<div class="repeat" data-array="item in ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
-		<span>hi</span>
+		<span>{{global}}</span>
 		<button>{{item}}</button>
 	</div>
 	<button onclick="start();">{{buttonTitle}}</button>
@@ -254,6 +254,8 @@
 	DOMstate.set('li13','test 13');
 	DOMstate.set('li14','test 14');
 	DOMstate.set('li15','test 15');
+	DOMstate.set('global', 'hi');
+	DOMstate.set('item', 'OVERRIDE ME');
 
 	DOMstate.arrayOp('ar').setAll([]);
 	var size = 1000;
