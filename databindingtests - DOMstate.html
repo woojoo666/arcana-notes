@@ -218,8 +218,10 @@
 			}
 		},
 		extendScope: function (item) {
-			var extendedScope = Object.create(this.scope); // create a new scope off the parent scope
-			extendedScope.value[this.subscopeAlias] = item; // add the extra "item" variable
+			// We can't just extend the entire scope object, because then all extendedScopes will share the same root listeners and values
+			// Instead, create a whole new root scope with its own listeners and value object, and have the new value object extend scope.value
+			var extendedScope = { listeners: [], value: Object.create(this.scope.value) };
+			extendedScope.value[this.subscopeAlias] = item; // add the extra "item" variable at the root
 			return extendedScope;
 		},
 		onpush: function (item) {
