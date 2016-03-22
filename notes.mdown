@@ -350,3 +350,23 @@ function parseRepeater (scope, container, template) {
 	* evaluates the expression for us so I don't have to make my own expression parser
 	* holds onto the scope so I don't have to manually store a reference to it
 	* leverages javascript's built in closure and scope mechanisms, ensuring consistency between my framework and doing everything in vanilla js
+
+### Binders
+
+* originally I was gonna try to leverage the `bind("x = a+b")` function for binding elements
+* issue: different method signatures:
+	* `bind (scope, 'x = a+b') => scope.x = scope.a + scope.b`
+	* `bindElem (scope, '{{a+b}}', elem) => elem.innerHTML = scope.a + scope.b`
+	* the left-hand side of bind() is within the scope, while bindElem() is not
+	* maybe there's a way to coax one of the functions to look like other?
+* realized that bind() and bindElem() do fundamentally different things
+* bind() is meant for binding data together within the same scope
+* bindElem() is meant for binding data between the app scope and the element scope
+* thus, while the syntax is similar now, the syntax can diverge at any time, so bind() and bindElem() should be kept separate
+* wijits and manual bind() expressions all are types of **binders**
+* binders are responsible for maintaining data bindings
+* internal binders like bind() expressions are for binding data within the same scope
+* binders like bindElem() are for binding data across scopes
+	* eg: a database binder that updates the database when the user changes data in the app
+* wijits create new scopes and bind to the parent scope
+* ultimately the wijit tree leads to elemwijits, special wijits that use bindElem() to bind directly to a DOM element
