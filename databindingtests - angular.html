@@ -28,7 +28,7 @@
 		<li>{{li15}}</li>
 	</ul>
 	<div ng-repeat="n in ar track by $index" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
-		<span>hi</span>
+		<span>{{global}}</span>
 		<button>{{n}}</button>
 	</div>
 	<button ng-click="start()">{{buttonTitle}}</button>
@@ -56,6 +56,8 @@
 			$scope.li13 = 'test 13';
 			$scope.li14 = 'test 14';
 			$scope.li15 = 'test 15';
+			$scope.global = 'hi';
+			$scope.item = 'OVERRIDE ME';
 
 			$scope.buttonTitle = 'randomize!!';
 
