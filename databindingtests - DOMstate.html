@@ -12,20 +12,17 @@
 	<br>
 	<ul>
 		<li>{{li1}}</li>
-		<li>{{li2}}</li>
-		<li>{{li3}}</li>
+		<li>bla bla {{li2}}</li>
+		<li>{{li3}} bla bla</li>
 		<li>{{li4}}</li>
 		<li>{{li5}}</li>
 		<li>{{li6}}</li>
 		<li>{{li7}}</li>
 		<li>{{li8}}</li>
 		<li>{{li9}}</li>
-		<li>{{li10}}</li>
-		<li>{{li11}}</li>
-		<li>{{li12}}</li>
-		<li>{{li13}}</li>
-		<li>{{li14}}</li>
-		<li>{{li15}}</li>
+		<li>{{li1 + li2}}</li>
+		<li>{{li1}} + {{li2}}</li>
+		<li>{{li1 + li2}} || {{li3 + li4}}</li>
 	</ul>
 	<div class="repeat" data-array="item in ar" style="border: 2px solid grey; display: inline-block; padding: 5px; margin: 5px;">
 		<span>hi</span>
@@ -115,15 +112,16 @@
 		},
 		bindElem: function (scope, elem) {
 			triggers = [];
-			var expression = elem.innerHTML.match(/\{\{(.*)\}\}/)[1];
 			var self = this;
-
-			expression = expression.replace(/[\w.]+/g, function (match) {
-				if (!match[0] || !isNaN(match[0])) return match; // skip names that start with a number (invalid)
-				triggers.push(self.getScope(match, scope)); // add match to triggers
-				return 'self.get(\"' + match + '\",scope)'; // prepend "scope." to all variable names
+			var converted = elem.innerHTML.replace(/\{\{(.*?)\}\}/g, function (match, expression) {
+				expression = expression.replace(/[\w.]+/g, function (match) {
+					if (!match[0] || !isNaN(match[0])) return match; // skip names that start with a number (invalid)
+					triggers.push(self.getScope(match, scope)); // add match to triggers
+					return 'self.get(\"' + match + '\",scope)'; // prepend "scope." to all variable names
+				});
+				return '\"+' + expression + '+\"';
 			});
-			assignFn = eval('(function () { elem.innerHTML = ' + expression + '; })');
+			assignFn = eval('(function () { elem.innerHTML = \"' + converted + '\"; })');
 
 			for (var i = 0; i < triggers.length; i++) {
 				this.getListeners(null, triggers[i]).push(assignFn);
@@ -185,6 +183,8 @@
 			};
 		},
 	};
+
+
 
 	function RepeatWijit(elem, scope) {
 		this.scope = scope;
