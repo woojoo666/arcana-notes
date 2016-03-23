@@ -34,23 +34,23 @@
 	/*
 	 *	Structure:
 	 *
-	 *	root = {
+	 *	root = ReactiveMap {
 	 *		repeaters: [ {template, container}, ... ],
 	 *		listeners: [ {template, elem, property}, ... ],
-	 *		value: {
-	 *			key1: {
+	 *		value: ReactiveMap {
+	 *			key1: ReactiveValue {
 	 *				repeaters: [...],
 	 *				listeners: [...],
 	 *				value: "hello"
 	 *			},
-	 *			key2: {
+	 *			key2: ReactiveValue {
 	 *				repeaters: [...],
 	 *				listeners: [...],
 	 *				value: {
 	 *					subkey1: {...},
 	 *				},
 	 *			},
-	 *			mArray: {
+	 *			mArray: ReactiveArray {
 	 *				repeaters: [...],
 	 *				listeners: [...],
 	 *				value: {
@@ -63,8 +63,73 @@
 	 *	};
 	 */
 
+	function ReactiveValue (value) {
+		this.value = value;
+	}
+
+	ReactiveValue.prototype = {
+		set: function (value) {
+			this.value = value;
+			var listeners = DOMstate.getListeners(null, this);
+			for (var i = 0; i < listeners.length; i++)
+				listeners[i]();
+		},
+		getScope: function (path) {
+			return DOMstate.getScope(path, this);
+		},
+		get: function (path) {
+			return DOMstate.get(path, this);
+		},
+	};
+
+	function ReactiveArray () {
+		this.value = [];
+		this.repeaters = [];
+	}
+
+	ReactiveArray.prototype = {
+		clear: function () {
+			for (var i = 0; i < this.repeaters.length; i++) {
+				this.repeaters[i].onclear();
+			}
+			this.value = [];
+		},
+		setAll: function (array) {
+			this.clear();
+			for (var i = 0; i < array.length; i++) {
+				this.push(array[i]);
+			}
+		},
+		get: function (index) {
+			return this.value[index].get();
+		},
+		set: function (index, value) {
+			if (index >= this.value.length) {
+				console.log("index out of bounds");
+				return;
+			}
+
+			this.value[index].set(value);
+			return this; // for chaining
+		},
+		push: function (value) {
+			var item = new ReactiveValue(value);
+			this.value.push(item);
+
+			for (var i = 0; i < this.repeaters.length; i++) {
+				this.repeaters[i].onpush(item);
+			}
+		},
+		pop: function () {
+
+		},
+		remove: function (value) {
+
+		},
+	};
+
 	DOMstate = {
-		root: {},
+		root: new ReactiveValue(),
 		handlebarsMatcher: /\{\{([\.\w]+)\}\}/g, // allow for '.' to delimit keys
 		getScope: function (path, parentscope) {
 			if (!parentscope) parentscope = this.root;
@@ -75,7 +140,7 @@
 			while (keys.length > 0) {
 				var head = keys.shift();
 				obj = obj.value || (obj.value = {});
-				obj = obj[head] || (obj[head] = {});
+				obj = obj[head] || (obj[head] = new ReactiveValue());
 			}
 			return obj;
 		},
@@ -146,58 +211,7 @@
 			return { expression: parsed, triggers: triggers };
 		},
 		set: function (path, value, parentscope) {
-			var scope = this.getScope(path, parentscope);
-			scope.value = value;
-			var listeners = this.getListeners(null, scope);
-			for (var i = 0; i < listeners.length; i++)
-				listeners[i]();
-			return this; // for chaining
-		},
-		arrayOp: function(path) {
-			var scope = this.getScope(path);
-			var repeaters = this.getRepeaters(path);
-			var parentThis = this;
-
-			return {
-				clear: function () {
-					for (var i = 0; i < repeaters.length; i++) {
-						repeaters[i].onclear();
-					}
-					scope.value = [];
-				},
-				setAll: function (array) {
-					this.clear();
-					for (var i = 0; i < array.length; i++) {
-						this.push(array[i]);
-					}
-				},
-				getPath: function (index) {
-					return path + '.' + index;
-				},
-				set: function (index, value) {
-					if (index >= scope.value.length) {
-						console.log("index out of bounds");
-						return;
-					}
-
-					parentThis.set(this.getPath(index), value);
-					return this; // for chaining
-				},
-				push: function (value) {
-					var item = {value: value};
-					scope.value.push(item);
-
-					for (var i = 0; i < repeaters.length; i++) {
-						repeaters[i].onpush(item);
-					}
-				},
-				pop: function () {
-
-				},
-				remove: function (value) {
-
-				},
-			};
+			this.getScope(path, parentscope).set(value);
 		},
 	};
 
@@ -211,7 +225,7 @@
 			}
 			return '\"+' + parseResult.expression + '+\"';
 		});
-		assignFn = eval('(function () { elem.innerHTML = \"' + converted + '\"; })');
+		var assignFn = eval('(function () { elem.innerHTML = \"' + converted + '\"; })');
 
 		for (var i = 0; i < triggers.length; i++) {
 			DOMstate.getListeners(null, triggers[i]).push(assignFn);
@@ -231,6 +245,12 @@
 		var match = elem.dataset.array.match(/(\w+)\s+in\s+(\w+)/);
 		this.subscopeAlias = match[1];
 		var path = match[2];
+
+		var split = path.split('.');
+		var last = split.pop();
+		var prefix = split.join('.');
+		var obj = DOMstate.getScope(prefix);
+		if (!obj.value[last]) obj.value[last] = new ReactiveArray();
 
 		DOMstate.getRepeaters(path).push(this);
 
@@ -290,17 +310,17 @@
 	DOMstate.set('global', 'hi');
 	DOMstate.set('item', 'OVERRIDE ME');
 
-	DOMstate.arrayOp('ar').setAll([]);
+	DOMstate.getScope('ar').setAll([]);
 	var size = 1000;
 	for (var i = 0; i < size; i++) {
-		DOMstate.arrayOp('ar').push(Math.floor(1000*Math.random()));
+		DOMstate.getScope('ar').push(Math.floor(1000*Math.random()));
 	}
 
 	DOMstate.set('buttonTitle','Randomize!!');
 
 	function start() {
 		setInterval(function() {
-			DOMstate.arrayOp('ar').set(Math.floor(size*Math.random()), Math.floor(1000*Math.random()));
+			DOMstate.getScope('ar').set(Math.floor(size*Math.random()), Math.floor(1000*Math.random()));
 		}, 50);
 	}
 
