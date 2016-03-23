@@ -370,3 +370,22 @@ function parseRepeater (scope, container, template) {
 	* eg: a database binder that updates the database when the user changes data in the app
 * wijits create new scopes and bind to the parent scope
 * ultimately the wijit tree leads to elemwijits, special wijits that use bindElem() to bind directly to a DOM element
+
+### Tracking Array Index
+
+* say you have a repeater that keeps track of index
+	`<repeat for="item,index in array">`
+* should the index be handled by the array data structure, or the repeat wijit?
+	* data structure: wrap item and index in a container `{ item: ..., index: ...}`
+		* array stores these containers, not the items directly
+		* when index of a container changes, container.index property updated to match
+	* repeat: keep an array of all the extendedScopes, store an `index` property in each of these extended scopes
+		* update affected extendedScopes.index properties when recieving #oninsert, #onremove events
+* the problem with handling it in the array structure is that we have this indirect wrapper structure going on
+* the problem with handling it in repeater, is if we have another wijit that wants to use indexes, we have to reimplement all the index updating functions when receiving #oninsert and #onremove
+* SOLUTION:
+* note that index is not a part of the item
+* array uses it internally to get/set items, but the item itself is detached
+* for this specific repeater, we want each item to contain both the item and the index
+* use a special array that wraps the item and index
+* thus, its not handled by the array structure or the repeat wijit, but a new data structure entirely
