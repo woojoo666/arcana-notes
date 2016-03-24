@@ -389,3 +389,138 @@ function parseRepeater (scope, container, template) {
 * for this specific repeater, we want each item to contain both the item and the index
 * use a special array that wraps the item and index
 * thus, its not handled by the array structure or the repeat wijit, but a new data structure entirely
+
+### Deep Property Binding
+
+* `x = a.a.a`
+* this can be seen as `x = a.get('a').get('a')`
+* two ways to handle this
+	* keep as one binding, with three triggers `[a, a.a, a.a.a]`
+	* separate into two bindings `temp = a.get('a')`, `x = temp.get('a')` with two triggers each
+
+### Collection Listeners
+
+* ignoring efficiency, whats the simplest collection listener?
+	* if we start with `map = {a: 1, b: 2}`, and a collection listener `for key,val in map => map2[key] = val+1`
+	* initially the collection listener creates 2 value listeners, `map2.a = map.a+1`, `map2.b = map.b+1`
+	* set `map.b = 3` => value listener changes `map2.b`
+	* set `map.c = 4` => collection listener notices keyset changes, destroys old `map2` and all value listeners, then re-evaluates entire collection to create 3 value listeners
+* what about arrays?
+* if we do `['a','b','c'].shift('x')`:
+	* item 0 changes to 'x', item 1 changes to 'a', item 2 changes to 'b', item 3 changes (from undefined) to 'c', and length changes to '4'
+
+### Separating Definitions from Data, Bindings from Values
+
+* binding should happen at the definition level, not the data/value level
+	* if we bound listeners to data/values:
+		* say we bind `x = a.a.a` => `a = {a: {a: 5, _listeners: ["x = a.a.a"] }}`
+		* then if we set `bla = a.a.a`, `bla` would inherit the listeners
+		* in addition, if we set `a.a.a = 10`, then we would lose the listeners
+* I already separated the listeners from the value at the tip level
+	* `x = {listeners[], value}`, if you change x value, don't have to rebind the listener
+* however, for `x = a.a.a`, if you set `a = {a: {a: 5}}`, have to rebind listeners for `a.a` and `a.a.a`
+* thus, we need to completely separate the bindings tree from the value tree
+* when setting a value:
+	* set the value in the value tree
+	* follow the same path in the bindings tree to retrieve the evaluators and run them
+		* make sure to trigger any collection listeners directly above the path, eg `a.a.a = 5` will trigger collection listeners on `a.a`
+	* this process is recursive; evaluators will set a value, which can trigger more evaluators
+
+```js
+a = {a: {a: 4}};
+b = 11;
+x = a.a.a; //binding 1
+y = x+b; //binding 2
+z = a.a*b; // binding 3
+```
+will result in:
+
+```js
+// eval1: (x = a.a.a), eval2: (y = x+b), eval3: (z = a.a*b)
+bindings: { "a": [eval1], "a.a": [eval1, eval3], "a.a.a": [eval1], "b": [eval2, eval3], "x": [eval2] }
+values: { a: {a: {a: 4} }, b: 11, x: 4, y: 15, z: 44}
+```
+
+### Event Listeners for Optimization, Re-evaluation by default
+
+* bindings work purely on the current state of the data, regardless of the operations used to get to that state
+* when the data changes, we simply re-evaluate the expression
+* this is why my previous idea in "Tracking Array Index" with registering #oninsert and #onremove listeners is wrong
+	* also my current implementation of ReactiveArray sends #onpush events to update listeners, which is also wrong
+* listeners should not have to implement an interface or listen to events. This part is data based, not function based
+* note that events can be used to optimize the re-evaluation
+
+ReactiveArray.splice(4,2,["a"]) => onsplice
+	ReactiveArray.remove(4,2) => onremove
+		ReactiveArray.removeOne(4) => onremoveOne
+		ReactiveArray.removeOne(4) => onremoveOne
+	ReactiveArray.insert(4,["a"]) => oninsert
+		ReactiveArray.insertOne(4,"a") => oninsertOne
+
+* lets say this ReactiveArray has 3 listeners:
+	* listener 1: implements onsplice
+		* absorbs the #onsplice event, and is not called for subsequent events
+	* listener 2: implements onremoveOne and oninsert
+		* absorbs two #onremoveOne events and one #oninsert event
+	* listener 3: implements onremove
+		* can absorb the onremove tree but not the oninsert tree, default to re-evaluation
+
+* a binding should always be able to default back to re-evaluating the expression
+
+### ReactiveArrays
+
+* note that if we use an internal array and use array operations, we have to make sure to manually call listeners
+* eg, ReactiveArray([1,2,3,4,5]).splice(2, 0, "x") has to both update any array/collection listeners, but also call value listeners for each array item after (and including) index 2
+
+### Proxies and getters/setters
+
+* use `defineProperty` to override get()/set() so you can use normal assignment notation while still triggering the listeners
+
+```js
+function createProxy(obj, prop) {
+	var value = obj[prop];
+
+	Object.defineProperty(obj, prop, {
+		get: function () {
+			return value;
+		},
+		set: function (newValue) {
+			value = newValue;
+			// call all listeners
+			obj._listeners[prop].forEach(function (listener) { listener(); });
+		},
+		enumerable: true,
+		configurable: true
+	});
+}
+
+var test = {a: 10}; // not proxied yet
+createProxy(test, 'a');
+test.a = 5; // proxied, calls listeners
+```
+
+* during the bind() function, we can extract the trigger variable names and proxy them
+* however, note that because we have to proxy one by one, we can't dynamically proxy every item in a collection
+* thus, collections listeners won't be able to detect when new properties are added
+* good try pupper
+
+### Pre-parsing
+
+* because proxies won't work, perhaps we can do pre-parsing
+* all wijit script tags are within a `<template>`, so they won't automatically be run
+* before running a wijit script, find all assignments and replace them with set()
+* eg `scope.a = "hi"` => `scope._set('a', "hi")`
+* make sure that set() returns the result to account for expressions like `var x = (scope.x = 5)` => `var x = (scope._set('x', 5))`
+* a possible issue with this is finding where to close the parenthesis
+* perhaps we can replace the assignments with proxies
+* eg `scope.x = "hi"` => `scope._proxy('x').$ = "hi"`
+
+```js
+scope._proxy = function (path) {
+	return {
+		set $ (val) {
+			return scope._set(path, val);
+		}
+	};
+};
+```
