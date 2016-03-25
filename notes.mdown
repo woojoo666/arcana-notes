@@ -468,6 +468,19 @@ ReactiveArray.splice(4,2,["a"]) => onsplice
 		* can absorb the onremove tree but not the oninsert tree, default to re-evaluation
 
 * a binding should always be able to default back to re-evaluating the expression
+* note that setting a just one property can trigger a complete re-evaluation
+* originally, in my repeat wijit, modifying one property just affected the corresponding item element
+* however, that won't work for something like a summation function: `array => array.reduce((sum, item) => sum+item, 0)`
+	* no #onset listeners so defaults to re-evaluation
+* on the other hand, operations like map() can automatically generate #onset listeners
+
+```js
+bind('squared = array.map(x => x*x)');
+// results in
+var mapFn = (x => x*x)
+evaluator = () => { scope.squared = scope.array.map(mapFn) }
+evaluator.onset = (key, value) => { scope.squared[key] = mapFn(value) }
+```
 
 ### ReactiveArrays
 
