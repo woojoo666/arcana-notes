@@ -482,6 +482,17 @@ evaluator = () => { scope.squared = scope.array.map(mapFn) }
 evaluator.onset = (key, value) => { scope.squared[key] = mapFn(value) }
 ```
 
+* map binds can also use item-to-item bindings in place of onset (which is how the repeat wijit works)
+
+```js
+bind('squared = array.map(x => x*x)');
+// results in
+var mapFn = (x => x*x)
+evaluator = () => { scope.array.forEach(evaluator.onpush) } // use onpush to create item-to-item bindings between scope.array and scope.squared
+evaluator.onset = () => true // don't do anything
+evaluator.onpush = (value, index) => { scope.squared.push(value); scope.bind('squared['+index+'] = mapFn(scope.array['+index+']') }
+```
+
 ### ReactiveArrays
 
 * note that if we use an internal array and use array operations, we have to make sure to manually call listeners
