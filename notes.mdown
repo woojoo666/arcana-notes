@@ -550,3 +550,118 @@ scope._proxy = function (path) {
 	};
 };
 ```
+
+### Deep Property Binding Revisited
+
+* consider a simple assignment, `foomirror = foo`
+* due to javascript's reference-based model is that, if foo.x changes, bar.x will change too (foo and bar point to the same object)
+* if foo itself changes though, bar won't, because now foo and bar point to different things
+* our binding mechanism fixes this, and mirrors changes at the base level:
+* however, while the reference-based model seems like a blessing, mirroring changes above the base level, this is actually a problem because it _silently_ mirrors changes
+* for example, if we bind `x = foomirror.x`, and we change `foo.x`, `foomirror.x` changes without the binding mechanism knowing about it, and `x` won't be updated
+* to fix this, when changing a value, don't just trigger the listeners on that value, trigger the listeners on any ancestors of that value as well
+	* we also trigger the listeners on any descendents too, as noted in the "Deep Property Binding" section
+* if "x" marks the set value, "a" marks every affected node
+
+	       a
+	      / \
+	     a   .
+	    / \   \
+	   .   x   .
+	      / \
+	     a   a
+
+* tbh, this makes perfect sense. if foo.x changes, that means foo changed as well
+* but what about collection listeners?
+
+* consider if we bind `bar.x = foo`, and the later bind `bar = foo`
+* this gives `bar.x` a double binding, because the binding `bar = foo` will also determine `bar.x`, BAD!!
+* to fix all these issues, we force all binding results to be at the root level
+* this also prevents multiple ways of defining identical bindings, which could happen before:
+	* `bind(x = {a: foo, b: bar})` == `x = {}; bind(x.a = foo); bind(x.b = bar)`
+* this also prevents mixed items, where some properties are bound and some aren't, eg `x = {a: 0}; bind(x.b = foo)`
+* in fact, all bindings should belong in a separate domain entirely
+
+```
+module songelem (song, audioPlayer) {
+	active: (song.src == audioPlayer.src)
+	playing: audioPlayer.playing
+} (active, playing)
+```
+
+* this also ensures that all bindings happen at once, at the beginning
+	* if a binding didn't happen at the beginning, then the period of time which it was unbound will likely lead to unexpected behavior
+* note that bound variables can't really be used in functional code, but functional code can be used to change bound variables
+
+### Collection Listeners Revisited
+
+* don't item-to-item bindings also create double bindings?
+* they also won't be at the root level
+* collection bindings actually are for defining collections of bindings, not just for binding collections
+	* thus, the "reduce" function discussed in the "Collection Listeners" section is not actually a collection binding!
+* collection bindings determine how and when to create/destroy bindings, and create a structure to store the values
+* the bindings themselves determine the values
+* that way there's no conflict of interest
+* the bindings they create "belong" to the collection
+* collection bindings are bindings themselves, so they can create recursive structures, like a 2d matrix bind
+
+```js
+function songlist (songs, audioPlayer) {
+	songelem: function (song) {
+		active: (song.src == audioPlayer.src)
+		playing: audioPlayer.playing
+	}
+	elems: songs.map(songelem) // collection bind. if a single song changes, then the corresponding _songelem changes, nothing else
+}
+```
+
+* a normal mirror bind, `bar = foo`, is also a collection bind!
+	* in a value-based model, this would be a vital optimization
+		* if `foo.x.x.x` changes, then we should only update `bar.x.x.x` and all it's subvalues
+	* in a reference-based model, the optimization is unneeded
+
+### Reference Based Models
+
+* its important to note that binding makes the most sense in a value-based model
+* a reference based model is useful for passing around data structures, which doesn't really happen in data binding
+* reference based models are also useful for copying data structures
+* in some ways, reference based model may seem like they have inherent data-binding
+
+```js
+var foo = [5];
+var bar = foo;
+foo[0] = 10;
+console.log(bar[0]); // outputs 10
+```
+
+* however, this only works because we are copying values
+* if we added any transformations, this would not work, and the distinction between reference-based models and data-binding becomes clear
+
+```js
+var foo = [5];
+var bar = foo.map(x => x*x)
+foo[0] = 10;
+console.log(bar[0]); // outputs 25, not 100
+```
+
+* thus, pass-by-reference is merely an optimization, and when thinking about data-binding, it's useful to assume a pass-by-value model
+
+### Defining Collection Binds and Functional Programming
+
+* functional programming is optimal for defining collection binds because functional programming never modifies or moves around data
+* likewise, it doesn't make sense to modify or move a binding (note: dynamic bindings do move around, but that's a weird exception)
+
+```js
+function concat (list1, list2) {
+	var res = new Array(list1.length + list2.length)
+	for (var i = 0; i < res.length; i++) {
+		res[i] = (i < list1.length) list1[i] : list2[i-list1.length] // bind the beginning to list1, and the rest to list2
+	}
+	return res
+}
+function flatten (tree) {
+	if (!tree.length) return tree; // either an empty list or a value
+	var last = tree.last();
+	return concat( flatten(tree.slice(0, tree.length-1)), flatten(last) )
+}
+```
