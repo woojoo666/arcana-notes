@@ -571,6 +571,7 @@ scope._proxy = function (path) {
 	      / \
 	     a   a
 
+* this is the full **#onset event propagation**
 * tbh, this makes perfect sense. if foo.x changes, that means foo changed as well
 * but what about collection listeners?
 
@@ -602,7 +603,13 @@ module songelem (song, audioPlayer) {
 * collection bindings determine how and when to create/destroy bindings, and create a structure to store the values
 * the bindings themselves determine the values
 * that way there's no conflict of interest
-* the bindings they create "belong" to the collection
+* the indings they create "belong" to the collection, called **sub-bindings**
+	* during #onset event propagation, the sub-bindings absorb the event for the collection listener
+	* if no sub-bindings absorb the event, then it reaches the base collection listener, and the whole collection binding is re-evaluated
+		* all old sub-bindings thrown away, new ones created
+	* this is why the sub-bindings don't have to be at root level 
+	* all sub-bindings have to be between children of the trigger collections and children of the output collection
+		* ensures that the sub-bindings will absorb the #onset
 * collection bindings are bindings themselves, so they can create recursive structures, like a 2d matrix bind
 
 ```js
@@ -655,7 +662,7 @@ console.log(bar[0]); // outputs 25, not 100
 function concat (list1, list2) {
 	var res = new Array(list1.length + list2.length)
 	for (var i = 0; i < res.length; i++) {
-		res[i] = (i < list1.length) list1[i] : list2[i-list1.length] // bind the beginning to list1, and the rest to list2
+		res[i] = (i < list1.length) ? list1[i] : list2[i-list1.length] // bind the beginning to list1, and the rest to list2
 	}
 	return res
 }
@@ -665,3 +672,34 @@ function flatten (tree) {
 	return concat( flatten(tree.slice(0, tree.length-1)), flatten(last) )
 }
 ```
+
+### Deep Property Binding and Collection Listeners Revisited (Again)
+
+* collection binders are responsible for creating/destroying bindings
+* monitor the pointers (collection keys), not the values of those keys
+* that way no need to monitor "sub-bindings"
+* also events are no longer propagated to ancestors
+* this means the normal assignment operator won't work for collections anymore
+* overload the assignment operator `=` to do a recursive mirror bind when acting on collections
+	* if `foo` and `bar` are collections, `bind(foo = bar)` => `mirrorbind(foo, bar)`
+
+```js
+function mirror(source, dest) {
+	if (source instanceof Object) {
+		for (var key in source) {
+			mirror(source[key], dest[key]);
+		}
+	} else {
+		bind(source, dest);
+	}
+}
+```
+
+* assignments like `foo = { x: bar.x, y: bar.y }` are no longer collection bindings anymore, because `foo` is not monitoring anything
+
+### Non-Root Level Bindings
+
+* assignments like `foo = { x: bar.x, y: bar.y }` are not collection bindings, and contain non-root level bindings
+* to prevent double bindings, we force non-root level bindings (eg `foo.x`) to be created at the same time as the container (eg `foo`)
+* thus, we are not allowed to do things like `foo = {}; foo.x = bar.x`
+* if we want to have "changing" bindings, we can always do something like `foo = loaded ? bar : "loading..."`
