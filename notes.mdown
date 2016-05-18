@@ -703,3 +703,40 @@ function mirror(source, dest) {
 * to prevent double bindings, we force non-root level bindings (eg `foo.x`) to be created at the same time as the container (eg `foo`)
 * thus, we are not allowed to do things like `foo = {}; foo.x = bar.x`
 * if we want to have "changing" bindings, we can always do something like `foo = loaded ? bar : "loading..."`
+
+### Dangling Deep Property Bindings and Entrance Nodes
+
+* lets say `foo = { x: bar.x, y: bar.y }` and `fizz = foo.x*foo.y`
+* what happens to foo when we set `bar = 3`?
+* what happens to fizz if we set `bar = {x: 5}`?
+
+* two main possibilities to handle hanging bindings, defaulting to `undefined` or throwing an error
+* default value of undefined
+	* makes it easy to handle 
+	* more flexible, objects like `foo` can change structure without throwing an error
+	* silent failures :(
+* throw error
+	* matches javascript way (`x = {}; y = x.x.x` => throws error)
+	* strict typing mindset. In above example, `foo` follows a `{ x: ..., y: ...}` structure, and should always follow that structure, otherwise throw error
+
+* lets change `bar` into a bound variable,`bar = buzz`, with `buzz` starting with a value of `buzz = {x: 3, y: 3}`
+* this is a mirror bind
+* if we change `buzz = {x: 4, y: 5}`, then the mirror bind destroys bar's old child values and bindings, and creates new ones
+* for `bar`, `bar.x` and `bar.y` are temporarily undefined
+* because this temporary undefinedness is inevitable, we can't throw an error otherwise we would have errors all the time
+* this extends to any level, e.g. if we do `a = b.x.x.x` and `b = null`, `a` should be undefined
+	* this is different from javascript, where an error would be thrown
+
+* in addition, note how event propagation is no longer needed to the children
+	* when bar's new `x` and `y` children are created and bound to `buzz`, their values will be updated, which will in turn update `foo`
+* **entrance nodes**: triggers whose value we set directly
+	* in above example, `buzz` is the entrance node
+* entrance nodes should be treated like mirror bindings, and propagate events to children
+	* setting `buzz = { x: 4, y: 5}` should trigger all bindings to `buzz`, `buzz.x`, and `buzz.y`
+* but this event propagation is only needed for entrance nodes!
+
+* note that an optimization would be to keep the `foo.x` and `foo.y` bindings and instead just replace the value
+* in a strict typing mindset, perhaps this would not be an optimization, since the structure of the value that we set `foo` to should never change
+* thus, in a strict typing mindset, perhaps throwing an error would be better
+
+### Strict Typing
