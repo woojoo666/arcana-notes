@@ -30,25 +30,36 @@
 	// collection binding
 	test.set('ar', [1,2,3]);
 
-	// map bind
+	// filter bind
 	test.bind('devnull', ['ar'], function (ar) {
-		test.set('ar2',[]);
-		ar.forEach((_, i) => test.bind('ar2.'+i, ['ar.'+i], val => val*val));
+		// leverage reduce bind to append all results to an array
+		var triggers = ar.map((x,i) => 'ar.' + i);
+		test.bind('evens', triggers, () => ar.reduce((acc, val) => val%2 === 0 ? acc.concat(val) : acc, []));
+	});
+
+	// map bind
+	test.bind('devnull', ['evens'], function (ar) {
+		test.set('evens2',[]);
+		ar.forEach((_, i) => test.bind('evens2.'+i, ['evens.'+i], val => val*val));
 	});
 
 	// reduce bind
-	test.bind('devnull', ['ar2'], function (ar) {
-		var triggers = ar.map((x,i) => 'ar2.' + i);
-		test.bind('ar2sum', triggers, () => ar.reduce((acc, val) => acc+val, 0));
+	test.bind('devnull', ['evens2'], function (ar) {
+		var triggers = ar.map((x,i) => 'evens2.' + i);
+		test.bind('evens2sum', triggers, () => ar.reduce((acc, val) => acc+val, 0));
 	});
 
-	console.log(test.get('ar2sum'));
-	test.set('ar.2', 5);
-	console.log(test.get('ar2sum'));
-	test.set('ar.3', 5);
-	console.log(test.get('ar2sum'));
-	test.set('ar', [4,5]);
-	console.log(test.get('ar2sum'));
+	function checker () {
+		return test.get('ar').filter(x => x%2 === 0).map(x => x*x).reduce((acc,x) => acc+x, 0);
+	}
+
+	console.log(test.get('evens2sum') + ' should be ' + checker());
+	test.set('ar.1', 5);
+	console.log(test.get('evens2sum') + ' should be ' + checker());
+	test.set('ar.3', 4);
+	console.log(test.get('evens2sum') + ' should be ' + checker());
+	test.set('ar', [5,6]);
+	console.log(test.get('evens2sum') + ' should be ' + checker());
 	</script>
 </body>
 
