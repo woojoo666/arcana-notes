@@ -676,10 +676,32 @@ function flatten (tree) {
 ### Deep Property Binding and Collection Listeners Revisited (Again)
 
 * collection binders are responsible for creating/destroying bindings
-* monitor the pointers (collection keys), not the values of those keys
+* the "value" of a collection is its pointers, not the values pointed to by those pointers
+* thus, only monitor the pointers (collection keys), and the bindings created for those pointers will be responsible for monitoring the values at each pointer
 * that way no need to monitor "sub-bindings"
-* also events are no longer propagated to ancestors
+* collection bindings are just like normal bindings, just triggered in a different way
+	* regular bindings get triggered when value changes
+	* collection bindings are triggered when key added/removed
+
+```js
+scope.set = function (collectionPath, key, value) {
+	collection = get(collectionPath);
+	var prev = collection[key]
+	collection[key] = value
+	if (prev == undefined) trigger(collectionPath) // key added, trigger collection binding
+	trigger(collectionPath + '.' + key) // trigger regular binding
+}
+scope.delete = function (collectionPath, key) {
+	collection = get(collectionPath);
+	delete collection[key]
+	trigger(collectionPath + '.' + key) // trigger regular binding
+	trigger(collectionPath) // trigger collection binding
+}
+```
+
+* also events are no longer propagated to ancestors (b/c children are now responsible for monitoring their own values)
 * this means the normal assignment operator won't work for collections anymore
+	* if we do `foo = bar`, and then `bar.x = 5`, binding for `bar.x` will be triggered but not the binding for `bar`, so `foo` won't get updated
 * overload the assignment operator `=` to do a recursive mirror bind when acting on collections
 	* if `foo` and `bar` are collections, `bind(foo = bar)` => `mirrorbind(foo, bar)`
 
@@ -695,7 +717,67 @@ function mirror(source, dest) {
 }
 ```
 
-* assignments like `foo = { x: bar.x, y: bar.y }` are no longer collection bindings anymore, because `foo` is not monitoring anything
+* static collection assignments like `foo = { x: bar.x, y: bar.y }` are no longer collection bindings anymore, because `foo` is not monitoring anything
+
+### Reduce Bindings
+
+* so far our design has been based on map bindings, but what expressions that work on an entire collection, not each child individually
+* to best understand this, look at the difference between a map binding and a reduce binding
+
+```
+map binding:
+
+    / a - bar.a
+foo - b - bar.b
+    \ c - bar.c
+
+reduce binding:
+
+    / a \
+foo - b - sum
+    \ c /
+```
+
+* we need to implement the dynamic many-to-one binding seen in the "reduce binding"
+* we leverage our collection listener again, except unlike in map-bind where we create a binding for each child, we create a trigger for each child, and all the triggers lead to one reduce expression
+* we can extend this to "deep" reduce functions, that act on trees and not just arrays
+* eg a `sumAll` function that sums all numbers in a collection
+* just push all numbers into an auxiliary array that is used for the reduce function
+
+```js
+temp = []
+function sumAll (obj) {
+	if (obj.length) obj.mapbind(sumAll)
+	else temp.push(obj)
+}
+sum = temp.collectionListener(function () {
+	var res = 0
+	for ( var i = 0; i < temp.length; i++)
+		res += temp[i]
+	return res
+});
+
+foo.mapbind(sumAll)
+```
+
+* note that we could have leveraged a shallow reduce function and used recursion to get the same functionality
+* this way we wouldn't need an auxiliary array for the reduce binding, just listen to each layer in the collection directly
+
+```
+deep binding:
+
+        / m \
+    / a - n \|
+foo - b --- sum
+    \ c ---/
+
+recursive shallow binding:
+
+        / m \
+    / a - n - temp \
+foo - b ------------ sum
+    \ c -----------/
+```
 
 ### Non-Root Level Bindings
 
