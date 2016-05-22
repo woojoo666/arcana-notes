@@ -30,27 +30,35 @@
 	// collection binding
 	test.set('ar', [1,2,3]);
 
-	// filter bind
-	test.bind('devnull', ['ar'], function (ar) {
-		// leverage reduce bind to append all results to an array
-		var triggers = ar.map((x,i) => 'ar.' + i);
-		test.bind('evens', triggers, () => ar.reduce((acc, val) => val%2 === 0 ? acc.concat(val) : acc, []));
-	});
+	var filterfn = x => x%2 === 0;
+	var mapfn = x => x*x;
+	var reducefn = (acc,x) => acc+x;
+	var reducestart = 0;
 
-	// map bind
-	test.bind('devnull', ['evens'], function (ar) {
-		test.set('evens2',[]);
-		ar.forEach((_, i) => test.bind('evens2.'+i, ['evens.'+i], val => val*val));
-	});
+	function mapbind (dest, src, fn) {
+		test.bind('devnull', [src], function (ar) {
+			test.set(dest,[]);
+			ar.forEach((_, i) => test.bind(dest+'.'+i, [src+'.'+i], fn));
+		});
+	}
 
-	// reduce bind
-	test.bind('devnull', ['evens2'], function (ar) {
-		var triggers = ar.map((x,i) => 'evens2.' + i);
-		test.bind('evens2sum', triggers, () => ar.reduce((acc, val) => acc+val, 0));
-	});
+	function reducebind (dest, src, fn, start) {
+		test.bind('devnull', [src], function (ar) {
+			var triggers = ar.map((_,i) => src+'.'+i);
+			test.bind(dest, triggers, () => ar.reduce(fn, start));
+		});
+	}
+
+	function filterbind (dest, src, fn) {
+		reducebind(dest, src, (acc, x) => fn(x) ? acc.concat(x) : acc, []);
+	}
+
+	filterbind('evens','ar',filterfn);
+	mapbind('evens2','evens',mapfn);
+	reducebind('evens2sum','evens2',reducefn, reducestart);
 
 	function checker () {
-		return test.get('ar').filter(x => x%2 === 0).map(x => x*x).reduce((acc,x) => acc+x, 0);
+		return test.get('ar').filter(filterfn).map(mapfn).reduce(reducefn, reducestart);
 	}
 
 	console.log(test.get('evens2sum') + ' should be ' + checker());
