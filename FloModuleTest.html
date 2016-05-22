@@ -29,15 +29,26 @@
 
 	// collection binding
 	test.set('ar', [1,2,3]);
+
+	// map bind
 	test.bind('devnull', ['ar'], function (ar) {
-		var triggers = ar.map((x,i) => 'ar.' + i);
-		test.bind('arsum', triggers, () => ar.reduce((acc, val) => acc+val, 0));
+		test.set('ar2',[]);
+		ar.forEach((_, i) => test.bind('ar2.'+i, ['ar.'+i], val => val*val));
 	});
-	console.log(test.get('arsum'));
+
+	// reduce bind
+	test.bind('devnull', ['ar2'], function (ar) {
+		var triggers = ar.map((x,i) => 'ar2.' + i);
+		test.bind('ar2sum', triggers, () => ar.reduce((acc, val) => acc+val, 0));
+	});
+
+	console.log(test.get('ar2sum'));
 	test.set('ar.2', 5);
-	console.log(test.get('arsum'));
+	console.log(test.get('ar2sum'));
 	test.set('ar.3', 5);
-	console.log(test.get('arsum'));
+	console.log(test.get('ar2sum'));
+	test.set('ar', [4,5]);
+	console.log(test.get('ar2sum'));
 	</script>
 </body>
 
