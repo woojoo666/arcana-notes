@@ -19,12 +19,25 @@
 	<script>
 	var test = new FloModule();
 
+	// basic tests
 	test.set('a', 5);
 	test.set('b', 10);
-	test.bind('c', ['a', 'b'], function(a, b) { return a + b; });
+	test.bind('c', ['a', 'b'], (a,b) => a+b);
 	console.log(test.get('c'));
 	test.set('b', 12);
 	console.log(test.get('c'));
+
+	// collection binding
+	test.set('ar', [1,2,3]);
+	test.bind('devnull', ['ar'], function (ar) {
+		var triggers = ar.map((x,i) => 'ar.' + i);
+		test.bind('arsum', triggers, () => ar.reduce((acc, val) => acc+val, 0));
+	});
+	console.log(test.get('arsum'));
+	test.set('ar.2', 5);
+	console.log(test.get('arsum'));
+	test.set('ar.3', 5);
+	console.log(test.get('arsum'));
 	</script>
 </body>
 
