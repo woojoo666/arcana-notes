@@ -35,7 +35,7 @@ FloModule.prototype = {
 		var obj = this.values;
 		if (!path) return obj;
 
-		var keys = path.split('.');
+		var keys = (''+path).split('.');
 		while (keys.length > 0) {
 			var head = keys.shift();
 			obj = obj[head];
@@ -46,14 +46,13 @@ FloModule.prototype = {
 		return this.bindings[path] || (this.bindings[path] = []);
 	},
 	bind: function (dest, triggers, fn) {
-		var self = this;
-		function evaluator () {
-			var triggerVals = triggers.map(function(trigger){ return self.get(trigger); });
-			var newVal = fn.apply(self, triggerVals);
-			self.set(dest, newVal);
-		}
+		var evaluator = (() => {
+			var triggerVals = triggers.map( trigger => this.get(trigger));
+			var newVal = fn.apply(this, triggerVals);
+			this.set(dest, newVal);
+		}).bind(this);
 		for (var i = 0; i < triggers.length; i++) {
-			self.getListeners(triggers[i]).push(evaluator);
+			this.getListeners(triggers[i]).push(evaluator);
 		}
 		evaluator();
 	},
