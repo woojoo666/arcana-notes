@@ -26,12 +26,14 @@
  *	};
  */
 
-function FloModule () {}
+class FloModule {
 
-FloModule.prototype = {
-	bindings: {},
-	values: {},
-	get: function (path) {
+	constructor () {
+		this.bindings = {};
+		this.values = {};
+	}
+
+	getVal (path) {
 		var obj = this.values;
 		if (!path) return obj;
 
@@ -41,47 +43,53 @@ FloModule.prototype = {
 			obj = obj[head];
 		}
 		return obj;
-	},
-	getListeners: function (path) {
+	}
+
+	getListeners (path) {
 		return this.bindings[path] || (this.bindings[path] = []);
-	},
-	bind: function (dest, triggers, fn) {
-		var evaluator = (() => {
-			var triggerVals = triggers.map( trigger => this.get(trigger));
+	}
+
+	bind (dest, triggers, fn) {
+		var evaluator = () => {
+			var triggerVals = triggers.map( trigger => this.getVal(trigger));
 			var newVal = fn.apply(this, triggerVals);
-			this.set(dest, newVal);
-		}).bind(this);
+			this.setVal(dest, newVal);
+		};
 		for (var i = 0; i < triggers.length; i++) {
 			this.getListeners(triggers[i]).push(evaluator);
 		}
 		evaluator();
-	},
-	separateLast: function (path) {
+	}
+
+	separateLast (path) {
 		var keys = path.split('.');
 		var last = keys.pop();
 		return {parentPath: keys.join('.'), key: last};
-	},
-	set: function (path, value) {
+	}
+
+	setVal (path, value) {
 		var split = this.separateLast(path);
-		var parent = this.get(split.parentPath);
+		var parent = this.getVal(split.parentPath);
 		var prev = parent[split.key];
 		parent[split.key] = value;
 		if (prev === undefined) this.trigger(split.parentPath); // key added, trigger collection binding
 		this.trigger(path); // trigger regular binding
-	},
-	delete: function (path) {
+	}
+
+	deleteProp (path) {
 		var split = this.separateLast(path);
-		var parent = this.get(split.parentPath);
+		var parent = this.getVal(split.parentPath);
 		delete parent[split.key];
 		this.trigger(path); // trigger regular binding
 		this.trigger(split.parentPath); // key removed, trigger collection binding
-	},
-	trigger: function (path) {
+	}
+
+	trigger (path) {
 		var listeners = this.getListeners(path);
 		for (var i = 0; i < listeners.length; i++) {
 			listeners[i]();
 		}
-	},
+	}
 
 	/******************************** Included Functions *******************************/
 
@@ -89,32 +97,32 @@ FloModule.prototype = {
 
 	mapbind (dest, src, fn) {
 		this.bind('devnull', [src], ar => {
-			this.set(dest,[]);
+			this.setVal(dest,[]);
 			ar.forEach((_, i) => this.bind(dest+'.'+i, [src+'.'+i], fn));
 		});
-	},
+	}
 
 	reducebind (dest, src, fn, start) {
 		this.bind('devnull', [src], ar => {
 			var triggers = ar.map((_,i) => src+'.'+i);
 			test.bind(dest, triggers, () => ar.reduce(fn, start));
 		});
-	},
+	}
 
 	filterbind (dest, src, fn) {
 		this.reducebind(dest, src, (acc, x) => fn(x) ? acc.concat(x) : acc, []);
-	},
+	}
 
 	mirrorbind (dest, src) {
 		this.bind('devnull', [src], obj => {
 			if (obj instanceof Object) {
-				this.set(dest, {});
+				this.setVal(dest, {});
 				for (var key in obj) {
 					this.mirrorbind(dest+'.'+key, src+'.'+key);
 				}
 			} else {
-				this.set(dest, obj);
+				this.setVal(dest, obj);
 			}
 		});
-	},
-};
+	}
+}

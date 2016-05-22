@@ -20,15 +20,15 @@
 	var test = new FloModule();
 
 	// basic tests
-	test.set('a', 5);
-	test.set('b', 10);
+	test.setVal('a', 5);
+	test.setVal('b', 10);
 	test.bind('c', ['a', 'b'], (a,b) => a+b);
-	console.log(test.get('c'));
-	test.set('b', 12);
-	console.log(test.get('c'));
+	console.log(test.getVal('c'));
+	test.setVal('b', 12);
+	console.log(test.getVal('c'));
 
 	// collection binding
-	test.set('ar', [1,2,3]);
+	test.setVal('ar', [1,2,3]);
 
 	var filterfn = x => x%2 === 0;
 	var mapfn = x => x*x;
@@ -40,22 +40,22 @@
 	test.reducebind('evens2sum','evens2',reducefn, reducestart);
 
 	function checker () {
-		return test.get('ar').filter(filterfn).map(mapfn).reduce(reducefn, reducestart);
+		return test.getVal('ar').filter(filterfn).map(mapfn).reduce(reducefn, reducestart);
 	}
 
-	console.log(test.get('evens2sum') + ' should be ' + checker());
-	test.set('ar.1', 5);
-	console.log(test.get('evens2sum') + ' should be ' + checker());
-	test.set('ar.3', 4);
-	console.log(test.get('evens2sum') + ' should be ' + checker());
-	test.set('ar', [5,6]);
-	console.log(test.get('evens2sum') + ' should be ' + checker());
+	console.log(test.getVal('evens2sum') + ' should be ' + checker());
+	test.setVal('ar.1', 5);
+	console.log(test.getVal('evens2sum') + ' should be ' + checker());
+	test.setVal('ar.3', 4);
+	console.log(test.getVal('evens2sum') + ' should be ' + checker());
+	test.setVal('ar', [5,6]);
+	console.log(test.getVal('evens2sum') + ' should be ' + checker());
 
-	test.set('foo', { a: 3, b: { x: 'hi', y: 3.43 }, ar: [5,2,7] });
+	test.setVal('foo', { a: 3, b: { x: 'hi', y: 3.43 }, ar: [5,2,7] });
 	test.mirrorbind('bar','foo');
-	console.log(JSON.stringify(test.get('bar')) + ' should be ' + JSON.stringify(test.get('foo')));
-	test.set('foo.b.y', 'bye');
-	console.log(JSON.stringify(test.get('bar')) + ' should be ' + JSON.stringify(test.get('foo')));
+	console.log(JSON.stringify(test.getVal('bar')) + ' should be ' + JSON.stringify(test.getVal('foo')));
+	test.setVal('foo.b.y', 'bye');
+	console.log(JSON.stringify(test.getVal('bar')) + ' should be ' + JSON.stringify(test.getVal('foo')));
 	</script>
 </body>
 
