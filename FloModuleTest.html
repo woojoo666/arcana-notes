@@ -35,27 +35,9 @@
 	var reducefn = (acc,x) => acc+x;
 	var reducestart = 0;
 
-	function mapbind (dest, src, fn) {
-		test.bind('devnull', [src], function (ar) {
-			test.set(dest,[]);
-			ar.forEach((_, i) => test.bind(dest+'.'+i, [src+'.'+i], fn));
-		});
-	}
-
-	function reducebind (dest, src, fn, start) {
-		test.bind('devnull', [src], function (ar) {
-			var triggers = ar.map((_,i) => src+'.'+i);
-			test.bind(dest, triggers, () => ar.reduce(fn, start));
-		});
-	}
-
-	function filterbind (dest, src, fn) {
-		reducebind(dest, src, (acc, x) => fn(x) ? acc.concat(x) : acc, []);
-	}
-
-	filterbind('evens','ar',filterfn);
-	mapbind('evens2','evens',mapfn);
-	reducebind('evens2sum','evens2',reducefn, reducestart);
+	test.filterbind('evens','ar',filterfn);
+	test.mapbind('evens2','evens',mapfn);
+	test.reducebind('evens2sum','evens2',reducefn, reducestart);
 
 	function checker () {
 		return test.get('ar').filter(filterfn).map(mapfn).reduce(reducefn, reducestart);
@@ -69,22 +51,8 @@
 	test.set('ar', [5,6]);
 	console.log(test.get('evens2sum') + ' should be ' + checker());
 
-	function mirrorbind (dest, src) {
-		test.bind('devnull', [src], function (obj) {
-			if (obj instanceof Object) {
-				test.set(dest, {});
-				for (var key in obj) {
-					mirrorbind(dest+'.'+key, src+'.'+key);
-				}
-			} else {
-				test.set(dest, obj);
-			}
-		});
-	}
-
 	test.set('foo', { a: 3, b: { x: 'hi', y: 3.43 }, ar: [5,2,7] });
-	console.log(test.get('foo'));
-	mirrorbind('bar','foo');
+	test.mirrorbind('bar','foo');
 	console.log(JSON.stringify(test.get('bar')) + ' should be ' + JSON.stringify(test.get('foo')));
 	test.set('foo.b.y', 'bye');
 	console.log(JSON.stringify(test.get('bar')) + ' should be ' + JSON.stringify(test.get('foo')));

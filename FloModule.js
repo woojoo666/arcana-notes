@@ -82,4 +82,39 @@ FloModule.prototype = {
 			listeners[i]();
 		}
 	},
+
+	/******************************** Included Functions *******************************/
+
+	// these functions are not part of FloModule operation, but are useful to have
+
+	mapbind (dest, src, fn) {
+		this.bind('devnull', [src], ar => {
+			this.set(dest,[]);
+			ar.forEach((_, i) => this.bind(dest+'.'+i, [src+'.'+i], fn));
+		});
+	},
+
+	reducebind (dest, src, fn, start) {
+		this.bind('devnull', [src], ar => {
+			var triggers = ar.map((_,i) => src+'.'+i);
+			test.bind(dest, triggers, () => ar.reduce(fn, start));
+		});
+	},
+
+	filterbind (dest, src, fn) {
+		this.reducebind(dest, src, (acc, x) => fn(x) ? acc.concat(x) : acc, []);
+	},
+
+	mirrorbind (dest, src) {
+		this.bind('devnull', [src], obj => {
+			if (obj instanceof Object) {
+				this.set(dest, {});
+				for (var key in obj) {
+					this.mirrorbind(dest+'.'+key, src+'.'+key);
+				}
+			} else {
+				this.set(dest, obj);
+			}
+		});
+	},
 };
