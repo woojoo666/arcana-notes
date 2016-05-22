@@ -68,6 +68,26 @@
 	console.log(test.get('evens2sum') + ' should be ' + checker());
 	test.set('ar', [5,6]);
 	console.log(test.get('evens2sum') + ' should be ' + checker());
+
+	function mirrorbind (dest, src) {
+		test.bind('devnull', [src], function (obj) {
+			if (obj instanceof Object) {
+				test.set(dest, {});
+				for (var key in obj) {
+					mirrorbind(dest+'.'+key, src+'.'+key);
+				}
+			} else {
+				test.set(dest, obj);
+			}
+		});
+	}
+
+	test.set('foo', { a: 3, b: { x: 'hi', y: 3.43 }, ar: [5,2,7] });
+	console.log(test.get('foo'));
+	mirrorbind('bar','foo');
+	console.log(JSON.stringify(test.get('bar')) + ' should be ' + JSON.stringify(test.get('foo')));
+	test.set('foo.b.y', 'bye');
+	console.log(JSON.stringify(test.get('bar')) + ' should be ' + JSON.stringify(test.get('foo')));
 	</script>
 </body>
 
