@@ -786,7 +786,7 @@ foo - b ------------ sum
 * thus, we are not allowed to do things like `foo = {}; foo.x = bar.x`
 * if we want to have "changing" bindings, we can always do something like `foo = loaded ? bar : "loading..."`
 
-### Dangling Deep Property Bindings and Entrance Nodes
+### Dangling Deep Property Bindings and Entry Nodes
 
 * lets say `foo = { x: bar.x, y: bar.y }` and `fizz = foo.x*foo.y`
 * what happens to foo when we set `bar = 3`?
@@ -809,16 +809,124 @@ foo - b ------------ sum
 * this extends to any level, e.g. if we do `a = b.x.x.x` and `b = null`, `a` should be undefined
 	* this is different from javascript, where an error would be thrown
 
-* in addition, note how event propagation is no longer needed to the children
-	* when bar's new `x` and `y` children are created and bound to `buzz`, their values will be updated, which will in turn update `foo`
-* **entrance nodes**: triggers whose value we set directly
-	* in above example, `buzz` is the entrance node
-* entrance nodes should be treated like mirror bindings, and propagate events to children
-	* setting `buzz = { x: 4, y: 5}` should trigger all bindings to `buzz`, `buzz.x`, and `buzz.y`
-* but this event propagation is only needed for entrance nodes!
-
-* note that an optimization would be to keep the `foo.x` and `foo.y` bindings and instead just replace the value
+* note that an optimization would be to keep the `foo.x` and `foo.y` bindings and instead just replace the value (instead of having temporary undefinedness)
 * in a strict typing mindset, perhaps this would not be an optimization, since the structure of the value that we set `foo` to should never change
 * thus, in a strict typing mindset, perhaps throwing an error would be better
 
-### Strict Typing
+* in addition, note how event propagation is no longer needed to the children
+	* when bar's new `x` and `y` children are created and bound to `buzz`, their values will be updated, which will in turn update `foo`
+* mirror binds replace event propagation
+* also slightly more efficient than event propagation
+	* only updates the subtree that need updating, instead of moving up the tree and updating the entire tree
+* **entry nodes**: nodes whose value we set directly
+	* in above example, `buzz` is the entry node
+* as shown above, for everything to work properly, entry nodes need event propagation
+	* setting `buzz = { x: 4, y: 5}` should trigger all bindings to `buzz`, `buzz.x`, and `buzz.y`
+* instead, we can insert a mirror binding after each entry node
+* to do this, we create a separate tree for entry nodes, and then mirror bind a node in the main tree to the node in the entry tree
+
+```js
+FloModule.set = function (key, value) {
+	this.get('inputs')[key] = value;
+	this.mirrorbind(key, '_inputs.'+key);
+}
+```
+
+### FilterBind, MapBind, ReduceBind
+
+as implemented in FloModule.js:
+
+```js
+function mapbind (dest, src, fn) {
+	this.bind('devnull', [src], ar => {
+		this.setVal(dest,[]);
+		ar.forEach((_, i) => this.bind(dest+'.'+i, [src+'.'+i], fn));
+	});
+}
+
+function reducebind (dest, src, fn, start) {
+	this.bind('devnull', [src], ar => {
+		var triggers = ar.map((_,i) => src+'.'+i);
+		test.bind(dest, triggers, () => ar.reduce(fn, start));
+	});
+}
+
+function filterbind (dest, src, fn) {
+	this.reducebind(dest, src, (acc, x) => fn(x) ? acc.concat(x) : acc, []);
+}
+```
+* notice how each binding contains two levels: an outer bind and an inner bind
+* this makes sense, because each binding monitors two things: the array pointers, and the values pointed to
+
+### Mirrorbind Everywhere
+
+* remember that we are using mirror binds instead of event propagation
+* earlier we said that "input nodes" need propagation
+* we can get around this by giving each input node a preliminary mirror bind
+* more specifically, input n
+	* `mFloModule.set('foo')`
+
+```js
+function concat (dest, src1, src2) {
+	this.bind('devnull', [src1, src2], (ar1, ar2) => {
+		var temp = [];
+		temp.length = src1.length+src2.length
+		this.set(dest, temp)
+		for (var i = 0; i < temp.length; i++) {
+			this.mirrorbind(dest+'.'+i, i < src1.length ? src1+'.'+i : src2+'.'+(i-src1.length))
+		}
+	});
+}
+```
+
+### Circular References
+
+* something I forgot to account for is circular references, eg `foo = { a: { x: 5 }}`, `foo.a.y = foo`
+* this would not exist in a value based model
+* a mirror bind will run infinitely
+* remember, we are using a value-based model because we are monitoring values, not references
+	* if we monitored references, then `foo = bar` would not be triggered when `bar.x` changes
+* perhaps we can copy by reference, but monitor by value
+* in order to prevent infinite loops, during the mirror bind we tag the nodes that we have already bound, so that we don't run indefinitely
+
+### Aliases
+
+* constantly monitoring and copying mirror bindings is slow and expensive, especially now that we have to do this extra tagging and checking
+* mirror bindings are extremely common, eg filter function on an array of objects will have many mirror binds
+* copying by reference is fast
+* perhaps there's an alternative way for an alias to mirror bind and "inherit" all triggers
+	* inherit: if `foo = bar`, and `a = foo.x`, `foo.x` should inherit all triggers from `bar.x`
+* one idea is to trigger based on *memory location*, not by variable names
+* if `foo = bar`, and `bar.x` is changed to 3, then `foo.x` is also triggered because it points to the same memory location as `bar.x`
+* but to make bindings based on memory location, we have to ensure memory locations for every variable stay the same
+* eg if `foo = JSON.parse(msg)`, then `foo` can be any object
+	* `bar = foo.x`, if `foo.x` disappears and reappears, it must be assigned to the same memory location to ensure that `bar` is updated
+* this could potentially be implemented in the hardware side
+
+* however, for now, an alternative would be a cross between propagation and mirror bind: lazy mirror binding
+* for `foo = bar`, initially, only the initial reference is copied, and a binding at the root
+* when `bar.x` is changed, the event propagates upwards until it reaches the root binding, where it realizes it is part of a mirror binding, and updates foo accordingly
+* in addition to updated foo accordingly, it creates a binding for every node that it touched during propagation
+* this way, if any node is changed again, it will just trigger the binding instead of propagating
+* if no binding is found during propagation, a flag is set on every one of the touched nodes to indicate that propagation is no longer needed
+* remember that this all works because *bindings are all defined in the beginning*
+	* so if no bindings were found during initial propagation, then there will never be a binding on those nodes
+
+* hmmm...what if we redirected all alias bindings to the source
+* eg if `foo = bar`, and `x = foo.x`, then internally `x` will actually be bound to `bar.x`
+* this shouldn't cause any problems because bindings don't change, so the source never should change either
+* this can be thought of as binding to data/memory instead of binding to variables
+* we bind to the source of data/information
+* eg, if `foo = JSON.parse(msg)`, then `foo` is a new source of information
+	* if we then do `fooalias = foo`, `fooalias` is not a source, so the binding goes to `foo` (the real source) instead of `fooalias`
+* sources are mainly entry nodes or the results of calculations/parsing
+* but why does this work?
+
+### Reductions
+
+* this is an example of a reduction
+* `x = foo.x`, `foo = bar`, so thus we can infer that `x = bar.x` (and make that binding directly)
+* another example of a reduction would be `a = b+c`, `d = a+b`, so we can infer that `d = 2b+c` and skip `a` (if its not used elsewhere)
+* reductions are all optimizations
+* in addition, the more complex the reduction, the less value it has
+* for now, the only reduction we'll use is the alias binding reduction mentioned earlier
