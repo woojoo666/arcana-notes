@@ -1073,3 +1073,62 @@ foo = bar;
 x = foo.x*2; // trigger on bar.x
 ```
 
+
+
+test.bind(foo, [bar, bar[0], bar[1], ...], args => {
+	for (var i = 0; i < bar.length; i++) {
+		foo[i] = bar[i]; // how to detect aliasing here
+	}
+});
+
+
+### Dynamic Bindings
+
+* So far I have only been concerned with creating bindings
+* however, I realized that for collection bindings, there are many cases where I will have to remove/reassign bindings
+* for example, consider `mapbind(foo2, foo, x => x*x)`
+* with our current implementation of `mapbind` (shown earlier), if you add another element to `foo`, then there will be double bindings on all the rest of the elements!
+* also, consider `reversedFoo = reverse(foo)` where `foo` and `reversedFoo` are both collections, and `reverse` simply rewires `foo`
+* what happens when `foo` starts out with one item and adds another?
+
+```
+  foo[0] ---> reversedFoo[0]                foo[0] -. .-> reversedFoo[0]
+                                                     X
+                                            foo[1] -' '-> reversedFoo[1]
+```
+* the alias binding of `foo[0]` needs to be reassigned!
+* lastly, consider a demultiplexer: `output = x? foo : bar`
+
+```
+  foo --
+          .----> output
+  bar ---'
+```
+* this doesn't have any data collections, but it still has dynamic bindings!
+* this helped me realize that *collection bindings are not about data collections*, or bindings involving arrays/sets
+* collection bindings are about defining sets of inner, dynamic bindings
+* when the input to a collection binding changes, the inner bindings change
+* thus, we need to group the inner bindings, so that can be cleared and reassigned easily
+* in fact, we can have a "binding controller" that manages all the inner bindings
+	* so when an inner binding is triggered, it first triggers the "binding controller", which in turn triggers the inner binding
+* for example, if we have `mapbind(foo2, foo, x => x*x)`, and currently `foo = [3,5]`, then currently there are two inner bindings
+* instead of doing `bind(foo2.0, [foo.0], x => x*x)`, `bind(foo2.1, [foo.1], x => x*x)`, we instead do `bind(null, [foo.0, foo.1], controllerfn)`, and 
+HMMMMM WE STILL NEED TO FIGURE OUT HOW TO REBIND CONTROLLERFN THEN...
+
+* let's revisit what we said earlier: when the input to a collection binding changes, the inner bindings change
+* compare this to a normal binding: when the input value to the binding changes, the output value changes
+* for a collection binding, the output value is the set of inner bindings
+* if you have multiple collection bindings chained after eachother, then binding changes propagate along the chain, just like value propagation in a chain of normal bindings
+* lets see how the aliasing algorithm factors into this
+
+* construct a graph of alias bindings
+
+```
+  foo --
+          .----> output
+  bar ---'
+```
+* when a early alias binding changes, the change propagates through the graph, so that the normal bindings at the ends can be triggered to re-compute the source aliases
+* if you think about it, when the alias algorithm bindings something like `[foo.x] --> { barx2 = bar.x*2 }`, we are saying "the value of bar.x is foo.x"
+* so when the alias bind changes, its like saying "the value of bar.x is now fizz.x"
+* so alias bindings really do work very similarly to how normal bindings work, propagate through the graph and updating "values"
