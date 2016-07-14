@@ -930,3 +930,146 @@ function concat (dest, src1, src2) {
 * reductions are all optimizations
 * in addition, the more complex the reduction, the less value it has
 * for now, the only reduction we'll use is the alias binding reduction mentioned earlier
+* this is because its simple, but massively reduces computations (no more graph-traversal mirror binds)
+
+
+
+foo = bar
+x2 = foo.x**2
+
+note that we can change foo.x in two ways:
+	* `bar = {x: 5}`
+	* `bar.x = 5`
+however, usually in flo, being able to change a variable in two ways causes conflicts, eg `a = b, a = c`
+* however, both these ways must update foo.x using the same mechanism!
+* in Flo, we can never have two functions updating the same value, to prevent conflicts
+* thus, we have to choose one: either `foo` updates `foo.x`, or `bar.x` updates `foo.x`
+* obviously makes more sents to have `bar.x` update `foo.x`
+* this
+
+bar = {x: 5}
+bar.x = 3
+
+in a way, the `.` (reference) operator acts like any other function
+however, unlike functions, they can both be set manually and automatically
+they are the only thing that is able to do something like that
+
+to prevent this double pointers, we choose one of them
+makes the most sense to choose the `bar.x -> foo.x` instead of `foo -> foo.x`
+
+
+so far I've been treating `foo.x` as data, just like `foo` and `bar`
+however, `foo.x` acts like a function, something like `foo.get('x')`
+just like any other function, the `.` operator has an internal implementation
+	while it might be obvious to just store the "address" of the value, and then use `.` to dereference the address, we can think of variations
+	eg, store 2*address, and then divide by 2 when dereferencing
+thus, when you do `bar = foo.x`, its like saying `bar = foo.get('x')`
+when you do `bar = foo.x.x`, its like saying `bar.get('x').get('x')`, so this seems like its actually creating a binding to foo!
+when we do something like `foo.x = 5`, that's where things get weird, because its not like we can do `foo.get('x') = 5`
+
+when `foo.x` changes, its really saying "change the value at the memory location pointed to by foo.x"
+so if we had another binding, like `foo.x = sourceX`, then this would be like changing `sourceX`
+when `sourceX` changes, we somehow need to recognize that `foo.get('x')` has changed as well
+
+usually in functions, we can determine the triggers through the variable names
+example: `xy = x*y` -> x and y are the triggers
+another example: `xy = fn(), fn = () => x*y`, we inspect the body of `fn` to determine that once again, x and y are the triggers
+however, in `foo.get('x')`, there are no variable names besides foo (which we already know is a trigger)
+but what is inside the body of `get`? in this case, it should return the value at an anonymous memory location
+that anonymous memory location is the trigger
+thus, triggers are defined through memory locations, not variables!
+in our memory based system, `foo.x` and `bar` point to the same memory location, so changing either triggers both
+a memory based system makes sense when working with pointers and references
+for a variable based system, `bar` would need to be bound to `foo.x`, which I guess might work, just not as efficiently
+	a variable based system makes it look more like a value oriented language
+	this is because in a value based system, each variable gets its own memory location (no two variables pointing to the same memory)
+	however, remember that circular pointers don't work in a value-oriented language :/
+
+using the `.` operator on the left hand side of an assignment is syntactic sugar!
+it merely allows us to modify memory locations without giving an explicit name
+however, if you think about it, this is not usually allowed
+eg, we can't do `foo.getX() = 5` to set the first element, even though we can do `foo.x = 5`
+theoretically, `foo.getX() = 5` could be implemented:
+	foo.getX() returns a value at a memory location, change the value at that memory location to 5
+	if the function happens to return a dynamically-created temporary value, like `foo.toString()`, then simply erase that memory location when you leave the scope
+NAHHH this is not true, because usually when u do `foo = bar.x`, foo is a new memory location
+
+
+
+usually for a function, like `foo.toString()`, we don't know if the output is a dynamically-created temporary value, so assigning to it might have no effect
+	if its dynamically created every time, then after assigning to the memory at `foo.toString()`, there will be no way to access the new value
+	because a second call to `foo.toString()` will just create a new temporary value
+however, for `foo.x` or `foo.get('x')`, we know for sure that it points to a memory location, so we can always assign to it
+
+
+
+`foo.x = 5` is syntactic sugar for `foo.set('x', 5)`
+`foo.a.x = 5` is syntactic sugar for `foo.get('a').set('x')`
+note that these setters and getters have no explicit implementation. the implementation is internal
+once we declare foo as an object with `foo = {}`, it gains these special setters and getters
+
+
+
+
+`bar = foo.a`, `foo.a.x = 5`
+the way this would work in flo diagram: `foo.a.x => foo => foo.a => bar`
+this follows the propagation method
+however, with our memory-location based triggers, we can skip the intermediate `foo` step, and do `foo.a.x => foo.a => bar`
+this is the difference between name based and memory based binding systems
+is memory based just an optimization?
+first must prove that they both work, and do exactly the same thing
+
+this is the real reason why the alias system works: (not reduction)
+the first variable "names" the memory location, all other aliases just point to it
+
+
+
+Summary
+so for, we have explored 3 types of binding systems for reference based models
+1. graph-traversal (variable-name based, adapted from value-based ideology)
+2. event propagation (variable-name based, the way flo seems to work?)
+3. memory location based (optimization?)
+
+
+
+memory location based is the only one whose complexity doesn't change no matter where in the tree it is
+`foo = bar` and `foo.x.x.x.x = bar.x.x.x.x` will both work the same in memory location based
+for event propagation, the deeper down the tree, the further the propagation, the slower it is
+for mirror-copy, the further up the tree, the larger the copy, the slower it is
+
+
+ITS NOT REALLY MEMORY LOCATION BIND, because bindings should not change, but memory and data structures do
+easiest way to think about it is like wires, in flo diagrams
+if `a = b, b = c, c = d`, then its one long wire from `a` to `d`, with `d` being the data source, and `a` through `c` being wires coming out of it
+
+
+
+the main issue is
+the data source gets changed through the setter, so all bindings to the data source is triggered
+how to trigger all aliases of the data source?
+we can make each alias another data source (mirror-copy method)
+we can just force the trigger to propagate (propagation method)
+or we can redirect all bindings to the alias, to the data source (memory location method)
+
+
+remember that currently, bindings are based on variable names
+this works fine if all variables point to values
+javascript (as well as many other languages) also introduces the idea of collections
+`bar[0] = foo.x` can be thought of as shorthand for `bar.set('0', foo.get('x'))`
+the issue arises when we have "collection aliasing", aka `foo = bar` or `foo = bar.x`, where `bar` and `bar.x` are both collections
+	note: this is a special case of collection bindings, where the right side is made up of one variable, and that variable refers to a collection
+	doesn't apply to things like `foo = reverse(bar)`, because here a new collection is being made
+	we'll go more in detail on this later
+
+collection aliasing allow things to change "invisibly"
+eg `foo = bar`, `bar.set('x', 5)` does not change `bar`, so the `foo = bar` binding is not triggered
+
+
+
+easy way to identify an alias binding without parsing the right hand side: check if righthandside.head is in trigger dictionary
+
+```js
+foo = bar;
+x = foo.x*2; // trigger on bar.x
+```
+

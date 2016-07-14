@@ -2,28 +2,31 @@
  *	Structure:
  *
  *	values = {
- *			key1: "hello"
- *			key2: {
- *				subkey1: {...},
- *			},
- *			mArray: [
- *				{...},
- *				{...},
- *				{...},
- *			],
+ *		key1: "hello"
+ *		key2: {
+ *			subkey1: {...},
  *		},
+ *		mArray: [
+ *			{...},
+ *			{...},
+ *			{...},
+ *		],
  *	};
  *
  *	bindings = {
- *			key1: [eval1]
- *			key2: [eval2]
- *			key2.subkey1: [eval2]
- *			mArray: [arrayeval1],
- *			mArray.0: [array0eval],
- *			mArray.1: [array1eval],
- *			mArray.2: [array2eval],
- *		},
+ *		key1: [evals to trigger...]
+ *		key2: [myeval, anothereval]
+ *		key2.subkey1: [anothereval]
+ *		mArray: [myarrayeval, mapFn, reduceFn, aliasFn],
+ *		mArray.0: [mapSubFn0, reduceSubFn],
+ *		mArray.1: [mapSubFn1, reduceSubFn],
+ *		mArray.2: [mapSubFn2, reduceSubFn],
  *	};
+ *  
+ *	aliases = {
+ *		myalias: aliasSrc,
+ *	};
+ *  
  */
 
 class FloModule {
@@ -31,6 +34,7 @@ class FloModule {
 	constructor () {
 		this.bindings = {};
 		this.values = {};
+		this.aliases = {};
 	}
 
 	getVal (path) {
@@ -49,6 +53,11 @@ class FloModule {
 		return this.bindings[path] || (this.bindings[path] = []);
 	}
 
+	aliasbind (dest, src) {
+		this.aliases[dest] = src;
+		this.bind(dest, [src], x => x);
+	}
+
 	bind (dest, triggers, fn) {
 		var evaluator = () => {
 			var triggerVals = triggers.map( trigger => this.getVal(trigger));
@@ -56,7 +65,11 @@ class FloModule {
 			this.setVal(dest, newVal);
 		};
 		for (var i = 0; i < triggers.length; i++) {
-			this.getListeners(triggers[i]).push(evaluator);
+			var parts = triggers[i].split('.');
+			var head = parts.shift();
+			var tail = parts.join('.');
+			var trigger = (this.aliases[head] || head) + tail;
+			this.getListeners(trigger).push(evaluator);
 		}
 		evaluator();
 	}
@@ -98,6 +111,7 @@ class FloModule {
 	mapbind (dest, src, fn) {
 		this.bind('devnull', [src], ar => {
 			this.setVal(dest,[]);
+			// do we need to remove the old bindings when rebinding?
 			ar.forEach((_, i) => this.bind(dest+'.'+i, [src+'.'+i], fn));
 		});
 	}
@@ -105,24 +119,12 @@ class FloModule {
 	reducebind (dest, src, fn, start) {
 		this.bind('devnull', [src], ar => {
 			var triggers = ar.map((_,i) => src+'.'+i);
-			test.bind(dest, triggers, () => ar.reduce(fn, start));
+			// do we need to remove the old bindings when rebinding?
+			this.bind(dest, triggers, () => ar.reduce(fn, start));
 		});
 	}
 
 	filterbind (dest, src, fn) {
 		this.reducebind(dest, src, (acc, x) => fn(x) ? acc.concat(x) : acc, []);
-	}
-
-	mirrorbind (dest, src) {
-		this.bind('devnull', [src], obj => {
-			if (obj instanceof Object) {
-				this.setVal(dest, {});
-				for (var key in obj) {
-					this.mirrorbind(dest+'.'+key, src+'.'+key);
-				}
-			} else {
-				this.setVal(dest, obj);
-			}
-		});
 	}
 }
