@@ -1108,12 +1108,9 @@ test.bind(foo, [bar, bar[0], bar[1], ...], args => {
 * this helped me realize that *collection bindings are not about data collections*, or bindings involving arrays/sets
 * collection bindings are about defining sets of inner, dynamic bindings
 * when the input to a collection binding changes, the inner bindings change
-* thus, we need to group the inner bindings, so that can be cleared and reassigned easily
-* in fact, we can have a "binding controller" that manages all the inner bindings
-	* so when an inner binding is triggered, it first triggers the "binding controller", which in turn triggers the inner binding
-* for example, if we have `mapbind(foo2, foo, x => x*x)`, and currently `foo = [3,5]`, then currently there are two inner bindings
-* instead of doing `bind(foo2.0, [foo.0], x => x*x)`, `bind(foo2.1, [foo.1], x => x*x)`, we instead do `bind(null, [foo.0, foo.1], controllerfn)`, and 
-HMMMMM WE STILL NEED TO FIGURE OUT HOW TO REBIND CONTROLLERFN THEN...
+* further discussed in the section "Grouping Bindings"
+
+### Alias Graphs
 
 * let's revisit what we said earlier: when the input to a collection binding changes, the inner bindings change
 * compare this to a normal binding: when the input value to the binding changes, the output value changes
@@ -1132,3 +1129,436 @@ HMMMMM WE STILL NEED TO FIGURE OUT HOW TO REBIND CONTROLLERFN THEN...
 * if you think about it, when the alias algorithm bindings something like `[foo.x] --> { barx2 = bar.x*2 }`, we are saying "the value of bar.x is foo.x"
 * so when the alias bind changes, its like saying "the value of bar.x is now fizz.x"
 * so alias bindings really do work very similarly to how normal bindings work, propagate through the graph and updating "values"
+
+### Update Order **[+ KEY POINT!!!]**
+
+* consider something like `foo = reverse(bar)` and `bar2 = bar[1]`
+* we have one dynamic collection alias binding, and one regular alias binding
+* lets say `bar` starts as `[4, 2, 5]` and gets reassigned to `[3, 4]`
+* we expect the end result to be `foo = [4, 3]` and `bar2 = 4`
+* notice that two (sets of) updates happen in parallel here
+	* the dynamic binding for `foo` gets triggered, reconstructing the inner bindings
+	* the value bindings (the inner bindings of `foo`, and the binding for `bar2`) get updated with new values
+		* more specifically, we the updates `bar[0] = 3`, `bar[1] = 4`, and `bar[2] = undefined`
+* first notice that, with our current model, the update order doesn't matter in regards to the end result (see key point below)
+* however, note that if the value bindings update before the dynamic binding, then `foo[0]` will temporarily show `undefined`
+* in addition, at least for `foo`, the value bindings can be completely ignored, because the dynamic binding re-evaluates the input values anyways
+* however, for `bar2` the value bindings clearly can't be ignored
+* so whats happening?
+* we can think of Flo/Wijit as a hierarchy of stages, one static and two dynamic
+	1. At the highest level, we have the Wijit code or Flo drawing. This definition is static, never changes
+	2. The code defines dynamic bindings, how the values are "wired" together. These dynamic binding modules can change and reconstruct their inner bindings
+		* this is the dynamic runtime graph directly defined by the code. While the modules may change, the graph between them does not
+	3. The dynamic bindings create a graph of value bindings. This stage contains all the values for the current state of the program
+
+	*  ================================================= WHAT ABOUT ALIAS BINDINGS =============================================================
+
+* notice how everything consists of two dynamic components: the "wiring" between the values, and the values themselves
+* when `bar` updates and the dynamic binding for `foo` updates, that is the wiring changing
+* when the inner bindings from `bar` update, that is the values updating
+* now we see why the value updates for `foo` are redundant:
+	* conceptually, wiring and values change independently of eachother
+	* however, for our implementation, when wiring changes (dynamic bindings re-evaluate), the values get re-evaluated too!
+
+
+key point:
+* as long as we always default to re-evaluation, then update order won't matter
+* if at any time, a node is "invalidated" with no other information, it should be able to re-evaluate the outputs and fully recover
+* this also means that events don't need to (and should try not to) carry any information
+
+
+
+
+
+### Grouping Bindings
+
+* we need to group the inner bindings, so that can be cleared and reassigned easily
+* we can have a "binding controller" that manages all the inner bindings
+	* so when an inner binding is triggered, it first triggers the "binding controller", which in turn triggers the inner binding
+* for example, if we have `mapbind(foo2, foo, x => x*x)`, and currently `foo = [3,5]`, then currently there are two inner bindings
+* instead of doing `bind(foo2.0, [foo.0], x => x*x)`, `bind(foo2.1, [foo.1], x => x*x)`, we instead do `bind(null, [foo.0, foo.1], controllerfn)`
+* hmm, this still won't work, because the binding controller still needs to keep track of what bindings point to it
+* instead, have the collection bind keep track of all triggers that point to it
+* in addition, instead of storing the binding directly inside each trigger, store it under a unique id, so that the collection bind knows which bindings belongs to it
+* for the unique id, just use the destination of the collection bind!
+* so if we have `mapbind(foo2, foo, x => x*x)`, and currently `foo = [3,5]`:
+	* the collection bind will make two bindings with the triggers `foo.0` and `foo.1` respectively
+	* each of those triggers will store `foo2: innerBindingEvalFn`
+	* when `foo` pops off the `5`, then the collection bind goes to `foo.1` and removes FDSAFDSA
+
+	*  ================================================= FINISH THIS =============================================================
+
+* another method would be to store a remove() function in each binding
+* the collection bind would just store all of its bindings, and call remove() on each of them
+* giving each binding a remove() function implies that the bindings can be passed around, and anybody can call remove()
+* however, this breaks encapsulation: all inner bindings belong to the collection bind, so that collection bind should be responsible for creation and destruction
+* note that both of these methods require a special "bind" function for inner binds
+
+### Modules
+
+* I need to pass in a special alias and normal bind function to the inside of the collection bind
+* for example, a "reverse" collection bind would look like:
+
+```js
+FloModule.bind(dest, [src], (innerbind, inneraliasbind, array) => {
+	for (var i = 0; i < array.length; i++) {
+		inneraliasbind(dest+'.'+(array.length-i), src+'.'+i);
+	}
+})
+```
+* I could group `innerbind` and `inneraliasbind` into a object:
+
+```js
+FloModule.bind(dest, [src], (innerscope, array) => {
+	for (var i = 0; i < array.length; i++) {
+		innerscope.aliasbind(dest+'.'+(array.length-i), src+'.'+i);
+	}
+})
+```
+* notice that FloModule already has the `bind` and `aliasbind` functions, so it seems like for `innerscope` I could just pass in a new FloModule object
+* this made me realize that thats exactly what dynamic binds do
+* dynamic binds create new binding modules
+	* kind of like how in javascript, functions define new scopes
+* for example, in the `reverse` bind above, lets assume `src` is an array of length 10
+* the `reverse` bind will create a FloModule that has alias bindings that rewire 10 inputs to 10 outputs
+* when `src` changes to length 11, then the `reverse` bind needs to destroy the old FloModule, and recreate one with 11 inputs and 11 outputs
+* now let's consider what should make up a FloModule
+
+### Modules (continued)
+
+* A FloModule should be a self-contained definition of bindings/aliasbindings
+* when you connect two modules together, you need to define how to map the outputs of the first, to the inputs of the second
+* for example, if you had two FloModules `add(a,b) { c = a+b }` and `square(x) { x2 = x*x }`
+* to connect them, we first define a new module and its inputs and outputs
+* lets give it 2 inputs `m,n` and 1 output `p`
+* then we map `m,n` to `a,b` of the `add` module, and map the `c` output of the add module to `x` of the `square` module, then map `x2` to `p`
+* notice how these mappings prevent variable collision
+	* Eg if `square` also defined its output as `c`, it wouldn't collide with `add` because the outer module maps both `c`s to different variables
+* so whenever you import and use a module, you have to define the mappings between the variables in your module, and the inputs/outputs of 
+* collection and dynamic bindings are special in that they should automatically map the inner module
+
+### Garbage Collection
+
+* if inner FloModules are like javascript scopes, then perhaps we can use javascripts method for cleaning up scopes jJFKDSLAJFD
+* in javascript, when variables are defined in a scope, and then control leaves the scope, then all the variables are "marked" for garbage collection
+	* "marked" as in no more pointers to it
+* so in our case, when a dynamic bind needs to recreate its inner module, it could simply invalidate the old module, insteaad of removing all the old bindings
+* we also need to ensure that triggers do not trigger the invalidated bindings
+* to solve this, we can have a timestamp as an id for each created module, and each binding in that module also contains that id
+* when a trigger leads to a inner module, it first checks the timestamp of the binding and the module, and if it doesn't match, then that binding is invalidated and gets removed
+* this "lazy" removal that only occurs during a trigger should save a lot of time, in case some invalidated bindings are never triggered, they don't need to be removed
+
+
+
+
+
+### Alias Bindings == Dynamic Bindings
+
+* an important thing to note is that, while dynamic bindings and value bindings are a fundamental way Flo works, alias bindings is an optimization in the implementation
+	* consider `foo = bar` and `x = foo.x`, and `bar.x` changes
+	* most logical response: `foo` updates (including all its children), which in turn updates `x` when `foo.x` updates
+	* this is the "event propagation" method discussed earlier
+	* the "copy value" method and "alias binding" methods are both optimizations
+* notice that alias bindings involve removing and recreating bindings
+	* eg, `output = multiplexor ? inputA : inputB`, `x = output.foo`
+	* when `multiplexor` changes, `x` switches between binding with `inputA` and `inputB`
+* thus, any binding attached to an alias is a dynamic binding!
+* another way of looking at it is, using the previous multiplexor examples, `x = aliasSource[output].foo`
+
+
+
+
+
+notice that value bindings, dynamic bindings, and alias bindings have rather different mechanisms
+what if we mix them?
+`foo = multiplexor ? myValue : myArray`
+the issue is that, bindings to `foo` are different based on whether `foo` is an alias or not
+if `foo` is an alias, we use a dynamic bind, otherwise we just use a static bind
+
+solution: everything is an alias bind? because everything is based off memory based binding?
+
+
+
+* note that for the following statements, "outer" refers to the scope of the containing module, and "inner" refers to the scope of the inner module
+* to make modules (aka dynamic bindings) simple, we reserve a namespace in the outer module's `bindings` dictionary specifically for inner modules
+	* so no need for anything special when creating the module's inner bindings, just prepend the namespace prefix
+* we identify each inner module by the outer variable mapped to its first output, which is guaranteed to be unique (because each output maps to exactly one binding)
+* we only store the dynamic binding's local inner variables in the reserved namespace
+	* inputs and outputs are simply replaced by the outer variables that are mapped to them
+	* so if we have `InnerModule { y = x*x; z = y % 5 }` and `OuterModule { InnerModule(foo = x, bar = y); fizz = bar+5; }`, the outer bindings would look like:
+	`values: { foo: 3, bar: 9, fizz: 14, __innerBindings: { bar: { z: 4 } } }`
+	* notice that "local inner variables" are just outputs that are not mapped to any outer variables
+	* also notice that `z` is never used, so it can be discarded. This is where "observed outputs" comes into play (discussed later on)
+
+
+
+* 
+
+
+
+
+for now we've only been considering binds with a single output
+but it's possible for binds to have multiple outputs
+consider a function `quotient_remainder(a,b)` which finds the quotient and remainder of `a/b`
+while this could be done with two bindings, but a single bind makes more sense and is more efficient
+	another, more complex example would be a left+inner+right join of two sets, where there would be three outputs:
+		1. elements only in the left set
+		2. elements in both sets
+		3. elements only in the right set
+
+
+
+
+
+
+```js
+new FloModule('integer_divider', function () {
+	this.bind('my_divider_module', ['dividend','divisor'], (output, dividend, divisor) => {
+		output.remainder = dividend%divisor;
+		output.quotient = (dividend-output.remainder)/divisor;
+	});
+});
+
+// which is equivalent to
+
+new FloModule('integer_divider', function () {
+	this.bind({__namespace__: 'my_divider_module'}, ['dividend','divisor'], (output, dividend, divisor) => {
+		output.remainder = dividend%divisor;
+		output.quotient = (dividend-output.remainder)/divisor;
+	});
+});
+```
+
+
+```js
+
+new FloModule('integer_divider', function () {
+	this.bind(['quotient','remainder'], ['dividend','divisor'], (output, dividend, divisor) => {
+		output.remainder = dividend%divisor;
+		output.quotient = (dividend-output.remainder)/divisor;
+	});
+});
+
+// which is equivalent to
+
+new FloModule('integer_divider', function () {
+	this.bind({quotient: null, remainder: null}, ['dividend','divisor'], (output, dividend, divisor) => {
+		output.remainder = dividend%divisor;
+		output.quotient = (dividend-output.remainder)/divisor;
+	});
+});
+
+// which is equivalent to
+
+new FloModule('integer_divide', function () {
+	this.bind({quotient: 'quotient', remainder: 'remainder'}, ['dividend','divisor'], (output, dividend, divisor) => {
+		output.remainder = dividend%divisor;
+		output.quotient = (dividend-output.remainder)/divisor;
+	});
+});
+```
+
+
+
+
+* notice that timestamps are only needed for alias binds and binding references/collections
+* consider what it would look like with primitive value bindings (no references/collections), but still with dynamic bindings
+
+
+```
+code:
+
+   b = a*2
+   d = x ? b : c
+   e = d+5
+
+value graph:
+
+  a ---> b ---.
+               '----> d --> e
+         c --
+```
+
+* notice how, even though there is a dynamic bind, if we think of the dynamic bind as a switch, and visualize update-events propagating through each node from left to right, then there is no need for timestamps
+* however, notice how alias bindings complicate things:
+
+```
+code:
+
+   b = {myprop: a}
+   d = x ? b : c
+   e = d.myprop
+
+value graph:
+
+   .-----(alias child)---.
+  a ---> b ---.           '.
+               '----> d --> e
+         c --
+
+(note: "alias child" refers to a child binding dynamically created by alias bindings)
+```
+* notice how when `x` changes, the `d` will switch from `b` to `c`, but when `a` updates, `e` will still get updated
+* because alias bindings create a "jump" from `a` to `e`, even if we somehow propagate updated alias information along the normal route, it will be too late
+	* the "alias child" bind allows the value propagation to jump ahead of the normal route
+	* by the time we can update `e` with the new alias information, it will have already been updated with `a`'s value, so there will be a flicker in time where `e` has the wrong value
+* this is why we have timestamps, so that the "alias child" binding gets invalidated instantly after `x` changes
+* however, note that adding timestamps means now before triggering any binding, we have the check the timestamp
+* this slows down every trigger and update event
+* we could restrict timestamps to alias child bindings, but that complicates things further
+* remember that we considered another solution to updating alias-child bindings:
+	* have whoever created the alias-child binding keep track of it, and when the alias bindings change, remove the outdated alias-child binding
+* this is better, because it doesn't slow down the update-events, and only slows down alias-child-binding creation by a tiny bit (to keep track of created bindings)
+
+
+### More Efficient Event Propagation (Set-Route Event Propagation)
+
+* in the previous section, we looked at how update events propagate through a network of only primitive value bindings
+* update events simply propagate through each node in the value graph
+* this is the simplest and most intuitive way of thinking about how Flo/WIjit works
+* conceivably, we can extend this to reference/collection bindings
+* consider this graph
+
+```
+code:
+
+   b = {myprop: a}
+   d = x ? b : c
+   e = d.myprop
+
+value graph:
+
+  a ---> b ---.
+               '----> d --> e
+         c --
+```
+* lets say `a` changes from  3 to 5
+* this triggers `b`, which doesn't do anything, but passes the event to `d`, who also doesn't do anything, but continues passing it to `e`, who updates to the new value of 5
+* note that `d` needs to know that the update originated from the `myprop` child of `a`, so that `d` knows to trigger `e`, which is bound to `myprop`
+* thus, when the update event "escalates" from `a` to its parent `b`, the event carries the information of which child was updated, so at the end of the line `d` knows which child binding to trigger
+* for this type of event propagation to work, **these events need to carry information**
+* notice the distinction between this event propagation, and the event propagation discussed much earlier (in the section "Deep Property Binding Revisited")
+* in the old event propagation, events are just propagated everywhere during run time
+* in this new method, the routes for event propagation are set during "compile time" (when the dynamic=bindings creates the value graph)
+* thus, there are no "wasted" events. An event will only propagate up to parents if a binding is explicity defined for it
+* in addition, an event can "jump" multiple parents, eg if in the example above `b = {foo: {bar: a}}`, then when the event propagates from `a` to `b`, its jumping to the grandparent
+* this event propagation strictly follows the value graph, so it is much more efficient, and also very intuitive
+
+* also, set-route event propagation always follows the graph, instead of creating "jumps" like in the alias binding method
+* thus, there is no need to worry about timestamps or removing "jump" bindings
+
+### Alias Bindings vs Set-Route Event Propagtion
+
+
+```
+code:
+
+   b = {myprop: a}
+   d = x ? b : c
+   e = d
+   f = e
+   g = f.myprop
+
+value graph:
+
+  a ---> b ---.
+               '----> d --> e --> f --> g
+         c --
+```
+
+
+* in the first
+
+
+
+
+
+### Triggering Nested Property Bindings
+
+* we have talked about the copy method, event-propagation method, and alias method to solve the issue of aliases
+* more specifically, the issue of `foomirror = foo` and being able to trigger `foomirror.x` when `foo.x` changes
+* however, there is one last issue we need to solve
+* `x = a.a.a`, we need to trigger this binding whenever `a`, `a.a`, and `a.a.a` changes
+* from a different perspective: if `foo = {a, b: {x, y}}`, and `b` changes, we need to trigger bindings on `b`,`x` and `y`
+* in essence, this is a reverse-prefix lookup problem:
+	* given a prefix, return all words in the dictionary with that prefix
+	* (in our case, given a node in a tree, return all bindings that are attached to descendents of that node)
+* we actually discussed this exact issue much earlier in the section "Deep Property Binding", and came up with 3 solutions:
+
+1. deep-bind: keep as one binding, with three triggers `[a, a.a, a.a.a]`
+2. incremental bind: separate into two bindings `temp = a.get('a')`, `x = temp.get('a')` with two triggers each
+3. runtime propgation: during runtime, when a parent is updated, trigger all children (and all their children, etc...)
+
+* consider a network with M nested property bindings, each nested to N layers deep
+* the last solution is the simplest to analyze: takes up no space, but event propagation is O(N) at worst (updating the highest ancestor)
+	* however, every object in the value graph is impacted, with events propagating through the properties of every object, even if there are no nested property bindings
+	* thus, event propagation is significantly slowed down, and there is a lot of wasted propagation
+* the first solution requires N triggers for every property binding, so M*N space, but event propagation is instantaneous, O(1)
+* the second solution, at worst, also requires N triggers for every property binding. However, event propation is O(N) (has to go through all intermediate ancestors)
+	* no wasted propagation though. Kind of similar to the set-route event propagation method
+* the second solution gets more interesting when the network becomes more interconnected
+* consider a tree-like network, with nested property bindings at every leaf node:
+
+```
+                         _ a _
+                        /     \
+                       a       b
+                      / \     / \
+                     a   b   c   d
+                    / \ / \ / \ / \
+                    a b c d e f g h
+```
+* here, the first method would still take up O(M*N) space
+* however, the second method would only have one binding at each node, so a total of 2M-1, or O(M) space
+* the second method only reaches its worse case of O(M*N) space in a completely disjoint network, where every nested property is completely separate from each other
+* the more interconnected the network, the lower the space cost, and the more sparse the network, the higher the space cost
+* the second solution is like a compromise between the first and third: not as much space as the first, but not as slow as the third
+* it seems like the first solution is more advantageous for shallower networks (N << M)
+* the third solution is better for populated networks (# of bindings >> # of nodes)
+	* imagine a very popular data channel, like the weather forecast, where tons of websites and apps have bound to this data
+	* every node in this value graph would have thousands of bindings, so in the third method where every update propagates to all descendants, there would be no wasted propagations
+	* in this case, the first and second methods would be extremely inefficient space-wise
+
+### Deep vs Nested Property Bindings
+
+* Note that so far, we have been considering
+
+
+
+
+* **deep bindings are syntactic sugar**
+* notice how deep bindings can be created from recursive dynamic bindings
+* they are an added feature that makes it easier to mix and embed imperative code into Flo modules
+	* eg, instead of using a complicated recursive dynamic bind to flatten a tree into an array, just do a depth-first-search with imperative code
+* later, in the "pure" version of Flo, deep bindings should not be possible
+* deep bindings lack the advantages that recursive dynamic binds have: tracking internal changes without affecting the whole object
+	* after flattening a tree into an array, if you change one value in the tree, you only need to change one value in the array, but the imperative deep-bind version will re-run the depth-first-search and reconstruct the entire array
+
+
+
+
+
+================================================== CHECK UR GOOGLE KEEP NOTES ===================================================================
+
+
+
+
+
+
+
+
+Language Rules:
+1. Outputs (at least, when observed) always reflect the current state of the inputs
+2. Bindings, by default, execute re-evaluations. This means update order doesn't matter, and update events don't need to carry any information
+3. Every output is determined by exactly one binding
+4. Dynamic binding definitions are static, and create/define value bindings
+5. Modules are self contained. A module can have any internal implementation as long as the inputs/outputs follow these rules
+6. All inputs and outputs are key/value pairs (just like in javascript), and values can point to modules (aka values can be collections)
+
+Implementation Rules:
+1. Reference based, and circular references are allowed
+2. Bindings are based on memory location
+3. 
+
+Implementation Assumptions:
+1. Value updates happen more than dynamic bind updates
