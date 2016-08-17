@@ -1543,17 +1543,97 @@ value graph:
 
 
 
+### Dynamic Collections Bindings are Based on Structure
+
+* consider the dynamic `reverse` bind, which takes an array and wires an output array such that the output elements are the input elements in reverse order
+* `reverseFoo = reverse(foo)`
+* when do we want the dynamic bind to be triggered, aka when do we need to re-wire the value graph?
+* we need to know when `foo` has been re-assigned, but that isn't enough
+* we also need to know when an element has been added or removed
+* however, we can't just simply listen to all properties+values of `foo`, because we don't need to know when an existing element's value changes
+	* the value graph will handle that
+* notice that essentially, we are listening to when the _structure_ of `foo` changes
+* this makes sense, because when the structure changes, the wiring would have to change too
+* thus, for javascript objects, the structure changes when
+	1. the main pointer is reassigned
+	2. a property is added
+	3. a property is removed
+* this is only for dynamic binds though. For normal binds, it just checks the value of the pointer
+	* because in normal binds, you can't monitor structure in the first place
+	* if you tried to make a normal bind monitor a structure, it wouldn't work, because you wouldn't know when child values change
+	* eg if you made a normal bind that 
+* this gets a little ugly for something like `output = foo == bar ? 1 : 2` (assuming foo and bar are both objects), because this binding is based only on the value of the pointers, not on the actual structure
 
 
 
+
+### Nested Binding vs Dynamic BInding
+
+* remember how much earlier (in the section "Collection Listeners Revisited"), we talked about how collection bindings create "sub-bindings" which absorb the onset event?
+* lets revisit that with an example:
+* lets say you have a collection binding, that binds to the array of phrases `savage[]` and:
+	* counts the number of phrases with the word `rekt`, outputting it to `rektCount`
+	* constantly outputs elements 1,3, and 5 to the object `onethreefive = {one: ___ , three: ___ ,five: ___ }`
+* lets say for some reason, element three constantly alternates between `undefined` and `0`
+* because a value of `undefined` implies the structure has changed (key-value entry was removed), then this means that the dynamic binding constantly gets updated
+* however, notice that we can make things a little more efficient by separating the `onethreefive` output to separate, non-dynamic binding
+* this was, when element 3 alternates, it doesn't need to recreate the entire `onethreefive` object over and over again
+* we can use a normal binding because `onethreefive` is not based on structure, it is based on value
+* this is the difference between a nested binding (value based) and a dynamic binding (structure based)
+
+### Automatic Detection of Dynamic Binds
+
+* from the example in the previous example, notice how normal bindings and dynamic bindings respond to `undefined` values a little differently
+	* normal bindings (bound to nested values in this case) stay attached to the memory location, and the output is set to undefined
+	* dynamically created bindings disappear when the value goes undefined, so the output doesn't exist anymore (also undefined, but for a different reason)
+* non-nested normal bindings work too
+* consider two ways of defining `x2`:
+	* `bind(x2 = x*2)`
+	* `dynamicbind { if (x !== undefined) then bind(x2 = x*2) }`
+* both result in the same output
+* while its normal for a language to have multiple ways of defining the same behavior, this feels like it needs more inspection
+* it seems like the main difference is that when x is undefined:
+	* with the normal binding, the binding is still there, but the value of `x2` is set to undefined
+	* with the dynamic binding, the binding disappears, and the value of `x2` is implicitely undefined
+* perhaps determining whether a binding is dynamic or normal should be implicit, not explicit
+* in order to automatically detect dynamic bindings, we need to identify and categorize a few key cases
+* some indisputably dynamic bindings include:
+	* reverse bind: `for (n in foo) { reversed[foo.length-n-1] = foo[n] }`
+	* demultiplexor: `a = x ? b : c` where `b` and `c` are collections (or perhaps it shouldn't matter if `b` and `c` are collections, because variables can change between value/collection at any time)
+* it seems like **any time the memory location of a variable is dynamic, you need a dynamic bind**
+* thus, in the case of `x2`, the memory location never changes (even in the dynamic bind, because without a binding, `x2` just becomes undefined), so it should be a normal bind
+
+### Optimizations: Breakdown into Atomic Statements, Joining Shared Paths, and Reducing Paths
+
+* statements can be broken down to atomic parts, helping to isolate dynamic and normal binds
+* eg `a = x ? b : c*5` can be broken down to `c5 = c*5` (normal bind) and `a = x ? b : c5` (dynamic bind)
+* breaking bindings into atomic parts allows the compiler to determine which variables can be shared and which paths can be joined
+* eg `a = x ? b : c*5` and `d = a+c*5` can be broken down to `c5 = c*5`, `a = x ? b : c5`, `d = a*c5`, thus allowing `c5` to be shared
+* in addition, bindings can be joined together if they are part of a "single path"
+* eg, if `a = b*5`, `b = c+1`, and `c = d%3`, and there are no other bindings to `b` and `c`, then we can reduce the three statemens to `a = ((d%3)+1)*5`
+* notice how a "single path" occurs when output variables are used as input to only one binding, allowing us to substitute that input with the expression for that input
+	* in the most recent example, we substituted `c` for `d%3` in the second statement, and then substituted `b` for `(d%3)+1` in the first statement
+* thus, the order of steps is
+
+1. Deconstruction: Break statements down into atomic binds
+2. Comprehension: Find shared variables, and join the paths
+3. Reduction: substitute single-use variables with their binding expression
+
+
+
+----------------------------------------------------------------------------------------------------
 
 Language Rules:
 1. Outputs (at least, when observed) always reflect the current state of the inputs
+	* no matter how the language is implemented, the observed outputs should always look as if the entire network is continuously being re-evaluated
 2. Bindings, by default, execute re-evaluations. This means update order doesn't matter, and update events don't need to carry any information
 3. Every output is determined by exactly one binding
 4. Dynamic binding definitions are static, and create/define value bindings
 5. Modules are self contained. A module can have any internal implementation as long as the inputs/outputs follow these rules
 6. All inputs and outputs are key/value pairs (just like in javascript), and values can point to modules (aka values can be collections)
+7. Output values with no input binding are implicitly undefined
+8. Undefined input values forces the outputs to be undefined (skipping evaluation of the binding function) unless the "undefined" case is explicitely accounted for in the binding function
+	* this means an undefined input that is not accounted for basically "voids" the binding, making it behave as if the binding disappeared (forcing the outputs undefined by rule #6)
 
 Implementation Rules:
 1. Reference based, and circular references are allowed
@@ -1562,3 +1642,5 @@ Implementation Rules:
 
 Implementation Assumptions:
 1. Value updates happen more than dynamic bind updates
+2. sparse vs interconnected?
+3. densely populated (many bindings per object property)?
