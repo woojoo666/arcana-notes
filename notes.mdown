@@ -1485,9 +1485,9 @@ value graph:
 	* (in our case, given a node in a tree, return all bindings that are attached to descendents of that node)
 * we actually discussed this exact issue much earlier in the section "Deep Property Binding", and came up with 3 solutions:
 
-1. deep-bind: keep as one binding, with three triggers `[a, a.a, a.a.a]`
+1. funnel bind: keep as one binding, with three triggers `[a, a.a, a.a.a]`
 2. incremental bind: separate into two bindings `temp = a.get('a')`, `x = temp.get('a')` with two triggers each
-3. runtime propgation: during runtime, when a parent is updated, trigger all children (and all their children, etc...)
+3. runtime propagation: during runtime, when a parent is updated, trigger all children (and all their children, etc...)
 
 * consider a network with M nested property bindings, each nested to N layers deep
 * the last solution is the simplest to analyze: takes up no space, but event propagation is O(N) at worst (updating the highest ancestor)
@@ -1519,12 +1519,33 @@ value graph:
 	* every node in this value graph would have thousands of bindings, so in the third method where every update propagates to all descendants, there would be no wasted propagations
 	* in this case, the first and second methods would be extremely inefficient space-wise
 
-### Deep vs Nested Property Bindings
+### Deep Bindings
 
-* Note that so far, we have been considering
+* Note that so far, we have been considering nested property bindings, aka binding to nested properties of an object, eg `foo.a.a = x`
+* as with any bind, this only detects when that specific reference/value changes
+* for imperative code, we oftentimes want to detect when any nested property changes, not just when the top-most reference changes
+* eg if we have some imperative code module that adds up all the integer-value descendants of `foo`
+* if we just created a binding to to `foo`, then our module wouldn't be triggered when `foo.x` changes
+* thus, we need a "deep bind", a binding that gets triggered whenever a descendant of `foo` changes
+* note that if we deep bind `foo.a.a`, it will also be triggered when `foo` or `foo.a` changes, but that's just a part of nested property binding, not a part of deep binding
+	* deep binding only monitors descendants
 
+Two ways to implement deep binding:
+1. prefix checking
+	* check if changed node is descendant of deep bind root (the input to the deep bind)
+	* aka if we deepbind `foo.a.a`, then we need to trigger on things that `foo.a.a.` is a prefix of, eg `foo.a.a.bar`
+	* if we are deepbinding X and we change Y, we trigger the binding if X is a prefix of Y
+2. recursive bind
+	* same mechanism as the copy/mirror bind mentioned earlier
+	* create a listener at the deep bind root that clones itself for each child (which will clone to grandchildren etc etc until all descendants have  a copy of that listener)
+	* this method will monitor every single node under the deep-bound tree, and if any node changes, it will automatically re-configure itself to monitor any new nodes added to the tree
+	* eg if we deepbind `foo.a.a`, and `foo.a.a.bar` changes, all listeners from the old descendants of `foo.a.a.bar` are removed, and new listeners are added for each of the current descendants of `foo.a.a.bar`
+	* to account for circular references, we do a graph search (keep track of visited nodes when adding listeners)
 
-
+Comparison:
+* prefix checking requires a new check for every single "set" operation
+* recursive bind is pretty slow and expensive, but only affects the deep bind
+* recursive bind also doesn't introduce any new mechanisms
 
 * **deep bindings are syntactic sugar**
 * notice how deep bindings can be created from recursive dynamic bindings
@@ -1533,9 +1554,7 @@ value graph:
 * later, in the "pure" version of Flo, deep bindings should not be possible
 * deep bindings lack the advantages that recursive dynamic binds have: tracking internal changes without affecting the whole object
 	* after flattening a tree into an array, if you change one value in the tree, you only need to change one value in the array, but the imperative deep-bind version will re-run the depth-first-search and reconstruct the entire array
-
-
-
+* thus, we should use the 2nd method (recursive binding) so deep binding is a built-in function that requires no special mechanism, and can be removed easily
 
 
 ================================================== CHECK UR GOOGLE KEEP NOTES ===================================================================
@@ -1558,14 +1577,13 @@ value graph:
 	1. the main pointer is reassigned
 	2. a property is added
 	3. a property is removed
-* this is only for dynamic binds though. For normal binds, it just checks the value of the pointer
+* this is only for dynamic binds though. Normal binds would just check the value of the pointer
 	* because in normal binds, you can't monitor structure in the first place
 	* if you tried to make a normal bind monitor a structure, it wouldn't work, because you wouldn't know when child values change
 	* eg if you made a normal bind that 
 * this gets a little ugly for something like `output = foo == bar ? 1 : 2` (assuming foo and bar are both objects), because this binding is based only on the value of the pointers, not on the actual structure
-
-
-
+	* wasted re-evaluations when foo/bar change structure, because the value of the pointers don't change
+	* ideally, the compiler would be able to detect this and use a normal bind instead of a dynamic bind
 
 ### Nested Binding vs Dynamic BInding
 
@@ -1619,11 +1637,115 @@ value graph:
 2. Comprehension: Find shared variables, and join the paths
 3. Reduction: substitute single-use variables with their binding expression
 
+### Combined Funnel and Incremental Bind: 
 
+* remember:
+	* funnel bind: one binding with three triggers `[a, a.a, a.a.a]`
+	* incremental bind: separate into two bindings `temp = a.get('a')`, `x = temp.get('a')` with two triggers each
+* minor optimization: if one funnel bind completely "encloses" another funnel bind, then use the smaller funnel bind in the larger one
+* if we have `x = a.a.a` and `y = a.a.a.a.a`, then instead of making `[a, a.a, a.a.a, a.a.a.a, a.a.a.a.a]` the triggers for `y`, just make it `[x, a.a.a.a, a.a.a.a.a]`
+
+```
+    a -.
+    a --\
+    a ---- x -.
+    a ---------\
+    a ----------- y
+```
+
+* while this means `y` is delayed by one step, this extra step is being used to trigger `x`, so there's no waste (at least in a single-threaded system)
+* note that this only works for "linear structures", aka when one funnel completely encloses the other because their triggers are along the same path
+* note that for if `y` only partially enclosed `x` (not fully enclosed but some shared ancestors), then no optimization is used
+	* see "Tree Variant" below for a different take
+* advantages:
+	* for single-threaded systems, same speed as funnel bind
+	* for linear structures, takes up the same space as incremental bind (same number of triggers)
+* disadvantages:
+	* slower setup time in some cases (if `x` is bound after `y`, then `y`'s funnel has to be restructured)
+	* in a multithreaded system, this prevents `x` and `y` from being triggered at the same time
+	* more complicated to remove bindings in some cases (if `x` is removed, then `y`'s funnel has to be restructured)
+	* for tree structures, takes up more space than incremental bind
+
+Tree Variant:
+* if a funnel bind doesn't completely enclose another funnel bind, but shares some ancestors, than create an intermediate binding for the shared ancestors
+* eg for `x = a.a.a` and `y = a.a.b.b`, then add intermediate binding `z = a.a` and use `z` in the triggers of `x` and `y`
+* advantages: always uses the same amount of space as incremental
+* disadvantages: every intermediate binding slows it down a little
+
+### Nested Property Binding: Graph Representation
+
+* what would nested property binding look like in a Flo network? how would it propagate through the value graph?
+* the value graph is the most intuitive way of looking at Flo, and is what Flo is based on, so studying how it works in the graph helps understand the core issue
+	* note: set-route event propagation adheres closest to the Flo graph representation
+* consider `bind(y = foo.x.x`
+* as we mentioned in the section "Deep Property Binding", this can be thought of as `bind(y = foo.get('x').get('x')`
+* instead of having a funnel bind with 3 triggers, we have three atomic bindings (including the one that creates `foo`): `foo = ...`, `temp = foo.x`, `y = temp.x`
+* any one of `foo`, `foo.x`, and `foo.x.x` changing will correspond to an update of exactly one of those atomic bindings
+* the funnel bind is just a reduction optimization that compresses those three atomic binds into one bind with 3 triggers
+* if we decompose all nested property bindings into atomic bindings, and follow this reduction optimization, the graph turns into the tree-optimization-variant of funnel bind
+
+### Reference Binds = Alias Binds
+
+* the name "alias binding" makes it seem like they are a special case of a object binding, where the left side exactly equals the right side
+* doesn't make it obvious that alias binds and normal binds are all that are needed to create a complete binding model for a reference based data system
+* this is because alias bindings are really "reference" bindings, analogous to pointers or references
+* thus, any data structure can be decomposed into values and references
+
+* value bindings are for defining values
+* reference bindings are for defining structures
+
+### Main Interface
+
+* in order to actually complete a working implementation of Flo/Wijit without worrying about this optimizations, we have to create a high level interface that we can roughly implement now, and optimize later, without too much refactoring
+* thus, we need to summarize all findings so far:
+
+Bindings:
+	1. Value bindings: creates a value
+	2. Reference bindings: creates a reference
+	3. Dynamic bindings: creates more bindings
+Triggers:
+	1. Normal triggers
+	2. Nested binding triggers
+Modules: multiple dynamic bindings
+Built-ins:
+	* Map bind
+	* Reduce bind
+	* Filter bind
+	* Deep bind
+
+* this is re-iterated in the section: Summary>Mechanisms
+
+### Atomic Bindings
+
+* ideally, we only create one binding at a time (corresponding to one output at a time)
+* this should be possible because the value graph is a DAG, so we'll just be building the DAG one node at a time in the "forward" direction
+* however, this gets a little complicated with dynamic bindings, because currently for list bindings (eg map bind), we use a for-loop and some imperative code to create all the output bindings at once
+* the solution to this is covered in the next section
+
+### List Iteration with Dynamic Bindings
+
+* one way to get rid of for-loops is to use linked-list-style array iteration, like how most functional and logic languages work (eg lisp, prolog)
+* this way instead of accessing elements by index, we do as follows:
+	1. create a binding for the current element
+	2. create a dynamic binding to check for the existence of a next element
+		* and if the element exists, execute these steps for the next element
+* thus, instead of a giant dynamic binding that uses for-loops (aka imperative code), we use a chain of dynamic bindings
+* in addition, this means we only create one binding at a time, achieving atomic dynamic bindings (at least for list iteration)
+* we also aren't introducing any new mechanics, just leveraging object properties
+* iterating across object properties will follow the same convention
+	* maintain a linked list of all registered properties for each object
+* will automatically detect when a property is added or removed
+	* takes care of "structure listening" as discussed in the section "Dynamic Collections Bindings are Based on Structure", without introducing any new mechanisms
 
 ----------------------------------------------------------------------------------------------------
 
-Language Rules:
+Summary
+--------
+
+All findings so far...
+
+### Language Rules
+
 1. Outputs (at least, when observed) always reflect the current state of the inputs
 	* no matter how the language is implemented, the observed outputs should always look as if the entire network is continuously being re-evaluated
 2. Bindings, by default, execute re-evaluations. This means update order doesn't matter, and update events don't need to carry any information
@@ -1634,13 +1756,83 @@ Language Rules:
 7. Output values with no input binding are implicitly undefined
 8. Undefined input values forces the outputs to be undefined (skipping evaluation of the binding function) unless the "undefined" case is explicitely accounted for in the binding function
 	* this means an undefined input that is not accounted for basically "voids" the binding, making it behave as if the binding disappeared (forcing the outputs undefined by rule #6)
+9. Value bindings are for defining values
+10. Reference bindings are for defining structures
+11. Dynamic bindings are for creating more bindings
 
-Implementation Rules:
+### Implementation Rules
+
 1. Reference based, and circular references are allowed
 2. Bindings are based on memory location
-3. 
+3. Iteration is done using dynamic binds, in a linked-list fashion (see "List Iteration with Dynamic Bindings")
 
-Implementation Assumptions:
+### Implementation Assumptions
+
 1. Value updates happen more than dynamic bind updates
 2. sparse vs interconnected?
 3. densely populated (many bindings per object property)?
+
+### Mechanisms
+
+* Bindings
+	1. Value bindings: creates a value
+	2. Reference bindings: creates a reference
+	3. Dynamic bindings: creates a binding
+* Triggers
+	1. Normal triggers
+	2. Nested-property triggers
+* Modules: multiple dynamic bindings
+* Built-ins
+	* Map bind
+	* Reduce bind
+	* Filter bind
+	* Deep bind
+
+### Mechanism Implementation
+
+Reference Binding:
+* Copy
+* Event propagation
+* Set-Route Event Propagation
+* Alias index
+
+Nested Property Triggers:
+* Funnel
+	* variant: path-incremental
+	* variant: tree-incremental
+* Incremental
+* Event propagation
+* Copy
+
+### Copy Bind
+
+* when binding to an object, use a recursive bind to create bindings between every descendant of the input and the corresponding descendant of the output
+* to account for circular references, keep track of visited nodes during the recursive bind
+
+something like
+
+```js
+function mirror(source, dest, visited) {
+	if (visited.contains(source))
+		return;
+	visited.add(source);
+	if (source instanceof Object) {
+		for (var key in source) {
+			mirror(source[key], dest[key], visited);
+		}
+	} else {
+		bind(source, dest);
+	}
+}
+```
+
+* because it creates a listener at every single descendant of every object that has bindings, this also (almost) takes care of nested property triggers without needing a separate mechanism
+	* doesn't account for dangling bindings, aka if `y = bar.x.x`, and we set `bar = 5`, `y` doesn't get updated to undefined
+* however, extremely slow and expensive
+
+### Other Optimizations
+
+Decomposition and Analyzing Shared Paths
+1. Deconstruction: Break statements down into atomic binds
+2. Comprehension: Find shared variables, and join the paths
+3. Reduction: substitute single-use variables with their binding expression
