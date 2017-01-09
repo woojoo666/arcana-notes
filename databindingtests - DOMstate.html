@@ -34,53 +34,30 @@
 	/*
 	 *	Structure:
 	 *
-	 *	root = ReactiveMap {
-	 *		repeaters: [ {template, container}, ... ],
-	 *		listeners: [ {template, elem, property}, ... ],
-	 *		value: ReactiveMap {
-	 *			key1: ReactiveValue {
-	 *				repeaters: [...],
-	 *				listeners: [...],
-	 *				value: "hello"
+	 *	values = {
+	 *			key1: "hello"
+	 *			key2: {
+	 *				subkey1: {...},
 	 *			},
-	 *			key2: ReactiveValue {
-	 *				repeaters: [...],
-	 *				listeners: [...],
-	 *				value: {
-	 *					subkey1: {...},
-	 *				},
-	 *			},
-	 *			mArray: ReactiveArray {
-	 *				repeaters: [...],
-	 *				listeners: [...],
-	 *				value: {
-	 *					0: {...},
-	 *					1: {...},
-	 *					2: {...},
-	 *				},
-	 *			},
+	 *			mArray: [
+	 *				{...},
+	 *				{...},
+	 *				{...},
+	 *			],
+	 *		},
+	 *	};
+	 *
+	 *	bindings = {
+	 *			key1: [eval1]
+	 *			key2: [eval2]
+	 *			key2.subkey1: [eval2]
+	 *			mArray: [arrayeval1],
+	 *			mArray.0: [array0eval],
+	 *			mArray.1: [array1eval],
+	 *			mArray.2: [array2eval],
 	 *		},
 	 *	};
 	 */
-
-	function ReactiveValue (value) {
-		this.value = value;
-	}
-
-	ReactiveValue.prototype = {
-		set: function (value) {
-			this.value = value;
-			var listeners = DOMstate.getListeners(null, this);
-			for (var i = 0; i < listeners.length; i++)
-				listeners[i]();
-		},
-		getScope: function (path) {
-			return DOMstate.getScope(path, this);
-		},
-		get: function (path) {
-			return DOMstate.get(path, this);
-		},
-	};
 
 	function ReactiveArray () {
 		this.value = [];
@@ -128,26 +105,95 @@
 		},
 	};
 
+	function followPath(path, obj, createifneeded) {
+		if (!path) return obj;
+
+		var keys = path.split('.');
+		while (keys.length > 0) {
+			var head = keys.shift();
+			if (!obj[head] && createifneeded) obj[head] = {};
+			obj = obj[head];
+		}
+		return obj;
+	}
+
+	function Scope () {}
+
+	Scope.prototype = {
+		bindings: {},
+		values: {},
+		get: function (path) {
+			return followPath(path, this.values);
+		},
+		getListeners: function (path) {
+			var base = followPath(path, this.bindings, true);
+			return base._listeners || (base._listeners = []);
+		},
+		bind: function (dest, triggers, fn) {
+			var self = this;
+			function evaluator () {
+				var triggerVals = triggers.map(function(trigger){ return self.get(trigger); });
+				var newVal = fn.apply(self, triggerVals);
+				self.set(dest, newVal);
+			}
+			for (var i = 0; i < triggers.length; i++) {
+				self.getListeners(triggers[i]).push(evaluator);
+			}
+			evaluator();
+		},
+		separateLast: function (path) {
+			var keys = path.split('.');
+			var last = keys.pop();
+			return {parentPath: keys.join('.'), key: last};
+		},
+		set: function (path, value) {
+			var split = this.separateLast(path);
+			var parent = this.get(split.parentPath);
+			var prev = parent[split.key];
+			parent[split.key] = value;
+			if (prev === undefined) this.trigger(split.parentPath); // key added, trigger collection binding
+			this.trigger(path); // trigger regular binding
+		},
+		delete: function (path) {
+			var split = this.separateLast(path);
+			var parent = this.get(split.parentPath);
+			delete parent[split.key];
+			this.trigger(path); // trigger regular binding
+			this.trigger(split.parentPath); // key removed, trigger collection binding
+		},
+		trigger: function (path) {
+			var listeners = this.getListeners(path);
+			for (var i = 0; i < listeners.length; i++) {
+				listeners[i]();
+			}
+		},
+	};
+
+	var scopetest = new Scope();
+
+	scopetest.set('a',5);
+	scopetest.set('b',10);
+	scopetest.bind('c',['a','b'], function (a, b) { return a+b; });
+	console.log(scopetest.get('c'));
+	scopetest.set('b',12);
+	console.log(scopetest.get('c'));
+
 	DOMstate = {
-		root: new ReactiveValue(),
 		handlebarsMatcher: /\{\{([\.\w]+)\}\}/g, // allow for '.' to delimit keys
-		getScope: function (path, parentscope) {
-			if (!parentscope) parentscope = this.root;
+		get: function (path, parentscope) {
+			if (!parentscope) parentscope = this;
 			if (!path) return parentscope;
 
 			var keys = path.split('.');
-			var obj = parentscope;
+			var obj = parentscope.values;
 			while (keys.length > 0) {
 				var head = keys.shift();
-				obj = obj.value || (obj.value = {});
-				obj = obj[head] || (obj[head] = new ReactiveValue());
+				obj = obj[head] || (obj[head] = {});
 			}
 			return obj;
 		},
-		get: function (path, scope) {
-			return this.getScope(path, scope).value;
-		},
 		getListeners: function (path, parentscope) {
+
 			var scope = this.getScope(path, parentscope);
 			return scope.listeners || (scope.listeners = []);
 		},
@@ -180,18 +226,18 @@
 			var lhs = split[0].trim();
 			var rhs = split[1];
 
-			var parseResult = this.parseExpression(scope, rhs);
+			var parseResult = this.parseExpression(rhs);
 			if (this.get(lhs, scope) === undefined) this.set(lhs, null, scope); // initialize as reactive data object
 			assignFn = eval('(function () { DOMstate.set(\"' + lhs + '\",' + parseResult.expression + ', scope); })');
 
 			var triggers = parseResult.triggers;
 			for (var i = 0; i < triggers.length; i++) {
-				this.getListeners(null, triggers[i]).push(assignFn);
+				this.bindings[triggers[i]].push(assignFn);
 			}
 			assignFn(); // call it once
 		},
 		// can handle multiple levels of quotes, eg (x = 'hello "cool" guy' + '!!!')
-		parseExpression: function (scope, expression) {
+		parseExpression: function (expression) {
 			var quoteStack = [];
 			var triggers = [];
 			var parsed = expression.replace(/.*?(['"]|$)/g, function (match, quoteMark) {
@@ -203,126 +249,146 @@
 				quoteStack.push(quoteMark);
 				return match.replace(/[\w.]+/g, function (match) {
 					if (!match[0] || !isNaN(match[0])) return match; // skip names that start with a number (invalid)
-					var trigger = DOMstate.getScope(match, scope);
-					if (triggers.indexOf(trigger) < 0) triggers.push(trigger); // add match to triggers if unique
+					if (triggers.indexOf(match) < 0) triggers.push(match); // add match to triggers if unique
 					return 'DOMstate.get(\"' + match + '\",scope)'; // prepend "scope." to all variable names
 				});
 			});
 			return { expression: parsed, triggers: triggers };
 		},
 		set: function (path, value, parentscope) {
-			this.getScope(path, parentscope).set(value);
+			var split = path.split('.');
+			var last = split.pop();
+			var prefix = split.join('.');
+			this.get(prefix, parentscope)[last] = value;
+			
 		},
-	};
+		mirrorbind: function (dest, src, scope) {
 
-	function ElemWijit(elem, scope) {
-		var triggers = [];
-		var converted = elem.innerHTML.replace(/\{\{(.*?)\}\}/g, function (match, expression) {
-			var parseResult = DOMstate.parseExpression(scope, expression, triggers);
-			for (var i = 0; i < parseResult.triggers.length; i++) {
-				var trigger = parseResult.triggers[i];
-				if (triggers.indexOf(trigger) < 0) triggers.push(trigger); // add if unique
-			}
-			return '\"+' + parseResult.expression + '+\"';
-		});
-		var assignFn = eval('(function () { elem.innerHTML = \"' + converted + '\"; })');
-
-		for (var i = 0; i < triggers.length; i++) {
-			DOMstate.getListeners(null, triggers[i]).push(assignFn);
-		}
-		assignFn(); // call it once
-	}
-
-	function RepeatWijit(elem, scope) {
-		this.scope = scope;
-
-		this.container = document.createElement('div');
-		elem.parentNode.insertBefore(this.container, elem);
-		elem.remove();
-
-		this.template = elem;
-
-		var match = elem.dataset.array.match(/(\w+)\s+in\s+(\w+)/);
-		this.subscopeAlias = match[1];
-		var path = match[2];
-
-		var split = path.split('.');
-		var last = split.pop();
-		var prefix = split.join('.');
-		var obj = DOMstate.getScope(prefix);
-		if (!obj.value[last]) obj.value[last] = new ReactiveArray();
-
-		DOMstate.getRepeaters(path).push(this);
-
-		var intiialArray = DOMstate.get(path);
-		if (intiialArray) {
-			// if any intiial items, call this.onpush() for each of them
-			for (var i = 0; i < intiialArray.length; i++) {
-				this.onpush(intiialArray[i]);
+			if (this.get(src) instanceof Object) {
+				// src is a collection. recursively call mirrorbind on all children
+				var reevaluate = function () {
+					this.root[dest] = {};
+					for (var key in src) {
+						this.mirrorbind(dest+'.'+key, src+'.'+key, scope);
+					}
+				};
+				this.bindings[src].push(reevaluate);
+				reevaluate(); // call it once
+			} else {
+				// src is primitive. do a regular bind
+				this.bind(scope, dest + ' = ' + src);
 			}
 		}
-	}
-
-	RepeatWijit.prototype = {
-		onclear: function () {
-			var container = this.container;
-			while (container.firstChild) {
-				container.removeChild(container.firstChild);
-			}
-		},
-		extendScope: function (item) {
-			// We can't just extend the entire scope object, because then all extendedScopes will share the same root listeners and values
-			// Instead, create a whole new root scope with its own listeners and value object, and have the new value object extend scope.value
-			var extendedScope = { listeners: [], value: Object.create(this.scope.value) };
-			extendedScope.value[this.subscopeAlias] = item; // add the extra "item" variable at the root
-			return extendedScope;
-		},
-		onpush: function (item) {
-			var elem = this.template.cloneNode(true);
-			DOMstate.parse(elem, this.extendScope(item)); // parse within the extended scope, bind listeners, etc
-			this.container.appendChild(elem);
-		},
 	};
 
-	DOMstate.parse(document.body, DOMstate.root);
+	// function ElemWijit(elem, scope) {
+	// 	var triggers = [];
+	// 	var converted = elem.innerHTML.replace(/\{\{(.*?)\}\}/g, function (match, expression) {
+	// 		var parseResult = DOMstate.parseExpression(expression, triggers);
+	// 		for (var i = 0; i < parseResult.triggers.length; i++) {
+	// 			var trigger = parseResult.triggers[i];
+	// 			if (triggers.indexOf(trigger) < 0) triggers.push(trigger); // add if unique
+	// 		}
+	// 		return '\"+' + parseResult.expression + '+\"';
+	// 	});
+	// 	var assignFn = eval('(function () { elem.innerHTML = \"' + converted + '\"; })');
 
-	DOMstate.set('title','Comparing Data-Binding Methods: DOMstate (listeners)');
-	DOMstate.set('description','Angular uses polling to update the elements, while DOMstate uses listeners. Supposedly, DOMstate should use less memory while idle because it doesn\'t continuously poll the data for changes, which Angular calls its \"digest\" loop. According to my tests, Angular used about 17k while DOMstate used about 13k. Randomizing the numbers (using the \"randomize!!\" button) doesn\'t really change memory usage for either method. Note that Angular\'s ng-repeat has a reputation for being slow, so I did 3 tests (making sure to restart the browser before each test to clear the cache!). Notice how DOMstate\'s memory barely increases (because it is actually idle), while Angular\'s increases marginally (because the polling loop gets slower). The difference is noticable, but really not significant (only 4k more memory used at 1000 repeats).');
-	DOMstate.set('test1results','No repeat: Angular - 16k, DOMstate - 15k');
-	DOMstate.set('test2results','100 repeats: Angular - 17k, DOMstate - 15k');
-	DOMstate.set('test3results','1000 repeats: Angular - 21k, DOMstate - 17k');
+	// 	for (var i = 0; i < triggers.length; i++) {
+	// 		DOMstate.getListeners(null, triggers[i]).push(assignFn);
+	// 	}
+	// 	assignFn(); // call it once
+	// }
 
-	DOMstate.set('li1','test 1');
-	DOMstate.set('li2','test 2');
-	DOMstate.set('li3','test 3');
-	DOMstate.set('li4','test 4');
-	DOMstate.set('li5','test 5');
-	DOMstate.set('li6','test 6');
-	DOMstate.set('li7','test 7');
-	DOMstate.set('li8','test 8');
-	DOMstate.set('li9','test 9');
-	DOMstate.set('li10','test 10');
-	DOMstate.set('li11','test 11');
-	DOMstate.set('li12','test 12');
-	DOMstate.set('li13','test 13');
-	DOMstate.set('li14','test 14');
-	DOMstate.set('li15','test 15');
-	DOMstate.set('global', 'hi');
-	DOMstate.set('item', 'OVERRIDE ME');
+	// function RepeatWijit(elem, scope) {
+	// 	this.scope = scope;
 
-	DOMstate.getScope('ar').setAll([]);
-	var size = 1000;
-	for (var i = 0; i < size; i++) {
-		DOMstate.getScope('ar').push(Math.floor(1000*Math.random()));
-	}
+	// 	this.container = document.createElement('div');
+	// 	elem.parentNode.insertBefore(this.container, elem);
+	// 	elem.remove();
 
-	DOMstate.set('buttonTitle','Randomize!!');
+	// 	this.template = elem;
 
-	function start() {
-		setInterval(function() {
-			DOMstate.getScope('ar').set(Math.floor(size*Math.random()), Math.floor(1000*Math.random()));
-		}, 50);
-	}
+	// 	var match = elem.dataset.array.match(/(\w+)\s+in\s+(\w+)/);
+	// 	this.subscopeAlias = match[1];
+	// 	var path = match[2];
+
+	// 	var split = path.split('.');
+	// 	var last = split.pop();
+	// 	var prefix = split.join('.');
+	// 	var obj = DOMstate.getScope(prefix);
+	// 	if (!obj.value[last]) obj.value[last] = new ReactiveArray();
+
+	// 	DOMstate.getRepeaters(path).push(this);
+
+	// 	var intiialArray = DOMstate.get(path);
+	// 	if (intiialArray) {
+	// 		// if any intiial items, call this.onpush() for each of them
+	// 		for (var i = 0; i < intiialArray.length; i++) {
+	// 			this.onpush(intiialArray[i]);
+	// 		}
+	// 	}
+	// }
+
+	// RepeatWijit.prototype = {
+	// 	onclear: function () {
+	// 		var container = this.container;
+	// 		while (container.firstChild) {
+	// 			container.removeChild(container.firstChild);
+	// 		}
+	// 	},
+	// 	extendScope: function (item) {
+	// 		// We can't just extend the entire scope object, because then all extendedScopes will share the same root listeners and values
+	// 		// Instead, create a whole new root scope with its own listeners and value object, and have the new value object extend scope.value
+	// 		var extendedScope = { listeners: [], value: Object.create(this.scope.value) };
+	// 		extendedScope.value[this.subscopeAlias] = item; // add the extra "item" variable at the root
+	// 		return extendedScope;
+	// 	},
+	// 	onpush: function (item) {
+	// 		var elem = this.template.cloneNode(true);
+	// 		DOMstate.parse(elem, this.extendScope(item)); // parse within the extended scope, bind listeners, etc
+	// 		this.container.appendChild(elem);
+	// 	},
+	// };
+
+	// DOMstate.parse(document.body, DOMstate.root);
+
+	// DOMstate.set('title','Comparing Data-Binding Methods: DOMstate (listeners)');
+	// DOMstate.set('description','Angular uses polling to update the elements, while DOMstate uses listeners. Supposedly, DOMstate should use less memory while idle because it doesn\'t continuously poll the data for changes, which Angular calls its \"digest\" loop. According to my tests, Angular used about 17k while DOMstate used about 13k. Randomizing the numbers (using the \"randomize!!\" button) doesn\'t really change memory usage for either method. Note that Angular\'s ng-repeat has a reputation for being slow, so I did 3 tests (making sure to restart the browser before each test to clear the cache!). Notice how DOMstate\'s memory barely increases (because it is actually idle), while Angular\'s increases marginally (because the polling loop gets slower). The difference is noticable, but really not significant (only 4k more memory used at 1000 repeats).');
+	// DOMstate.set('test1results','No repeat: Angular - 16k, DOMstate - 15k');
+	// DOMstate.set('test2results','100 repeats: Angular - 17k, DOMstate - 15k');
+	// DOMstate.set('test3results','1000 repeats: Angular - 21k, DOMstate - 17k');
+
+	// DOMstate.set('li1','test 1');
+	// DOMstate.set('li2','test 2');
+	// DOMstate.set('li3','test 3');
+	// DOMstate.set('li4','test 4');
+	// DOMstate.set('li5','test 5');
+	// DOMstate.set('li6','test 6');
+	// DOMstate.set('li7','test 7');
+	// DOMstate.set('li8','test 8');
+	// DOMstate.set('li9','test 9');
+	// DOMstate.set('li10','test 10');
+	// DOMstate.set('li11','test 11');
+	// DOMstate.set('li12','test 12');
+	// DOMstate.set('li13','test 13');
+	// DOMstate.set('li14','test 14');
+	// DOMstate.set('li15','test 15');
+	// DOMstate.set('global', 'hi');
+	// DOMstate.set('item', 'OVERRIDE ME');
+
+	// DOMstate.getScope('ar').setAll([]);
+	// var size = 1000;
+	// for (var i = 0; i < size; i++) {
+	// 	DOMstate.getScope('ar').push(Math.floor(1000*Math.random()));
+	// }
+
+	// DOMstate.set('buttonTitle','Randomize!!');
+
+	// function start() {
+	// 	setInterval(function() {
+	// 		DOMstate.getScope('ar').set(Math.floor(size*Math.random()), Math.floor(1000*Math.random()));
+	// 	}, 50);
+	// }
 
 	DOMstate.set('a', true);
 	DOMstate.set('b', 20);

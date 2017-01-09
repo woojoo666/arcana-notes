@@ -1239,7 +1239,7 @@ FloModule.bind(dest, [src], (innerscope, array) => {
 
 ### Garbage Collection
 
-* if inner FloModules are like javascript scopes, then perhaps we can use javascripts method for cleaning up scopes jJFKDSLAJFD
+* if inner FloModules are like javascript scopes, then perhaps we can use javascripts method for cleaning up scopes
 * in javascript, when variables are defined in a scope, and then control leaves the scope, then all the variables are "marked" for garbage collection
 	* "marked" as in no more pointers to it
 * so in our case, when a dynamic bind needs to recreate its inner module, it could simply invalidate the old module, insteaad of removing all the old bindings
@@ -1252,7 +1252,7 @@ FloModule.bind(dest, [src], (innerscope, array) => {
 
 
 
-### Alias Bindings == Dynamic Bindings
+### Alias Method uses Dynamic Bindings
 
 * an important thing to note is that, while dynamic bindings and value bindings are a fundamental way Flo works, alias bindings is an optimization in the implementation
 	* consider `foo = bar` and `x = foo.x`, and `bar.x` changes
@@ -1288,7 +1288,7 @@ solution: everything is an alias bind? because everything is based off memory ba
 	* so if we have `InnerModule { y = x*x; z = y % 5 }` and `OuterModule { InnerModule(foo = x, bar = y); fizz = bar+5; }`, the outer bindings would look like:
 	`values: { foo: 3, bar: 9, fizz: 14, __innerBindings: { bar: { z: 4 } } }`
 	* notice that "local inner variables" are just outputs that are not mapped to any outer variables
-	* also notice that `z` is never used, so it can be discarded. This is where "observed outputs" comes into play (discussed later on)
+	* also notice that `z` is never used, so it can be discarded. This is discussed in the later section "Observed Outputs"
 
 
 
@@ -1397,6 +1397,7 @@ value graph:
          c --
 
 (note: "alias child" refers to a child binding dynamically created by alias bindings)
+(note: there are unshown alias child bindings between a->b and a->d)
 ```
 * notice how when `x` changes, the `d` will switch from `b` to `c`, but when `a` updates, `e` will still get updated
 * because alias bindings create a "jump" from `a` to `e`, even if we somehow propagate updated alias information along the normal route, it will be too late
@@ -1410,6 +1411,18 @@ value graph:
 	* have whoever created the alias-child binding keep track of it, and when the alias bindings change, remove the outdated alias-child binding
 * this is better, because it doesn't slow down the update-events, and only slows down alias-child-binding creation by a tiny bit (to keep track of created bindings)
 
+
+
+### Lazy Evaluation
+
+
+### Observed Outputs
+
+* we don't need to update outputs that are not being observed
+* for example, for a demultiplexor, `foo = x ? a : b`, only one output is being observed at a time
+* whichever output is not being observed, does not need to be updated
+* this property traverses backwards as well
+* if `a` is not being observed, and `a = m + n`, then `m` and `n` don't need to be updated as well
 
 ### More Efficient Event Propagation (Set-Route Event Propagation)
 
@@ -1684,7 +1697,7 @@ Tree Variant:
 * the funnel bind is just a reduction optimization that compresses those three atomic binds into one bind with 3 triggers
 * if we decompose all nested property bindings into atomic bindings, and follow this reduction optimization, the graph turns into the tree-optimization-variant of funnel bind
 
-### Reference Binds = Alias Binds
+### Reference Binds vs Alias Method
 
 * the name "alias binding" makes it seem like they are a special case of a object binding, where the left side exactly equals the right side
 * doesn't make it obvious that alias binds and normal binds are all that are needed to create a complete binding model for a reference based data system
@@ -1693,6 +1706,9 @@ Tree Variant:
 
 * value bindings are for defining values
 * reference bindings are for defining structures
+
+* note that alias method is different from reference binds
+* alias method is a way of triggering reference binds, by keeping track of the "reference root", aka the first variable in a chain of reference bindings
 
 ### Main Interface
 
@@ -1722,7 +1738,7 @@ Built-ins:
 * however, this gets a little complicated with dynamic bindings, because currently for list bindings (eg map bind), we use a for-loop and some imperative code to create all the output bindings at once
 * the solution to this is covered in the next section
 
-### List Iteration with Dynamic Bindings
+### Collection Binding/Iteration Using Linked-List Dynamic Bindings
 
 * one way to get rid of for-loops is to use linked-list-style array iteration, like how most functional and logic languages work (eg lisp, prolog)
 * this way instead of accessing elements by index, we do as follows:
@@ -1736,6 +1752,333 @@ Built-ins:
 	* maintain a linked list of all registered properties for each object
 * will automatically detect when a property is added or removed
 	* takes care of "structure listening" as discussed in the section "Dynamic Collections Bindings are Based on Structure", without introducing any new mechanisms
+
+### List Iteration - Optimized without Indexes
+
+* as mentioned in the last section, we can implement a dynamic list bind using something like this:
+
+```
+module ListBind(list, index, fn) {
+	if (list[index] == undefined) return;
+
+	bind(   )
+}
+```
+
+
+
+
+
+
+
+
+### Can all dynamic binds be atomic binds?
+
+* we just showed how to decompose a for-loop iterated list bind into a linked-list style dynamic bind, made up of completely atomic binds
+* modules create multiple bindings, though modules seem like a special case altogether, like a whole new abstraction layer on top of dynamic bindings
+* simple demultiplexors use multiple bindings as well: `out = a ? x : y` either creates a binding between `x->out` or `y->out`
+* if we try to decompose it into two binds: `if (a) then bind(out = x)`, `if (!a) then bind(out = y)`, now it looks like `out` can be bound to two variables (even though it never actually happens)
+* we could use a priority queue method of resolving multiple bindings for one output (first non-undefined binding determines the output, everything else ignored), but does this make sense?
+* or perhaps by atomic, we could mean "one output variable", so even though demultiplexors control multiple bindings, they only create one output variable
+* doesn't make sense to split up a demultiplexor's bindings, because each binding needs to know about eachother to ensure they never break rule 3 (every output is determined by exactly one binding)
+... ehhh hold onto that thought
+
+
+
+### fdsfdsafdsa
+
+* dynamic bindings are like control statements and loops
+* modules are like functions
+	* not necessary, but allows for code reuse
+
+
+### Modules Don't Need Triggers ============ CHANGE THIS TITLE?!?! =============
+
+* note that my original views on dynamic binding and modules have changed quite a bit
+* before I thought dynamic binding and modules were the same thing (see the section "Modules")
+	* dynamic binds/modules create a group of bindings based on the values of the "triggers"
+	* when a "trigger" to the module changes, all the bindings are re-created
+	* for example, a group of bindings where each binding maps to an element of the input collection
+* this made the most sense for collection bindings, where the bindings are based off the structure of a single collection (see "Dynamic Collections Bindings are Based on Structure")
+* however, this gets complicated for situations like demultiplexors, where we might have multiple triggers, and the triggers are separate from the inputs to the bindings
+	* eg `out = ar[x+y/z]`, where input is `ar`, and the triggers are `x`, `y`, and `z`
+	* (note: yes, if we extract `x+y/z` and use the result for the dynamic bind, we are left with only one trigger. This is covered later in this section)
+* note that this meant modules would have both inputs and triggers, and they would need to be specified
+* something like
+
+```js
+//function signature
+function dynamicBind (dest, mapping, triggers, module) {
+	// implementation stuff
+}
+
+//usage
+dynamicBind('reversedFoo', {input: 'foo'}, ['foo.length'], reverseModule);
+```
+
+* on the upside, this was simple and made sense (at least for collection binds)
+* on the downside, it was a little ugly
+* this interpretation of dynamic binds and modules persisted all the way to the section "Nested Binding vs Dynamic Binding"
+
+* however, beginning with the section "Collection Binding/Iteration Using Linked-List Dynamic Bindings", I now think about them differently
+* think about them in terms of the Flo graph, and relate them to imperative and functional languages
+* dynamic binds aren't just for creating bindings
+* they are analogous to control structures in imperative languages
+* modules are a separate idea, analogous to functions in imperative languages
+* they are purely used to group code for re-use and A E S T H E T I C S
+* they are **not necessary**, just like how in imperative languages we don't need functions (just have one monilithic `main()`)
+* if the value graph is the first layer and dynamic bindings are the second layer, then modules make up the third layer
+	* they don't change the functionality of the program, just used for modularization
+* thus, dynamic bindings are separate from modules
+* they are atomic expressions (not created in groups) for defining how/when a binding is created
+
+### Two Types of Dynamic Bindings: Conditional Binds and Dynamic-Memory-Location Binds
+
+* note that there are two types of dynamic bindings
+	1. a binding created based on a single condition, eg `if (x) then bind(y = z)`
+		* commonly occurs in recursive data structures, like linked-lists or trees, where the tail end points to undefined (aka not bound to anything)
+	2. a binding where the memory locations of some inputs are dynamic, eg a demultiplexor: `out = x ? a : b`
+		* commonly occurs in demultiplexors or array operations, eg binary search
+* we can reduce this into one mechanism in 2 ways:
+	1. reduce (2) into (1): an input with dynamic memory location is just a one-hot conditional bind
+		* eg. `out = x ? a : b` becomes `if (x) then bind(out = a) else bind(out = b)`
+		* this has 2 possible input memory locations. If we increase it to 3, like `out = x ? a : (y ? b : c)`, now we have 3 conditionals
+		* gets uglier as we increase the number possible memory locations
+		* infinite possibilities: `out = myArray[x]`
+	2. reduce (1) into (2): a conditional bind is just a dynamic-memory-location binding where the memory location is "undefined" when the condition is false
+		* a reserved memory location that means "don't create this binding", kind of like `/dev/null`
+* IMPORTANT: both these reductions are based on the assumption that no-binding is the same as undefined output, and vice versa
+	* discussed further in the later section "Persistence"
+* both these reductions are kind of ugly
+* perhaps we should just keep these two types distinct
+* after all, (1) determines when we create the binding, and (2) determines how we create the binding
+* put another way, (1) affects the output, while (2) affects an input
+
+* this still feels a little off though
+* the fact that there are reductions between the two means that the two rely on the same internal mechanism
+* thus, there is redundancy, and redundancy leads to ambiguity (when to use conditional binds vs dynamic-memory-location binds, if they're essentially the same thing?)
+
+
+* note how in imperative languages, both these are handled through one mechanism
+1. `if (x) then bind`
+2. `if (a) then bind(out = x) else if (b) then bind(out = y) ... else bind(out = zzz)`
+* the only difference is that in the first, not all cases are specified
+* thus we need a default case????
+
+
+
+* no binding means undefined value
+
+
+
+* in imperative languages, we defined a bunch of statements that execute in sequence
+* in Flo, we define how outputs are created from inputs
+* so if in imperative language, we have something like this: `if (x > 0) then y = 5`
+* then in Flo, we are saying that `y = 5` if `x > 0`, otherwise `y = undefined`
+* this follows reduction (2) mentioned in previous section
+* this also ensures that we don't have to worry about when binds appear/disappear
+* whenever an output is declared, it is always bound to some input expression
+* defines the output in terms of inputs, instead of in terms of bindings
+
+
+
+* if any input is undefined, then output is undefined
+	* makes stuff simpler
+	============= WRONG, CONSIDER A MODULE THAT INTERNALLY USES AN `if undefined` STATEMENT TO HANDLE UNDEFINED INPUTS =================
+	* perhaps special case when input is fed into an `if undefined` module?
+	* depends on what operations/modules can handle undefined inputs, and which can't
+	* think about this later, this is just for convenience, not an integral part of the language
+
+### Switches == Dynamic Bindings ========================= DOES THIS STILL MAKE SENSE IN THE CONTEXT OF THE SECTION ABOVE ============================
+
+* as mentioned in the previous section, dynamic bindings are not really bindings
+* a dynamic binding just combines two components: a condition and a binding
+* the condition is really just a modifier to the binding
+* we can take any binding (value or reference), and add this condition
+
+
+
+
+
+* think about it in terms of outputs, in the Flo graph
+* if we have a set # of outputs, then at any moment of time, each output must have a binding, like a value or maybe some default value (aka base case)
+	* note: a default value of "undefined" still counts as a binding, because an output needs a binding to have a value
+
+	=============== NO THIS IS WRONG, UNDEFINED SHOULD MEAN NO BINDING, ESP FOR THINGS LIKE LINKED LISTS EG `linkedListElem.next == undefined` =========================
+
+* in this case, all bindings are dynamic memory location binds
+* only when we have a dynamic # of outputs, like in a map bind, do we have to worry about creating/destroying bindings
+* however, if we have a dynamic # of outputs, we need to be able to iterate through those outputs
+	* otherwise how would we reference these dynamically created outputs? Without a name to reference them by, they are useless
+* we need to wrap these dynamically created outputs in a named collection so we can iterate through them
+* this named collection represents one output, so once again we are left with a set # of outputs
+* consider a doubly linked list: the head and tail are the only outputs
+	* even though there is a dynamic # of elements, there are only 2 outputs, all other elements are reached from this set # of outputs
+* in summary, in order to be able to reference all outputs, there has to be a set number of outputs, and if there's a set number of outputs, then we always use dynamic memory location binds
+
+
+
+
+### Don't Throw Errors, Output Undefined
+
+* throwing errors is an action/event, meant for imperative/functional languages
+* Flo is about data and persistent definitions
+* for cases that are not accounted for, output should be undefined
+
+### Persistence, Multiplexors and Branches
+
+* imperative code is forward moving
+* a sequence of statements executed in forward direction (forward in time)
+* uses multiplexors, aka if-else statements
+
+```
+x ---.--- if x > 3 ----- do something
+      '-- else --------- do another thing
+```
+
+* in Flo, update events move fowards, but conditionals are "backwards" in a sense
+* define outputs in terms of inputs
+* uses demultiplexors
+
+```
+```
+
+* notice how both branches are evaluated, but only one branch's output is used at the end
+* this makes switching between the two outputs very fast
+* however, sometimes you might want to save space/computation, and prevent a branch from being computed until needed
+* this can be solved with "observability" (discussed)
+
+* you can do this with a multiplexor, combined with the fact that binds are not evaluated if the input is undefined (and the output is automatically undefined)
+	* note: if-undefined modules are a special case, discussed later
+* something like
+
+```
+```
+
+
+
+
+
+
+
+
+* 
+
+
+
+
+### Persistence
+
+
+* currently modules and bindings are persistent
+
+* from assumption that undefined = no binding
+
+* different from imperative code, where stuff can be conditionally executed
+
+* currently, everything in the graph is executed
+
+* how to prevent infinite recursion?
+
+* forward-moving: a conditional binding that disables/removes all bindings after it
+	* unless it reaches an if-undefined input to a binding? in order to explicitely define persistent modules
+
+======================================= BREAK =========================================
+
+* observation-based is another solution
+* modules are needed for recursion, works at the module level
+* to prevent infinite recursion, this mechanism needs to work at the module level too
+* observation-based currently works at the reference-binding level
+* needs to work at module level
+* what happens for case like
+
+```
+        ______
+  ---->|      |-----
+    ,->|______|--,
+    '------------'
+```
+
+* observation-based won't work, because technically this module will always be observed (by itself)
+* we could modify the definition of observation-based to not include inputs that come from the same module's outputs
+* this won't work in all cases, what if we just inserted a do-nothing module inside the output-to-input loop
+
+```
+        ______
+  ---->|      |-----
+    ,->|______|--,
+    |     __     |
+    '----|__|<---'
+```
+
+
+* conditional-bind method moves foward
+* observation-based method moves backwards
+* oftentimes we will be dealing with branches, like
+
+```
+      ,-----.
+  ---<------->---
+      `-----'
+```
+
+* in this case, both conditional-bind and observation-based will do the same thing (removing a branch from the front or the back will do the same thing in this case)
+* distinction arises with tree-style branches
+* conditional-bind works on trees with multiple outputs
+
+```
+      ,----
+  ---<-----
+      `----
+```
+
+* observation-based works on trees with multiple inputs
+
+```
+  ----.
+  ----->---
+  ----'
+```
+
+======================================= BREAK =========================================
+
+* another special case
+
+```
+            __            __
+        ,--|__|---.----->|  |--.
+       /           \ .-->|__|   \
+  ----<             X     __     >---->
+       \    __     / '-->|  |   /
+        `--|__|---'----->|__|--'
+
+```
+
+* what should happen in this case?
+
+
+
+### Passive Language vs Active Language
+
+* many optimizations have been discussed so far, each with their own tradeoffs
+	* alias binding: slow alias index updates (eg when demultiplexor switches inputs), fast alias value updates
+	* lazy updates: fewer unnecessary updates, more memory usage (needs a timestamp for every binding)
+	* nested property triggers: funnel method vs incremental method vs funnel tree-variant
+* a passive language picks and chooses which optimizations to use, and makes a single compiler/interpreter
+* an active language has an active interpreter, and continuously analyzes the inputs and use cases of the program (AKA module in the case of Flo) to determine which optimizations are best, dynamically changing the interpreter itself
+* note that this is an optimization in itself, which also has its drawbacks
+* namely, this slows down the interpreter because it needs to run analysis on the inputs, and dynamically change itself
+* note that the more a module is used, the more data the interpreter can analyze, and the more efficient and effective the interpreter becomes
+* after a module has been used millions of times, the interpreter is very confident in its choice of optimizations, and will rarely need to change them
+* thus, the interpreter will become faster and better over time, and the slowdowns due to restructuring itself will also reduce over time
+* a network of modules, where each machine is assigned a module, and any program with dependencies on that module makes a remote call to that machine, where the output is calculated and returned to the caller
+* this way, all usages of a module are localized, so that the interpreter maximizes the number of data points it gets, and this optimization's benefit is maximized
+* also, instead of having dependencies installed on every machine, this means it only needs to be install once, reducing total memory usage
+* if a module is used extremely often, then it can be distributed across multiple machines, as long as analysis data is shared between interpreters
+* perhaps if there are two drastically different use cases for a module, then there would be two different interpreters, and the analysis data would go to a different interpreter depending on the apparent use case
+* eg if a certain module is used often in both server-side and UI-side code, the server-side use case would use lazy-evaluation, and the UI-side code (which is constantly observed) would not
+* this starts getting into machine learning...
+
 
 ----------------------------------------------------------------------------------------------------
 
@@ -1758,13 +2101,13 @@ All findings so far...
 	* this means an undefined input that is not accounted for basically "voids" the binding, making it behave as if the binding disappeared (forcing the outputs undefined by rule #6)
 9. Value bindings are for defining values
 10. Reference bindings are for defining structures
-11. Dynamic bindings are for creating more bindings
+11. Dynamic bindings are for conditional bindings
 
 ### Implementation Rules
 
 1. Reference based, and circular references are allowed
 2. Bindings are based on memory location
-3. Iteration is done using dynamic binds, in a linked-list fashion (see "List Iteration with Dynamic Bindings")
+3. Iteration is done using dynamic binds, in a linked-list fashion (see "Collection Binding/Iteration Using Linked-List Dynamic Bindings")
 
 ### Implementation Assumptions
 
@@ -1781,7 +2124,7 @@ All findings so far...
 * Triggers
 	1. Normal triggers
 	2. Nested-property triggers
-* Modules: multiple dynamic bindings
+* Modules: a set of bindings
 * Built-ins
 	* Map bind
 	* Reduce bind
