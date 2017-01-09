@@ -2079,6 +2079,52 @@ x ---.--- if x > 3 ----- do something
 * eg if a certain module is used often in both server-side and UI-side code, the server-side use case would use lazy-evaluation, and the UI-side code (which is constantly observed) would not
 * this starts getting into machine learning...
 
+### Persistence Continued
+
+* Actually, observation-based works for all cases, and can completely replace conditional binds
+* rule is simple: a node is created if it can reach an observed node
+* algorithm: traverse backwards from observed nodes, adding more and more nodes into the "observed nodes" set until no more can be added
+* proof: if a node can reach an observed node, then it needs to be evaluated, if a node cannot reach an observed node, then it doesn't need to evaluated
+	* thus, a node can reach an observed node <=> that node needs to be evaluated
+* it sort of makes sense that we don't need conditional bindings, because Prolog doesn't have if-else blocks, and traverses backwards as well (queries)
+* math also uses the same sort of "backwards" conditional style:
+
+```
+       / 1 : x > 5
+f(x) = |
+       \ 0 : otherwise
+```
+
+$$ f(x) = \begin{cases} 1 & : x > 5 \\ 0 & : otherwise \end{cases} $$
+
+### Execution Order
+
+* I was thinking more about forward-moving vs backward-moving conditional binds
+* I realized that there isn't really an inherent direction fdsafdsa
+* bla
+* bla
+* bla
+* manual chaining:
+* single output per change:
+	* looks at previous modules
+		* prone to deadlocks (show cycle example)
+		* how far back do we go?
+	* looks at inner modules
+		* just check if any inner modules still running/updating
+			* aka if a change is still propagating inside
+		* no deadlocks, even if theres recursion, because recusion creates a copy of the module inside, doesn't create a cycle
+
+
+### Perspectives 2? 3? Domains?
+
+* herd server example
+* html/xml layout example
+* languages nowadays try to do everything
+* talk about domains in math
+* relationships (they are natural way we see things)
+* bindings between domains, converters
+* async and sync are different domains
+
 
 ----------------------------------------------------------------------------------------------------
 
