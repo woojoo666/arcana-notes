@@ -2114,6 +2114,26 @@ $$ f(x) = \begin{cases} 1 & : x > 5 \\ 0 & : otherwise \end{cases} $$
 			* aka if a change is still propagating inside
 		* no deadlocks, even if theres recursion, because recusion creates a copy of the module inside, doesn't create a cycle
 
+### Pass Through Chaining
+
+if we want to force the execution order of 3 independent modules dependent on one input `x`, we do "pass-through chaining", like so:
+
+```
+      ,--[1]--
+x ---<---[2]--
+      `--[3]--
+```
+
+```
+      __________       __________
+x ---|-.--------|-----|-.--------|----[3]--
+     |  `--[1]--|--   |  `--[2]--|--
+     |__________|     |__________|
+     synchronized     synchronized
+```
+
+* note: "synchronized" modules are ones that update the output only if there are no changes still propagating inside
+* notice that, while simple and powerful, trying to synchronize everything can become quite ugly and unreadable
 
 ### Perspectives 2? 3? Domains?
 
@@ -2124,6 +2144,11 @@ $$ f(x) = \begin{cases} 1 & : x > 5 \\ 0 & : otherwise \end{cases} $$
 * relationships (they are natural way we see things)
 * bindings between domains, converters
 * async and sync are different domains
+* html/css/javascript already use this paradigm
+* most server-side code is written using a single language, eg Java or C++
+* however, even server-side code can have many different features, expressed best in different ways
+* eg state machines, algorithms, class/interface structure and relationships
+file formats
 
 
 ----------------------------------------------------------------------------------------------------
