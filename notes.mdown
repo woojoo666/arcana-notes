@@ -2151,6 +2151,60 @@ x ---|-.--------|-----|-.--------|----[3]--
 file formats
 
 
+
+
+////////////////
+
+   F A C E T S
+
+////////////////
+
+
+### Turing Completeness / Equivalence
+
+
+
+
+
+### Alias Bindings and Verilog Wires
+
+* all outputs like registers, store values/pointers
+* alias bindings make the outputs act like wires
+	* automatically update and propagate when the root value changes
+* so in Flo, `a = b` will automatically create a "wire" between `a` and `b`
+* in a way, Flo has "wires" and "registers", but they are automatically assigned
+* but in Verilog, sometimes you want to manually assign a register instead of a wire
+* eg in `a = b`, maybe we want `a` to hold the value after the assignment, even if `b` changes, so we set `a` to be a register even though the assignment implies a wire
+* note that in Flo, this would automatically be an alias binding
+* perhaps we could add a similar mechanism, where we "copy" the value instead of creating an alias binding
+* basically have a system for "manual updating"
+* kind of like a "latch" (in EE terms), where `b` can be set to the value of `a` and then hold it while `a` changes
+* note that most common programming languages have this already, since manual updating and setting values is already the norm
+* but since Flo is Turing complete, shouldn't Flo be able to do this as well?
+* turns out, yes, this is how Flo would implement a latch
+
+```
+    .-------------------------.
+    |     ________________    |
+    '----|1               |   |
+         |   multiplexor  |---*--- Q
+D -------|0               |
+         |________________|
+                  |
+hold -------------'
+```
+
+* basically uses a multiplexor to switch between `D` or holding its current value (using a feedback loop)
+* note that while doable, these loops and EE tricks are not very intuitive...
+
+### Meta-Programming
+
+
+
+
+
+
+
 ----------------------------------------------------------------------------------------------------
 
 Summary
