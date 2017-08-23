@@ -2197,12 +2197,127 @@ hold -------------'
 * basically uses a multiplexor to switch between `D` or holding its current value (using a feedback loop)
 * note that while doable, these loops and EE tricks are not very intuitive...
 
+### Closures
+
 ### Meta-Programming
 
 
 
+* meta-programming
+	* maybe allow modules to be modified in layers?
+	* first create a simple, inefficient but very readable flow
+	* then add modifications, rearrange inner modules, add optimizations
+	* need a system for defining "rearrangements" and substitutions and stuff
+	* kind of like Java reflection
+	* is this needed tho? in Javascript we just have everything be an object and modify it directly
+	* however, in javascript we can only modify properties and stuff, we can't modify the code inside a function
+	* so if we want to have a section of a function be modifiable, we have to pull it out into another function, and then override that new function
+* classes
+	* a new system for classes? or just use dictionaries like Flo
+	* stuff like Array.map and Array.reduce, built-in functions, should they be segregated or just exist as regular properties like in javascript
+* functions as objects
+	* what syntax to use when turning a module definition into a variable, and vice versa?
+	* when you define a module, you can easily use it within the same context just by drawing another module with the same name
+	* but what if you want to use the module outside the context? aka pass it around
+	* libraries would leverage the same system
+	* note that this isn't totally necessary. Functions can't be "pulled out" in C++ or Java, only in things like Javascript
+
+	* this is actually less about "functions as objects" and more about having dynamic functions, aka being able to create functions dynamically and then pass them around
+
+	* there are two types of contexts to worry about: the context the function was created in, and the context the function was called from
+	* the context the function was created in is more important, the function can be called from anywhere, if its passed around it becomes more like a "remote" that can be called from anywhere, but runs within its original environment
+	* one example would be like, a button that makes a robot wave his arm, created within the robot but passed outside the robot so that anybody can make the robot wave his arm
+	* we can have similar functionality by passing around modules in Flo
+	* however, in Flo, stuff is communicated through data, not through function calls
+	* so instead of pressing a button to make the robot to wave his arm, the button-press triggers a flag, which is then registered by the robot, who waves his arm
+	* this is possibly better as well because the locus of control remains within the robot, instead of being controlled from outside
+	* better interface isolation, loose coupling
+	* everything is asynchronous too, because the person pressing the button wouldn't have to wait until the robot waves to move onto the next thing
+		* in synchronous code, when you call a function you have to wait for it to return to continue
+
+	* this can get complicated tho if, for example, the button press flag needs to get registered by multiple robots who all need to wave their arms
+
+	* normal imperative languages are function call based
+	* Flo uses a data based model, can be thought of as an event+listener model
+		* things like button presses create events (data) and then the listener consumes the event
+
+	* to handle multiple listeners, you have each of the listeners register the event and then create another event indicating that the event was registered
+	* then you have a garbage collector for the original event that waits for the event to get registered by all listeners, before deleting the event
+	* the garbage collector on the listener side waits for the event to get deleted, then deletes the event-registered event
+	* this is truly decoupled, each side only acts on their own data
+	* no race conditions
+	* even for just one listener, this method is more loosely coupled than the method of having the listener "consume" the event
+		* though much more complicated
+
+	
+currying
+	* vishvanand brought up that functions are passed around not just for passing control, but also for currying
+	* how does this fit into Flo?
+	* currying is really just for convenience
+	* all about dynamic creation of functions that were created with different scopes
+	* a way of "hiding" inputs
+
+* array.reduce
+* selectors
+* scopes and closures and enviroments
+	* in Javascript we have closures, aka a function can be "pulled out" of its environment, but it still holds onto its environment
+	* it makes sense to have implicit environments/scoping, aka not every variable used in a module has to be declared as an input
+		* modules can pull variables from its outer modules
+		* problems and solutions often only make sense within a certain context, and its unreasonable for the entire context to be declared as inputs
+	* but when you "return" a module, aka use a module outside of where it was defined, does it still hold onto the scope?
+	* useful, but counter-intuitive? Maybe theres a better way?
+
+* one of the annoying things about Flo is that it takes a lot of work to modify data
+	* for example, in imperative languages, anybody can modify a piece of data using something like `myScope.data = 10`
+	* however, in Flo, the "controller" in charge of the data has to be aware of every single actor that might want to change the data
+	* even if you use the flag based system, the actor in charge of the data has to know where the flags are to monitor them
+		* if Alice, Bob, and Clare all want to modify Joe's data, Joe has to monitor Alice, Bob, and Clare
+		* this is static, has to be registered **in the code**
+		* if we want to allow Dave to modify the data as well, we have to change Joe's code
+		* in Javascript, we can just modify Dave's code to anonymously modify the data, `Joe.data = 10`
+		* a less destruvtive method would be to have Dave put in a request, `Joe.requests.push({data: 10})`
+		* this request queue method is still not possible in Flo without modifying Joe's code
+	* every piece of data needs a central controller that is aware of every actor that might want to modify the data
+	* I mean technically, I guess imperative languages have the same thing, their central controller is the CPU and Memory Controller
+	* every program is aware of the CPU, and the CPU is aware of every program
+	* whenever a program wants to modify a piece of data, `Joe.data = 10`, then ..................
+	* we can sort of imitate this with a universal memory controller in Flo
+		* so instead of needing to bind every actor-data pair, we just bind each actor to the universal memory controller, and the universal memory controller to each piece of data
+		* 2 methods
+			1. special flag and special receiver
+				* set a flag being like `Joe.data: 10`, and the universal memory controller will look for anybody raising that special flag
+				* special receiver node that has no inputs, is set by the universal memory controller
+			2. dynamic inputs, multi-wire input, anybody can plug into that input, takes the latest value
+				EXPLAIN.................
 
 
+* turing machine using Flo, 2 complications
+	* ensuring simultaneous operations (write at tape head, move tape head, change state)
+	* "modifying" data, overwriting existing data, infinite tape
+* time is an input
+* much of these complications (output needs to be aware of all inputs) comes from the "backwards" nature of Flo (outputs are defined in terms of inputs)
+	* in javascript, we have like a little robot that goes to a memory location and writes at that location
+	* in Flo, we start at the memory location, and then define how the robot's actions affect the data at that location
+* the "dynamic inputs" are a kind of way of adding pseudo-forward logic into Flo
+
+* variables are not memory
+* we are used to re-using variables to save memory
+* but in Flo, that makes things more complicated and ugly
+
+* synchronization can be implemented using states!
+	* just have a master-slave lock system, kind of like master-slave flip flops in EE, or canal locks and airlocks in mechanical systems
+	* all outputs initially start as `null`
+	* one state waits for all outputs to be ready (aka non-`null`), then the other state "flushes" the outputs and resets them to `null`
+
+
+* the original ideas behind Flo
+	* be able to draw anything high level
+		* like the connections between a server herd
+			* zoom in on the nodes to see the server definition, or zoom in on the connections to see how they are communicating
+		* like a high level procedure including synchronous and asynchronous operations
+			* zoom in on the arrow to see how it is actually implemented, eg if its synchronous or asynchronous
+			* zoom out to see the high level procedure, where we don't care if the method is synchronous or asynchronous, as long as we have a procedural execution order
+		* like state machine
 
 
 ----------------------------------------------------------------------------------------------------
@@ -2304,3 +2419,9 @@ Decomposition and Analyzing Shared Paths
 1. Deconstruction: Break statements down into atomic binds
 2. Comprehension: Find shared variables, and join the paths
 3. Reduction: substitute single-use variables with their binding expression
+
+### Philosophy
+
+* start by defining states, not state transitions
+* bindings/relationships, not functions
+* variables and relationships are _time independent_
