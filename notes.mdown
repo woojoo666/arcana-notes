@@ -2305,9 +2305,19 @@ currying
 * but in Flo, that makes things more complicated and ugly
 
 * synchronization can be implemented using states!
-	* just have a master-slave lock system, kind of like master-slave flip flops in EE, or canal locks and airlocks in mechanical systems
+	* just have a master-slave lock system, kind of like [master-slave flip flops](http://www10.edacafe.com/book/ASIC/Book/CH02/CH02.5.php) in EE, or [canal locks](https://en.wikipedia.org/wiki/Lock_(water_navigation)) and [airlocks](https://en.wikipedia.org/wiki/Airlock) in mechanical systems
 	* all outputs initially start as `null`
 	* one state waits for all outputs to be ready (aka non-`null`), then the other state "flushes" the outputs and resets them to `null`
+
+* stack reduction should only occur for time-insensitive inputs
+	* if an input gets tons of "update" events, just calculate ....................
+
+* "public" objects and contract systems:
+	* in Flo its impossible to make an object "public", aka modifiable by anybody
+		* e.g. a light switch that anybody can turn on/off
+	* in Javascript this is easily doable, as variables are public so any function can just modify the data representing the light switch
+	* in Flo, instead we can have a contract system where the public object provides an interface through which actors can submit requests to change the object
+	* each actor just "implements" the interface, and the public object automatically monitors all active instances of the interface
 
 
 * the original ideas behind Flo
@@ -2318,6 +2328,14 @@ currying
 			* zoom in on the arrow to see how it is actually implemented, eg if its synchronous or asynchronous
 			* zoom out to see the high level procedure, where we don't care if the method is synchronous or asynchronous, as long as we have a procedural execution order
 		* like state machine
+	* tags?
+		* how to apply a map operation to every element of a tree structure
+
+* select, map, reduce
+	* default select: each property of the object
+	* default reduce: append all to a list
+	* connect select and reduce
+		* do things like rebuild the structure of a tree after applying an operation on each node
 
 
 ----------------------------------------------------------------------------------------------------
@@ -2424,4 +2442,8 @@ Decomposition and Analyzing Shared Paths
 
 * start by defining states, not state transitions
 * bindings/relationships, not functions
-* variables and relationships are _time independent_
+* data, not actions (represent actions through the data they modify)
+* variables and relationships are _time-independent_
+	* "coding" can now be time-independent, where ..........................................
+	* more holistic, rough, like painting
+* while there can be multiple ways to achieve one output, so focus on the output and less on the implementation
