@@ -2328,6 +2328,8 @@ currying
 			* zoom in on the arrow to see how it is actually implemented, eg if its synchronous or asynchronous
 			* zoom out to see the high level procedure, where we don't care if the method is synchronous or asynchronous, as long as we have a procedural execution order
 		* like state machine
+		* "sketch" programs, starting with high level diagrams and slowly filling in details
+	* persistent underlying layer of data, upper layer of transformations on that data
 	* tags?
 		* how to apply a map operation to every element of a tree structure
 
@@ -2337,6 +2339,135 @@ currying
 	* connect select and reduce
 		* do things like rebuild the structure of a tree after applying an operation on each node
 
+### READ THE NOTES FROM ONENOTE!!
+
+### Muxes, Execution Order, and Infinite Loops
+
+* currently, everything is forward-evaluated for simplicity (as in, no observation-based/call-by-need stuff)
+* however, we can't do that for recursion, or else we'll end in an infinite loop
+* thus, for true-false muxes, we use backward evaluation:
+
+```
+ -[ TRUE BLOCK  ]---|\
+ -[ FALSE BLOCK ]---|_|---
+ -[ CONDITIONAL ]----'
+```
+
+* note that the internal of the TRUE, FALSE, and CONDITIONAL blocks are still forward evaluated
+* the conditional is evaluated first to determine which true/false block is "observed", and then that block is created and evaluated
+	* just like for an mux, where first the value of the pointer is determined, and then the value at the pointer's destination
+* note that this is exactly like an if-else conditional
+* essentially, an if-else conditional is just a true-false mux with lazy evaluation!
+
+* ok actually, one issue
+* the blocks aren't explicitely defined for the "TRUE BLOCK" and "FALSE BLOCK"
+* where would you define the blocks here?
+
+```
+        ,------|\
+--[ ]--<       | |
+        `--[ ]-|_|---
+----------------'
+```
+
+* it's somewhat arbitrary where the blocks are
+* imperative works the same way. Compare:
+
+```js
+a = b+c;
+if (conditional)
+	a++;
+else
+	a--;
+```
+
+```js
+if (conditional)
+	a = b+c;
+	a++;
+else
+	a = b+c;
+	a--;
+```
+
+* I guess it makes the most sense to just make the blocks extend to the last divergence
+* this has to be computed before runtime though
+* an example of "execution metadata"
+* what if we have something like this
+
+```
+      _____
+   --|     |-|\
+   --|     | | |
+   --|_____|-|_|---
+              |
+   -----------'
+```
+
+* the recusion could be hidden inside the big block
+* thus, naively forward evaluating the big block could result in an infinite loop
+* lazy evaluation would have no problem dealing with this case though
+* imperative languages would consider this a programmer mistake, and always infinite loop
+
+```js
+if (condition)
+	x = bigBlock(a,b,c)[0]
+else
+	x = bigBlock(a,b,c)[1]
+```
+
+* so either we can:
+	* not worry about it
+	* enforce backward execution on the big block
+	* something else?
+* I don't think we should be allowed to enforce execution order on inner modules
+* after all, the whole point is that execution order doesn't matter
+* so if one execution order possibly leads to an infinite loop, it's up to the programmer to fix it
+
+* a good example of this
+* program that attaches a unique id to every page of search results
+	* one loop retrieves page after page of search results until there's no more
+	* one loop generates a unique id (maybe cranks out rsa hashes)
+	* zipper fn to zip the results of the two loops together
+	* id generator loop should technically end after there's no more results
+	* one method: synchronize the generator with the search results, generator waits for each page of search result
+	* another method: generate ids in batches of 100 before waiting for search results to catch up
+		* if not enough search results, will "clip off" the extra ids
+	* bad method: one thread generates ids without waiting at all, one thread pulls search results, first thread will infinite loop but oh well
+	* technically all methods are valid, represent different execution methods
+
+
+
+* in fact, we can extend lazy evaluation to all muxes
+* all muxes have the potential of containing conditional recursion, that would lead to infinite recursion if evaluated forward
+* we could either try to detect these loops, 
+......................................
+
+### Context and Environment
+
+* in imperative languages, the "global variables" are the context and environment
+* they represent values in a function that are relatively static, 
+........................................
+
+
+* in javascript, "global" variable use is detected at runtime
+	* if a line of code referenced an undefined variable, it'll throw an error at runtime
+* in Flo, it kinda depends
+* for forwards evaluation, the binding is created before runtime so that changes to the global variable will propagate properly
+* for lazy evaluation, the binding is created only when needed, so missing global dependencies will be detected at runtime
+
+
+### Angular, React, Vue?
+
+* wijit is probably going to look very similar to angular
+* so what will make wijit stand out from the rest?
+	* (aside from the underlying language of Flo instead of javascript, which will probably drive people away tbh)
+* the IDE interface needs to change
+* reading [this debate](https://www.reddit.com/r/webdev/comments/6xehrj/why_we_moved_from_angular_2_to_vuejs_and_why_we/dmfefim/?utm_content=permalink&utm_medium=front&utm_source=reddit&utm_name=webdev) about JSX and "separation of concern" made me realize the core problem is the IDE
+* people like JSX because it allows creation of small components where you can see the javascript+html all at once
+* people like Angular because for complicated programs, it separates the html from javascript
+* what would be nice is for the IDE to dynamically adapt to the best way of presenting code and information
+* this really shouldn't be an issue that the language/framework should solve, but a problem that the IDE should solve
 
 ----------------------------------------------------------------------------------------------------
 
@@ -2359,7 +2490,7 @@ All findings so far...
 	* this means an undefined input that is not accounted for basically "voids" the binding, making it behave as if the binding disappeared (forcing the outputs undefined by rule #6)
 9. Value bindings are for defining values
 10. Reference bindings are for defining structures
-11. Dynamic bindings are for conditional bindings
+11. Dynamic bindings are for conditional logic
 
 ### Implementation Rules
 
@@ -2405,6 +2536,9 @@ Nested Property Triggers:
 * Event propagation
 * Copy
 
+Muxes
+* 
+
 ### Copy Bind
 
 * when binding to an object, use a recursive bind to create bindings between every descendant of the input and the corresponding descendant of the output
@@ -2447,3 +2581,13 @@ Decomposition and Analyzing Shared Paths
 	* "coding" can now be time-independent, where ..........................................
 	* more holistic, rough, like painting
 * while there can be multiple ways to achieve one output, so focus on the output and less on the implementation
+* define the structure and the relationships between the data, and let the compiler/interpreter determine the optimal procedure
+	* interpretted? compiled for single-threaded systems? compiled for multiple-threaded systems? etc...
+
+### Advantages
+
+* easier to debug, because every "line of code" is accompanied with some sort of data change
+	* imperative languages have "void" functions, how to determine if they were actually executed in a unit test?
+* more collaborative
+	* loose coupling and no "side-effects" means that you can import modules with less worry
+	* the community can compete to optimize popular modules, and everybody can benefit without changing their code
