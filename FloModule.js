@@ -33,6 +33,13 @@
  *	}
  */
 
+Sub-property watching
+Alias binding
+select/map/reduce
+Synchronization
+timelines
+
+
 class FloModule {
 
 	constructor (fn) {
@@ -161,8 +168,10 @@ class FloModule {
 
 	trigger (path) {
 		var listeners = this.getListeners(path);
-		for (var prop : listeners) {
-
+		for (var prop : this.bindings) {
+			if (prop.substr(position || 0, path.length) === path) {
+				listeners.append(this.getListeners(prop));
+			}
 		}
 		for (var i = 0; i < listeners.length; i++) {
 			listeners[i]();

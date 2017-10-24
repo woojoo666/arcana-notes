@@ -2469,6 +2469,82 @@ else
 * what would be nice is for the IDE to dynamically adapt to the best way of presenting code and information
 * this really shouldn't be an issue that the language/framework should solve, but a problem that the IDE should solve
 
+
+* List monad powerset is just a way of converting a set of sets into exponentiation
+* List monad == multiplication/exponentiation
+* Multiplication is a way of combining sets
+* An alternative to recursion (which is another way of combining sets)
+* Multiplication is a fully valid alternative
+* Multiplication == repeating, for-loops
+* Turing complete
+	* Multiply Turing function by infinity to make it loop infinitely
+* binary tree example
+	* $2*2*2*2...$ n times, creates an n-dimensional space with $2^n$ cells, each corresponding to a leaf in a binary tree with $n$ height
+* Permutations example
+	* similarly, create a n-dimensional space using $n*(n-1)*(n-2)...*2*1$
+* any time map an item to a set, eg `for 0<i<N, do ... with i`, you are adding a dimension
+* Actually cleaner than recursion, separates logic from sample space, less spaghetti
+* Allows accumulation of values at leaves?
+* Order-agnostic multi-dimensional iteration?
+* Extension to data types? How to create an order-agnostic multi-dimensional array without using "set of sets"?
+	* Use properties. Instead of using Grid[5][7] use Grid[row: 5][col: 7], and optimize the datatype in the background to fit the use case
+
+* imperative languages like to use "stacking", taking operations with fixed number of inputs, and stacking them to allow for variable number of inputs
+	* recursion, nested for-loops, arrays of arrays, etc
+* however, many of these operations are commutative, aka order doesn't matter
+* so it creates order where there doesn't need to be any
+
+* sets allows us to define a "repeat" operator, which repeats any module/operation
+* "repeat" operator enables us to do multiplication and exponentiation
+* the hard part is defining all the different ways of combining these "repeated" modules
+* maybe have a "multi" input which takes a normal operator and, when fed multiple inputs, automatically stacks them?
+
+* context
+* filterM (list monad version) preserves the link between list element and include/exclude
+
+* objects == modules
+	* modules are just objects, with properties that are dynamic generated based on rules
+	* i guess this is kinda already covered since we said earlier that objects are just bare modules with 1-to-1 wires
+
+* replace order with labels
+	* in stacked for-loops, we can specifically reference each for-loop by their respecive depths, or by their unique "i" "j" "k" labeling
+	* when we lose order, we have to reference them explicitely by labeling them
+
+* one issue with powerset is that, after the exponentiation module blows up all the individual [true,false] lists into a set of all sequences of [true/false, true/false, true/false...], we have to map the elements of these sequences back to the elements of the original list in order to include/exclude them during the filter operation
+* for example, if the input list was `["a","b","c"]` and one of the sequences is `[true, false, false]`, how do we know which letter is mapped to which boolean? after all, these are unordered sets
+* in haskell, the list monad uses recursion and scopes to "keep track" of which boolean corresponds to which element
+* however, the exponentiation module loses that information
+* I was trying to think of how to extend scopes/context in Flo to handle this
+* after talking with vishvanand, realized that I was trying to make the language do too much
+* instead, the exponentiation module should allow for optional labels to each input list, and each element of the output sequences retain that label
+* eg: if the input is `[1, 2]  (foo)` and `[a, b]  (bar)`, then the outputs would be `[1 (foo), a (bar)]  [1 (foo), b (bar)]  [2 (foo), a (bar)]  [2(foo), b (bar)]`
+* an ordered exponentiation module could be slightly cleaner, with the output sequences simple matching the order of the inputs, so no labels are needed
+
+* objects can have "empty"/default properties
+	* this allows for stuff like sets with properties, numbers with properties, etc
+	* also allows for un-named inputs
+	* can only have one "empty"/default input and output though
+	* allows for tagging/labeling
+		* adding properties to objects without changing everything else
+	* for example, if you have `myArray.concat([1,2,3])`, you can add tags to `myArray` without having to change it to `myObject.myArray.concat([1,2,3])`
+	* how do these tags get passed on when there's multiple inputs and a single output?
+	* the problem is that maybe you'll have a flow that inspects and modifies and rearranges some objects
+		* how can you add a tag while ensuring that it won't interfere with existing object properties?
+		* eg: traversing a graph of nodes, where each node has a `children` property, but each node stores an object
+		* traditionally, you'd have a `node` object that has a `children` property and a `value` property, where the object is stored in `value`
+		* now, if you want to do a BFS traversal, you might want to add a `visited` tag, which you could add onto `node`
+		* but for a generic BFS traversal function, we don't know if the input `node` objects already have the `visited` property
+		* so we have to add yet another wrapper, `BFS_node`, that is just used for the traversal, and has a `node` property and a `visited` property
+	* we create "context-specific" properties, kind of like Scheme's symbols, which are guaranteed not to collide with existing properties
+	* these are also useful as constants and stuff (eg the `filter.INCLUDE` and `filter.EXCLUDE` example in the OneNote doc)
+	* technically you can create symbols in javascript and other imperative languages using pointers
+		* `filter.INCLUDE = {}`, now you can use `filter.INCLUDE` as a unique value
+		* however, in javascript you can't use these pointers as property names (`filter.INCLUDE` will be cast to the string `"[object Object]"`)
+
+* unordered sets are a primitive
+	* can have duplicates (unlike dictionaries)
+	* how to create a hashset (no duplicates)??
+
 ----------------------------------------------------------------------------------------------------
 
 Summary
