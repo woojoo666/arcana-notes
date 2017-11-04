@@ -2520,14 +2520,44 @@ else
 * eg: if the input is `[1, 2]  (foo)` and `[a, b]  (bar)`, then the outputs would be `[1 (foo), a (bar)]  [1 (foo), b (bar)]  [2 (foo), a (bar)]  [2(foo), b (bar)]`
 * an ordered exponentiation module could be slightly cleaner, with the output sequences simple matching the order of the inputs, so no labels are needed
 
-* objects can have "empty"/default properties
-	* this allows for stuff like sets with properties, numbers with properties, etc
-	* also allows for un-named inputs
-	* can only have one "empty"/default input and output though
-	* allows for tagging/labeling
-		* adding properties to objects without changing everything else
-	* for example, if you have `myArray.concat([1,2,3])`, you can add tags to `myArray` without having to change it to `myObject.myArray.concat([1,2,3])`
-	* how do these tags get passed on when there's multiple inputs and a single output?
+### Node datatype
+
+* in Flo, instead of objects, we have "Nodes"
+* Nodes have a value, and a dictionary of tags (key-value pairs)
+* this allows for stuff like numbers with tags, sets with tags, etc
+* this is the most natural way to represent nodes in a graph
+	* every node has a value, and graph edges are the tags
+	* instead of cutting up the world into objects, we think of the world as a giant web of relationships, every object is just a node in that web
+	* this is why Flo and Common Knowledge work so well together
+	* eg: instead of creating a "song" object, we have the mp3 file as the value, and tags that link to the artist, the album, the album art, etc
+
+* almost identical to objects tbh
+	* you can convert any javascript object to a Node just by wrapping it in `{value: ____, tags: ____}`
+	* but making it a default datatype removes the need to wrap it
+* objects can be thought of as Nodes without a value
+* the "value" of a Node can be thought of as corresponding to a default/empty key of a dictionary
+* extension: because modules are just "objects" with dynamically rendered properties, they can also have an unnamed input/output
+	* in other words, because "objects" are just modules with wires connecting each input to an output, there is also the unnamed input/output
+
+* allows for tagging/labeling
+	* adding properties to objects without changing everything else
+* eg if we have `myArray.concat([1,2,3])`, we can add tags to `myArray` without having to change it to `myObject.myArray.concat([1,2,3])`
+
+------ stuff below is still in progress -----
+
+? how to we specify whether an operation works on the Node's value or on the tags?
+	* only the property accessor operator works on tags (think the `.` and `[]` operator in javascript)
+	* every other operator works on the value
+	* property accessor can use regex and pattern matching as well
+	? perhaps we have a class of functions that are for pattern matching? or perhaps we allow any module to be used as a pattern matcher, as long as it has a boolean output? (if it has multiple inputs it will try every combination of sets of keys as inputs)
+		* the `[]` operator takes a matcher as the input, and applies it to the key-value pairs of Node
+		* eg `myNode[myMatcher]`
+		? if the matcher only takes in single value inputs, then it acts on keys
+		? if the matcher takes in sets as inputs, then it acts on [key value] pairs?
+		* if the matcher is a string or a number or set, then simply checks for equality (on the keys, not values)
+		* `.` operator is shorthand for string matcher, eg `foo.bar == foo["bar"]`
+
+* 
 	* the problem is that maybe you'll have a flow that inspects and modifies and rearranges some objects
 		* how can you add a tag while ensuring that it won't interfere with existing object properties?
 		* eg: traversing a graph of nodes, where each node has a `children` property, but each node stores an object
@@ -2541,9 +2571,37 @@ else
 		* `filter.INCLUDE = {}`, now you can use `filter.INCLUDE` as a unique value
 		* however, in javascript you can't use these pointers as property names (`filter.INCLUDE` will be cast to the string `"[object Object]"`)
 
-* unordered sets are a primitive
-	* can have duplicates (unlike dictionaries)
-	* how to create a hashset (no duplicates)??
+	? we can also use symbols as namespaces?
+
+### Sets vs Array
+
+* in addition to the de factor "Number", "Node", and "String" base datatypes, we also have "Set" and "Array"
+* sets are unordered sets of objects
+	* can have duplicates (unlike when you use dictionaries as hashsets)
+	* note: doesn't use commas, eg `(1 2 4)`
+* arrays are ordered sets
+	* mostly for matrix and math operations
+	* `+` and `*` operators are geared towards matrix operations when operating on arrays
+
+? how to create a hashset (no duplicates)??
+
+### The `+` and `*` Operators
+
+* `+` sign works differently for each primitive
+	* Numbers: addition
+	* String: concatenation
+	* Set: concatenation
+	* Array: matrix addition
+* `*` symbol is kind of like a repeat operator
+	* note that for numbers, it represents adding itself a given number of times
+	* thus, it works similarly for other primitive datatypes
+	* Numbers: multiplication
+	* String: repeats the string, `"a"*3 == "aaa"`
+	* Set: repeats the set wrapped in a larger set: `(a b c)*3 == ((a b c) (a b c) (a b c)`
+		? exception: single item sets don't get wrapped in a larger set: `(a)*3 == (a a a)`
+	* Array: matrix multiplication
+	? Module: repeats the module?
+? exponentiation? how to extend the `**` methodology?
 
 ----------------------------------------------------------------------------------------------------
 
@@ -2614,6 +2672,52 @@ Nested Property Triggers:
 
 Muxes
 * 
+
+### Operations
+
+* property access
+	* by name
+	* using variable
+		* mux
+* declare object
+* modify property
+* declare module
+* use module
+* timeline
+* pattern match / for loop
+* combine
+
+### Typed Syntax
+
+	x = a + b
+	set = (3 5 7)
+	out = mymodule(a b)
+	obj = { (a b), a: 5, b: 10 }
+	prop = obj["a"] || obj.a
+	obj2 = set(obj.a, 6)
+	obj3 = for (x in obj) {
+	}
+
+	module funtimes (in1, in2) {
+
+	} (out1, out2, out3)
+
+	module demoDefaultOutput (in1, in2) {
+		out = in1 + int2
+	}
+
+	allBinaryLength = paragraph.match(/[01]+/g).foreach(module (e) {
+		x = e.length
+	} (x)).combine(module (curr, prev) {
+		out = curr + prev
+	})
+
+* how to minimize stacking in the "reduce" operation
+* take advantage of the fact that "void" functions don't exist, maybe we can make some syntax cleaner?
+* `+` operator is for concatenation
+* `*` operator is for repeat
+* `[]` operator is for matchers
+	* `.` operator is shorthand for a string matcher
 
 ### Copy Bind
 
