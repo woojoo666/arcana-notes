@@ -2556,6 +2556,8 @@ else
 		? if the matcher takes in sets as inputs, then it acts on [key value] pairs?
 		* if the matcher is a string or a number or set, then simply checks for equality (on the keys, not values)
 		* `.` operator is shorthand for string matcher, eg `foo.bar == foo["bar"]`
+	? what assignment? should it by default pass on only the value? or the entire node?
+	? what about combination operators
 
 * 
 	* the problem is that maybe you'll have a flow that inspects and modifies and rearranges some objects
@@ -2572,6 +2574,33 @@ else
 		* however, in javascript you can't use these pointers as property names (`filter.INCLUDE` will be cast to the string `"[object Object]"`)
 
 	? we can also use symbols as namespaces?
+
+* "types" are tags as well
+	* can implement a type system by adding "type" tags to everything
+	* operations like `+` and `*` would be modified to pass on the type tag
+		? how to make the modified operators the default? maybe override them in the namespace?
+	* create an "extend" module to handle inheritance
+	? polymorphism?
+* in this vein, tags should be passed on by default during assignment
+? namespace?
+	* the operators `+` and `*` and assignment `=`, are all imported operations, provided by the environment
+	* to actually enforce the type system, you would re-define/override those operators, and then create a module with the new environment
+	* everything inside that module now follows the type system
+
+* technically, primitive types like Numbers and Strings are not "inherent" primitive types, they are defined by us
+* eg Regex is a primitive type in Javascript, but not in Java
+* eg we can define a new primitive type like "user", and we would only need to do a few things
+	* define it's binary representation, and a syntax to declare it, eg `<name, age>`
+	* define it's behavior for primitive operators like `+` and `*` (or throw an "unsupported" error if appropriate)
+* given this, does it still make sense for Nodes to have a primitive value?
+* seems more like Nodes are just the same thing as Java objects, just with special behavior when the object is a Number or String and the operation is `+` or `*`
+
+### Node datatype: to keep or not to keep?
+
+* Pros:
+	* less wrappers
+* Cons:
+	* complexity: equality (are you checking if the Node value is equal? or if all the tags are equal as well?)
 
 ### Sets vs Array
 
@@ -2602,6 +2631,25 @@ else
 	* Array: matrix multiplication
 	? Module: repeats the module?
 ? exponentiation? how to extend the `**` methodology?
+
+### Equality
+
+* the concept of Nodes introduces a complication: does the equality operator check if the Node values are equal, or does it check if all the tags are equal as well?
+* just like javascript
+	there are two equality operators, `==` and `===`
+	* `==` checks value equality, ignores tags
+	* `===` checks reference equality, aka if they are referencing the same Node
+* in order to check if two different Nodes are "equal", you need to do a recursive deep check, going through all the tags and checking for equality within them
+* this has its own special function, `isIdentical(node1, node2, ...)`
+
+? note: following this, if you do `a == b`, and `a` and `b` are different null Nodes, then this equality check will still return true, because it checks the values (which are both null)
+* but if null Nodes are supposed to be analogous to javascript objects, then `a == b` should behave like javascript object equality, which will check if the references are the same
+* I guess we could create "object" Nodes, whose value is just a reference to itself, so `a == b` would check if the references are the same if `a` and `b` are both object Nodes
+* sort of makes sense. an object is different from a null node with tags. An object is meant to contain a set of properties. A null node is just meant to represent "null", and the tags are optional add-ons
+? this sort of removes the need for `===` as well: just make the default node an Object Node instead of a null Node
+
+? this brings up another complication: what if we want to check for equality of some tags, but not others? eg, equal "type" tag, but nothing else
+* perhaps this is where the type system comes in? If you want to implement a type system, then you would override the value equality operator `==` to also check if the "type" tags are equal
 
 ----------------------------------------------------------------------------------------------------
 
