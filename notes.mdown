@@ -2778,7 +2778,69 @@ timeline leading to a timeline? timelines should specify exactly what to track, 
 	* on the other hand, it's impossible to reference the local property inside submodules unless the container module has a name
 * hmm I guess javascript has this as well, just do `this.localProp = new Symbol()` inside a function
 
+### Optimizers
 
+* optimizers are basically metaprogramming, reconfiguring code to make it more efficient
+* below, we'll use javascript-like Flo pseudocode to explain how they work
+
+```js
+// time varying input temperature
+// adds up all the changes in the temperature, squaring the last term before adding it
+// result = t_1 + t_2 ... + t_(n-1) + (t_n)^2
+// note: list.split() function takes an array of selectors, and returns an array of sets,
+//       each set containing matches from the input list found for that selector
+//       split.rest is a special selector that selects everything not selected from previous selectors
+// note that because split() returns multiple lists, map() needs to provide a map fn for each list
+function sum_changes_with_last_squared(temperature) {
+	var changes = changelist(temperature)
+	return changes.split([n => n == changes.last, split.rest]).map([x => x*x, x => x]).concat().reduce(sum)
+}
+
+// a more efficient state-based version written in javascript
+// --------- begin javascript code -------------
+var last = 0
+var sum_of_before_last = 0
+function on_temperature_changed(temperature) {
+	sum_of_before_last = sum_of_before_last + last
+	last = temperature
+	return sum_of_before_last + last*last
+}
+// -----------end javascript code ----------
+
+// the same thing written in Flo
+// we can imagine an "optimizer" that we can apply to the original to re-configure it to this efficient version
+// notice that each step in the changelist is only dependent on the previous step
+// thus, once each step is computed, the results can be cached for the next step
+// put a different way, because the data in previous steps aren't used anymore, they are garbage collected
+function optimized_version(temperature) {
+	return changelist(temperature).reduce((current, [last, sum_of_before_last, result]) => [current, sum_of_before_last+last, sum_of_before_last+last+current*current], [0,0,0])
+}
+
+// note that this optimization is completely predicated on the fact that changelist() implementation maintains state
+// note that while it may look like javascript, this is Flo code
+synchronized function changelist(input) {
+	feedback var list
+	synchronized function (list, input) {
+		list = input == list.last ? list : list.push(input)
+	}
+	return list
+}
+
+// thus, we can imagine an even more high level optimizer, one that inspects synchronized feedback mechanisms
+// however, while more generalized, such an optimizer would be slower, having to reach into the changelist() implmentation
+// to figure out that it can re-configure the module like it was done above
+// so instead of having the optimizer reach all the way into the changelist() implementation to figure this out,
+// we can "memoize" this rule! cache this specific case for whenever dealing with changelist()
+
+// note the process we just went through. We first wrote our optimizer. Then we found a higher-level optimizer,
+// for which our original optimizer was just a special case of this higher-level optimizer. In a way, we are
+// "memoizing backwards", replacing our original code with a memoization of higher level code.
+
+// this is a core development process in Flo. For example, imagine if we had come up with the optimized, state-based
+// version of sum_changes_with_last_squared() first. Then later, we realize that it's just an optimization of the
+// stateless high-level version. Then we replace our original code with the higher level version (which is easier to
+// understand), and record the specific optimization to use in the metadata.
+```
 
 ----------------------------------------------------------------------------------------------------
 
