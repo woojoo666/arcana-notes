@@ -2559,21 +2559,6 @@ else
 	? what assignment? should it by default pass on only the value? or the entire node?
 	? what about combination operators
 
-* 
-	* the problem is that maybe you'll have a flow that inspects and modifies and rearranges some objects
-		* how can you add a tag while ensuring that it won't interfere with existing object properties?
-		* eg: traversing a graph of nodes, where each node has a `children` property, but each node stores an object
-		* traditionally, you'd have a `node` object that has a `children` property and a `value` property, where the object is stored in `value`
-		* now, if you want to do a BFS traversal, you might want to add a `visited` tag, which you could add onto `node`
-		* but for a generic BFS traversal function, we don't know if the input `node` objects already have the `visited` property
-		* so we have to add yet another wrapper, `BFS_node`, that is just used for the traversal, and has a `node` property and a `visited` property
-	* we create "context-specific" properties, kind of like Scheme's symbols, which are guaranteed not to collide with existing properties
-	* these are also useful as constants and stuff (eg the `filter.INCLUDE` and `filter.EXCLUDE` example in the OneNote doc)
-	* technically you can create symbols in javascript and other imperative languages using pointers
-		* `filter.INCLUDE = {}`, now you can use `filter.INCLUDE` as a unique value
-		* however, in javascript you can't use these pointers as property names (`filter.INCLUDE` will be cast to the string `"[object Object]"`)
-
-	? we can also use symbols as namespaces?
 
 * "types" are tags as well
 	* can implement a type system by adding "type" tags to everything
@@ -2650,6 +2635,150 @@ else
 
 ? this brings up another complication: what if we want to check for equality of some tags, but not others? eg, equal "type" tag, but nothing else
 * perhaps this is where the type system comes in? If you want to implement a type system, then you would override the value equality operator `==` to also check if the "type" tags are equal
+
+? what about nested objects? like if i have an object {song, name, length, artist}, perhaps i want the node value to be this object, amd add some tags to the node, not the object
+? node value can be used as a "default" value?
+	eg if you have a node `sizes = {100, small: 10, medium: 100, large: 1000}`, then you can do `my_size = sizes[]` or `my_size = sizes.small`???
+
+### Symbols
+
+* in Scheme, symbols are like unique identifiers, useful for creating enums for states and such
+	* eg the `filter.INCLUDE` and `filter.EXCLUDE` example in the OneNote doc
+* Java/C++ have a similar construct for enums
+* Ocaml has [Variants and Tags](https://realworldocaml.org/v1/en/html/variants.html)
+* Javascript can actually create ad-hoc symbols using pointers, just create a variable that points to an arbitrary object, eg `
+	* eg `color.BLACK = {}`, now you can use `color.BLACK` as a unique value
+* Java, C++, and other imperative languages can technically use this trick as well
+
+
+
+	* however, in javascript you can't use these pointers as property names (`filter.INCLUDE` will be cast to the string `"[object Object]"`)
+
+
+* the problem is that maybe you'll have a flow that inspects and modifies and rearranges some objects
+	* how can you add a tag while ensuring that it won't interfere with existing object properties?
+	* eg: traversing a graph of nodes, where each node has a `children` property, but each node stores an object
+	* traditionally, you'd have a `node` object that has a `children` property and a `value` property, where the object is stored in `value`
+	* now, if you want to do a BFS traversal, you might want to add a `visited` tag, which you could add onto `node`
+	* but for a generic BFS traversal function, we don't know if the input `node` objects already have the `visited` property
+	* so we have to add yet another wrapper, `BFS_node`, that is just used for the traversal, and has a `node` property and a `visited` property
+* we create "local" properties, kind of like Scheme's symbols, which are guaranteed not to collide with existing properties
+
+
+? we can also use symbols as namespaces?
+
+### Symbols as Tags and Local Properties
+
+* symbols can be tags as well
+
+? context follows a naturally tree structure, but tags are more of a undirected graph structure...does this make sense
+	* like it could just be better to just use wrappers, which are also a tree structure
+
+? local properties are how Arcane internally implements caching/memoization
+	* not visible from the outside
+
+? should they be considered or copied over when checking for object equality or doing object deep-copies?
+
+### RENAME!! Flo is now Arcane
+
+* renamed Flo to Arcane! Flo is a bit generic and doesn't really capture the concepts of the language very well
+* Arcane was actually inspired by the magic references in the sidebar of a diagram-based dataflow language similar to mine, [unseen programming](https://www.reddit.com/r/unseen_programming/)
+* I was reminding of my own fascinations with magic, and I realized that combined with the spoken word commands and drawings that look like runes or magic circles, my language could really look like the magic of ye olden times
+* this language is also meant to speed up programming, quickly tying together a global database of data and APIs, kind of like casting spells
+* thus, Arcane seemed like a fitting name, and doesn't seem taken yet
+
+### Arcane as a Distributed Language
+
+* most imperative languages don't work well in distributed systems simply because they use too many non-serializable constructs
+	* threads, pointers, classes, etc
+* javascript kind of gets around this by using strings for almost everything, eg object properties and class methods (which are technically the same thing)
+* however, this is also not very conducive for distributed systems because you have to be careful for name collisions
+	* eg when adding a property to a object, have to make sure you're not overriding existing properties
+	* collisions become much more likely at a global distributed scale
+* Arcane however is designed to be a distributed language, encouraging collaboration between live processes across the internet
+* thus, Arcane needs to have a system to ????????????????????????????
+
+### Add-ons
+
+* community plugins simply check if certain variables/properties exist, and then generate outputs/data/more properties
+* can be used to extend the functionality of an object
+? uses local properties so they don't affect the general behavior of the object? doesn't affect the current flow?
+
+### Two-Sided Bindings/Tags??
+
+* makes sense to have it because it removes unnecessary order
+* wouldn't be hard to implement it as a system on top of Arcane though
+* just create `Edge` objects between nodes
+* create local property `neighbors` for each node, that calculates each node's neighbors using the edge objects
+
+
+
+* local properties are kind of like local variables
+* except instead of local variables, they're like local bindings (think: graph edges vs graph nodes)
+
+* for local properties, should they be factored into things like assignment? counting the number of tags/properties?
+
+* two conflicting ideas:
+	* tag things without changing the rest of the flow, especially when passing the object to sub-modules
+		* wrappers change the flow, because instead of doing stuff like `obj.isAlive` you have to do `wrapper.obj.isAlive`
+	* access and use local properties within the flow, just like with normal tags
+* these are conflicting ideas, because either the local properties should be visible or not visible to the flow/submodules
+	* if it's visible, it'll affect the flow. If it's invisible, you can't access or use them within the flow
+* maybe we can make it invisible unless you explicitly reference it?
+	* might involve some backtracking, but how far back should we backtrack?
+
+
+? myModule.localProp vs this.localProp
+	? myModule.localProp is visible to everything inside the module, including submodules
+	? this.localProp is visible only to everything directly inside the module, discluding submodules
+		? even though an object might be tagged `myObj[this.localProp] = 5`, it will be invisible within submodules, until it comes out of the submodule
+
+
+* technically we can think of everything as local properties
+* eg types, or other kinds of environments we might want to create
+* we don't really want `type` to be visible when we iterate through object properties
+* whether or not a tag is visible or invisible should be up to the programmer
+
+* only transferred through assignment?
+* local properties are for creating systems, eg a type system
+	* for creating an invisible layer of rules for the data to follow
+* they aren't part of the data, rather, they are part of the system
+* like metadata
+* kind of like non-enumerable properties in javascript
+
+
+? local properties can still collide with local properties from ancestors
+	* eg if module called `TypeSystem` has local property `type`, then even though it's hidden, we can't make another local property `type` inside submodules simply because the variable names collide
+	* how would we know which `type` symbol we are referring to, when we want to use one of them?
+
+
+python decorations?
+timeline leading to a timeline? timelines should specify exactly what to track, otherwise prone to tracking noise
+	input to timeline should be synchronized to something
+
+* programmer needs a way to specify particular aspects to change, while leaving the rest untouched
+* for example, a type system changes the way operators behave (numbers => addition, strings => concatenation)
+* local properties are important, because they allow a programmer to add properties without changing property enumeration or causing collisions
+* lets programmer explicitly define where the behavior needs to change, without changing anything else
+* Flo programs can be thought of as data, and operated on, re-arranging and modifying the program behavior
+
+
+* aw shit looks like javascript has local properties, called "symbol properties"
+* found it when going through [Mozilla's javascript inheritance tutorial](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Objects/Inheritance), and I looked up [`Object.getOwnPropertyNames()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyNames)
+* looks like it stemmed from the same exact motivation that I had, [see this](https://www.keithcirkel.co.uk/metaprogramming-in-es6-symbols/)
+* damn, beat to the punch :(
+
+* I guess the only difference between symbol properties and local properties is the concept of locality
+* when I first came up with local properties, it was about properties that were only visible inside a module
+* the local properties would be disappear when the data went outside the module
+* I guess javascript symbol properties can work the same way:
+	* if a symbol is defined in a function, then once data leaves the function, the symbol property would get garbage collected
+* I also have the concept of `this.localProp`, which is kind of like an anonymous local property
+	* the container module doesn't need to have a name, `this` refers to the current container
+	* on the other hand, it's impossible to reference the local property inside submodules unless the container module has a name
+* hmm I guess javascript has this as well, just do `this.localProp = new Symbol()` inside a function
+
+
 
 ----------------------------------------------------------------------------------------------------
 
