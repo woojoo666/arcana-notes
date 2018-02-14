@@ -1097,7 +1097,7 @@ test.bind(foo, [bar, bar[0], bar[1], ...], args => {
                                             foo[1] -' '-> reversedFoo[1]
 ```
 * the alias binding of `foo[0]` needs to be reassigned!
-* lastly, consider a demultiplexer: `output = x? foo : bar`
+* lastly, consider a multiplexor (mux for short): `output = x? foo : bar`
 
 ```
   foo --
@@ -1260,10 +1260,10 @@ FloModule.bind(dest, [src], (innerscope, array) => {
 	* this is the "event propagation" method discussed earlier
 	* the "copy value" method and "alias binding" methods are both optimizations
 * notice that alias bindings involve removing and recreating bindings
-	* eg, `output = multiplexor ? inputA : inputB`, `x = output.foo`
-	* when `multiplexor` changes, `x` switches between binding with `inputA` and `inputB`
+	* eg, `output = mux ? inputA : inputB`, `x = output.foo`
+	* when `mux` changes, `x` switches between binding with `inputA` and `inputB`
 * thus, any binding attached to an alias is a dynamic binding!
-* another way of looking at it is, using the previous multiplexor examples, `x = aliasSource[output].foo`
+* another way of looking at it is, using the previous mux (short for multiplexor) examples, `x = aliasSource[output].foo`
 
 
 
@@ -1271,7 +1271,7 @@ FloModule.bind(dest, [src], (innerscope, array) => {
 
 notice that value bindings, dynamic bindings, and alias bindings have rather different mechanisms
 what if we mix them?
-`foo = multiplexor ? myValue : myArray`
+`foo = mux ? myValue : myArray`
 the issue is that, bindings to `foo` are different based on whether `foo` is an alias or not
 if `foo` is an alias, we use a dynamic bind, otherwise we just use a static bind
 
@@ -1419,7 +1419,7 @@ value graph:
 ### Observed Outputs
 
 * we don't need to update outputs that are not being observed
-* for example, for a demultiplexor, `foo = x ? a : b`, only one output is being observed at a time
+* for example, for a mux, `foo = x ? a : b`, only one output is being observed at a time
 * whichever output is not being observed, does not need to be updated
 * this property traverses backwards as well
 * if `a` is not being observed, and `a = m + n`, then `m` and `n` don't need to be updated as well
@@ -1630,7 +1630,7 @@ Comparison:
 * in order to automatically detect dynamic bindings, we need to identify and categorize a few key cases
 * some indisputably dynamic bindings include:
 	* reverse bind: `for (n in foo) { reversed[foo.length-n-1] = foo[n] }`
-	* demultiplexor: `a = x ? b : c` where `b` and `c` are collections (or perhaps it shouldn't matter if `b` and `c` are collections, because variables can change between value/collection at any time)
+	* mux: `a = x ? b : c` where `b` and `c` are collections (or perhaps it shouldn't matter if `b` and `c` are collections, because variables can change between value/collection at any time)
 * it seems like **any time the memory location of a variable is dynamic, you need a dynamic bind**
 * thus, in the case of `x2`, the memory location never changes (even in the dynamic bind, because without a binding, `x2` just becomes undefined), so it should be a normal bind
 
@@ -1776,11 +1776,11 @@ module ListBind(list, index, fn) {
 
 * we just showed how to decompose a for-loop iterated list bind into a linked-list style dynamic bind, made up of completely atomic binds
 * modules create multiple bindings, though modules seem like a special case altogether, like a whole new abstraction layer on top of dynamic bindings
-* simple demultiplexors use multiple bindings as well: `out = a ? x : y` either creates a binding between `x->out` or `y->out`
+* simple muxes use multiple bindings as well: `out = a ? x : y` either creates a binding between `x->out` or `y->out`
 * if we try to decompose it into two binds: `if (a) then bind(out = x)`, `if (!a) then bind(out = y)`, now it looks like `out` can be bound to two variables (even though it never actually happens)
 * we could use a priority queue method of resolving multiple bindings for one output (first non-undefined binding determines the output, everything else ignored), but does this make sense?
-* or perhaps by atomic, we could mean "one output variable", so even though demultiplexors control multiple bindings, they only create one output variable
-* doesn't make sense to split up a demultiplexor's bindings, because each binding needs to know about eachother to ensure they never break rule 3 (every output is determined by exactly one binding)
+* or perhaps by atomic, we could mean "one output variable", so even though muxes control multiple bindings, they only create one output variable
+* doesn't make sense to split up a mux's bindings, because each binding needs to know about eachother to ensure they never break rule 3 (every output is determined by exactly one binding)
 ... ehhh hold onto that thought
 
 
@@ -1800,7 +1800,7 @@ module ListBind(list, index, fn) {
 	* when a "trigger" to the module changes, all the bindings are re-created
 	* for example, a group of bindings where each binding maps to an element of the input collection
 * this made the most sense for collection bindings, where the bindings are based off the structure of a single collection (see "Dynamic Collections Bindings are Based on Structure")
-* however, this gets complicated for situations like demultiplexors, where we might have multiple triggers, and the triggers are separate from the inputs to the bindings
+* however, this gets complicated for situations like muxes, where we might have multiple triggers, and the triggers are separate from the inputs to the bindings
 	* eg `out = ar[x+y/z]`, where input is `ar`, and the triggers are `x`, `y`, and `z`
 	* (note: yes, if we extract `x+y/z` and use the result for the dynamic bind, we are left with only one trigger. This is covered later in this section)
 * note that this meant modules would have both inputs and triggers, and they would need to be specified
@@ -1837,8 +1837,8 @@ dynamicBind('reversedFoo', {input: 'foo'}, ['foo.length'], reverseModule);
 * note that there are two types of dynamic bindings
 	1. a binding created based on a single condition, eg `if (x) then bind(y = z)`
 		* commonly occurs in recursive data structures, like linked-lists or trees, where the tail end points to undefined (aka not bound to anything)
-	2. a binding where the memory locations of some inputs are dynamic, eg a demultiplexor: `out = x ? a : b`
-		* commonly occurs in demultiplexors or array operations, eg binary search
+	2. a binding where the memory locations of some inputs are dynamic, eg a mux: `out = x ? a : b`
+		* commonly occurs in muxes or array operations, eg binary search
 * we can reduce this into one mechanism in 2 ways:
 	1. reduce (2) into (1): an input with dynamic memory location is just a one-hot conditional bind
 		* eg. `out = x ? a : b` becomes `if (x) then bind(out = a) else bind(out = b)`
@@ -1925,11 +1925,11 @@ dynamicBind('reversedFoo', {input: 'foo'}, ['foo.length'], reverseModule);
 * Flo is about data and persistent definitions
 * for cases that are not accounted for, output should be undefined
 
-### Persistence, Multiplexors and Branches
+### Persistence, Muxes and Branches
 
 * imperative code is forward moving
 * a sequence of statements executed in forward direction (forward in time)
-* uses multiplexors, aka if-else statements
+* uses muxes, aka if-else statements
 
 ```
 x ---.--- if x > 3 ----- do something
@@ -1938,7 +1938,7 @@ x ---.--- if x > 3 ----- do something
 
 * in Flo, update events move fowards, but conditionals are "backwards" in a sense
 * define outputs in terms of inputs
-* uses demultiplexors
+* uses muxes
 
 ```
 ```
@@ -1948,7 +1948,7 @@ x ---.--- if x > 3 ----- do something
 * however, sometimes you might want to save space/computation, and prevent a branch from being computed until needed
 * this can be solved with "observability" (discussed)
 
-* you can do this with a multiplexor, combined with the fact that binds are not evaluated if the input is undefined (and the output is automatically undefined)
+* you can do this with a mux, combined with the fact that binds are not evaluated if the input is undefined (and the output is automatically undefined)
 	* note: if-undefined modules are a special case, discussed later
 * something like
 
@@ -2061,7 +2061,7 @@ x ---.--- if x > 3 ----- do something
 ### Passive Language vs Active Language
 
 * many optimizations have been discussed so far, each with their own tradeoffs
-	* alias binding: slow alias index updates (eg when demultiplexor switches inputs), fast alias value updates
+	* alias binding: slow alias index updates (eg when mux switches inputs), fast alias value updates
 	* lazy updates: fewer unnecessary updates, more memory usage (needs a timestamp for every binding)
 	* nested property triggers: funnel method vs incremental method vs funnel tree-variant
 * a passive language picks and chooses which optimizations to use, and makes a single compiler/interpreter
@@ -2187,14 +2187,14 @@ file formats
     .-------------------------.
     |     ________________    |
     '----|1               |   |
-         |   multiplexor  |---*--- Q
+         |   mux  |---*--- Q
 D -------|0               |
          |________________|
                   |
 hold -------------'
 ```
 
-* basically uses a multiplexor to switch between `D` or holding its current value (using a feedback loop)
+* basically uses a mux to switch between `D` or holding its current value (using a feedback loop)
 * note that while doable, these loops and EE tricks are not very intuitive...
 
 ### Closures
@@ -2344,14 +2344,18 @@ currying
 ### Muxes, Execution Order, and Infinite Loops
 
 * currently, everything is forward-evaluated for simplicity (as in, no observation-based/call-by-need stuff)
-* however, we can't do that for recursion, or else we'll end in an infinite loop
-* thus, for true-false muxes, we use backward evaluation:
+* this forces us to evaluate both blocks of a conditional mux
 
 ```
  -[ TRUE BLOCK  ]---|\
  -[ FALSE BLOCK ]---|_|---
- -[ CONDITIONAL ]----'
+    -[ CONDITION ]---'
 ```
+
+* however, notice how for recursion, this results in an infinite loop
+	* eg: `function fac(n) => n > 0 ? n*fac(n-1) : 1`
+	* if we always have to evaluate both conditional blocks, we'll be evaluating fac(-1) -> fac(-2) -> fac(-3) etc etc
+* thus, for true-false muxes, we use backward evaluation
 
 * note that the internal of the TRUE, FALSE, and CONDITIONAL blocks are still forward evaluated
 * the conditional is evaluated first to determine which true/false block is "observed", and then that block is created and evaluated
