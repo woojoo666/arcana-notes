@@ -2715,7 +2715,7 @@ else
 * just create `Edge` objects between nodes
 * create local property `neighbors` for each node, that calculates each node's neighbors using the edge objects
 
-
+### Local Properties (brainstorm)
 
 * local properties are kind of like local variables
 * except instead of local variables, they're like local bindings (think: graph edges vs graph nodes)
@@ -2845,6 +2845,451 @@ synchronized function changelist(input) {
 // stateless high-level version. Then we replace our original code with the higher level version (which is easier to
 // understand), and record the specific optimization to use in the metadata.
 ```
+
+* Arcane's internal caching and memoization system is also a metaprogramming optimization
+* however, optimizations shouldn't be visible from the top-level diagram of the structure
+* metaprogramming is about hiding complexity behind layers of increasingly high-level code
+	* a lot of the time, complexity is implied
+* we can also use machine learning to figure out when to apply these optimizations, and which optimizations to apply
+* we briefly touched on this in the "Passive Language vs Active Language" section much earlier
+
+### Local Properties vs Regular Properties
+
+* notice that regular properties can actually be thought of as local properties as well
+* they are "local" to the global environment
+* any time you reference a regular property, eg `obj["prop"] = 5`, it's can be thought of as shorthand for `obj[global."prop"] = 5`
+* any time you are enumerating across properties, you are by default enumerating across all global properties
+	* `for (var prop in obj)` == `for (var prop in obj.global)`
+* so in a way, regular properties are just a way of declaring properties in the default, global namespace
+
+### Local Properties and Local Variables
+
+* we can think of local variables as local properties too
+* local properties are kind of like local variables that are tied to an object
+* in the same way, we can think of local variables as just local properties that are attached to a "default" object, the module/namespace itself
+
+* every local variable can be accessed outside the module by using `moduleName.localVariableName`
+
+* thus, local variables are the same as regular object properties
+* stuff inside an object/module is "in the namespace", and doesn't need the prefix when referencing that module's properties
+* local variables are just properties that are referenced in the same namespace
+
+### Local Properties and Extensions
+
+* objects are not static, we can think of many "add-on" properties that are not always needed
+* eg, we can ask a Student object for his highest test grade, and it'll go through all the Student's tests and find the highest grade
+* however, it's impractical to make `highest_test_grade` a default property of Student
+* instead, it's more of an attachment, attached and evaluated when we ask for it
+* local properties are a perfect fit for this situation/use case
+* note that alternatively we could have a hashtable storing Student/test-grade pairs, and use a library function that takes a Student object and returns their test grade from the table
+* however, this is just a convoluted way binding the Student object to the test-grade object
+
+* we can dynamically add properties to an object, and it'll backtrace to load the property
+
+* perhaps optimizations can be viewed as extensions as well
+* when an optimization is applied, it's actually loaded as a module property
+
+### Metaprogramming II
+
+* treating programs as data
+* we can treat input data as part of the program
+* everything is data, everything is program
+	* object-module duality
+
+* example of optimization:
+	* module A always makes sure output words don't have leading/trailing spaces
+	* module B always strips leading/trailing spaces of input words
+	* when combining A->B, module B doesn't need to strip spaces anymore
+
+* the hard part about metaprogramming is the syntax
+* three parts to metaprogramming:
+	* input program, transformation, and output program
+* kinda the same as viewing unit tests, where you have the input data, program, and output data
+
+### Metaprogramming and Version Control, Mods, Plugins, etc
+
+* version control, mods, and many other things can all be thought of as metaprogramming
+* all involve taking a piece of the program and modifying it
+* in many cases, the modifications are explicit, manually changing program flow or adding functionality
+
+* renaming a variable shouldn't create an entire diff of every line of code changed, like it does in Git
+* instead, should just record the variable that was changed, and the name it was changed to
+
+
+* swappable parts
+* inheritance system?
+	* program A
+	* program A+ is A optimized
+	* program B is A modified
+	* program B+ is A's optimization applied to B
+* kind of like a type system
+
+example:
+
+* programmer A comes along and needs to scrape Soundcloud.com pages for song info
+* writes a simple one like this:
+
+```
+songName = html.search(type: h1, contains: "song name:").first.innerHTML
+artist = html.search(type: p, contains: "artist:").first.innerHTML
+album = html.search(type: p, contains: "album:").first.innerHTML
+albumArtUrl = html.search(type: image, tag: "album art").first.src
+```
+
+* programmer B comes along and realizes they can optimize this by doing it all in one left-to-right scan, instead of four separate scans
+* this involves some complicated conditional logic that is not shown here
+* programmer C comes along and realizes this optimization can be generalized with a multi-search combiner algorithm
+
+* later, programmer A decides to add a field, "song duration", and once again simply searches for it in the html
+* because of programmer C, the search is automically optimized
+* if programmer C hadn't come along, then programmer B's optimization wouldn't work anymore
+	* however, can automatically fall back to programmer A's unoptimized code
+
+edge cases:
+* accounting for edge cases is another use case of metaprogramming
+* the normal flow shouldn't show edge cases for simplicity
+* edge cases can be accounted for later, tweaking the base flow to factor in the edge case
+* base flow can still be viewed and modified without the added complexity of the edge cases
+* edge case is like a plugin, that modifies the base flow dynamically
+* if base flow is modified such that the plugin is no longer compatible, then could cause some bugs
+* in that case, edge case can be removed or fixed
+* test cases are important in this case to continuously check if the edge cases are working
+
+### Two-Way Relationships vs Input/Output
+
+* Prolog and other logic languages have an interesting property in that the relationships they define are two-way, and have no defined "input" or "output"
+* in other words, you simply give it a set of constraints, and then it determines possible outputs based on those constraints
+* if you constrain `a=b+c`, and you give `a` and `b`, it'll calculate `c`
+	* if you give `b` and `c`, it'll calculate `a`
+* in this sense, there is no order to the relationships, which is quite elegant
+* in the OneNote doc "Monads and Sample Spaces and Infinities", I actually already talked about this
+* I also talk about how I decided to stick with the input/output model, because it is intuitive
+* while unordered relationships are elegant, logic/constraint-based programming is hard to define and understand
+* perhaps I can still have syntax for defining two-way bindings, for when it's convenient
+
+### Two-Way Relationships vs Input/Output - Metaprogramming
+
+* the input/output model has different implications in metaprogramming though
+* remember that we have an AI analyzing our metaprograms and learning how to optimize and transform code
+* if we have high-level program A transforming into optimized program B, shouldn't the AI learn both ways?
+	* if it sees A, it suggests optimization B
+	* if it sees B, it suggests high-level view A
+* I guess there are certain cases where two way relationships make sense in regular programming as well
+* for now I will probably just keep metaprogramming one-way, just like the rest of Arcane
+
+### Synchronization vs Clock Triggers in EE
+
+* synchronization is kind of like how in EE, engineers ensure that timing constraints are met in sequential logic systems
+* ensuring that all output signals are stable by the next clock signal
+
+### Metaprogramming vs Extensions
+
+* remember that extensions were like local property add-ons, dynamically added when needed
+* I guess extensions can be viewed as a subset of metaprogramming
+* we are changing the object dynamically, and objects == modules == programs, so changing an object == changing a program
+
+### The Human Element
+
+* Arcane modules and connections are mostly static
+* they need to know the inputs going in and outputs going out
+* in order to change a module, you need to stop the program, modify the source code, and re-run the program
+	* this is true even with metaprogramming
+* humans, on the other hand, can be thought of as completely dynamic agents
+* they can modify any program, change the inputs to any program, re-route the outputs of any program, etc
+* however, humans can be thought of as "metaprogrammers"
+	* their work, changing and reorganizing programs, can be thought of metaprogramming over time
+* so they should be able to fit into this Arcane network as Arcane modules themselves
+* how do we model humans in the Arcane system?
+
+* in Arcane, variable definitions are static
+* but variable usage is dynamic: dynamic programs and flows will constantly change which variables they're referencing and using
+* once a variable is defined, its in public domain (or whatever local domain it was defined in) and any module can see it and use it
+* a human modifying a module is just a metaprogram creating a new version of the module, and discarding the old one
+	* all other modules depending on that module are automatically wired to get the latest version
+
+### Metaprogramming vs Type Systems - Flexibility
+
+* in sketching, the rough initial base sketch is not necessarily what the end result looks like
+* oftentimes none of the base sketch makes it to the final draft
+* the base sketch just provides a foundation, a structure, to add detail on top of
+* music is the same
+* painting is the same
+* type systems are not the same, too rigid
+* metaprogramming is a better way of creating flexible and rough sketches of programming, and then refining it detail by detail until the final product
+
+### Events as Actions, outputting Actions
+
+* sometimes we don't just want to output data, we want to output actions
+* for example, if a person is in the room, turn on the light
+* just like when we treated events as data, we can use the same idea to treat data as events
+* output a list of events
+
+```
+// for every personEntered event, create a lights.onEvent
+for (event in room.personEnteredEvents)
+	lights.onEvent
+```
+
+* note that we can actually model this simply as
+
+```
+light.on = room.hasPerson
+```
+
+* but sometimes actions/events are simpler and easier to understand than data
+
+### Timelines
+
+* eventlists give us a way to treat events/actions as data, for both inputs and outputs
+* not enough, we need ways of specifying time and duration, not just events
+* for example, if we were designing an app like Guitar Hero
+* maybe we want to display a message for 2 seconds after the user hits a note
+* we also want to define the hitbox of each note as 1 second before and after the note
+
+* I guess an easy way to define these timelines is using events, eg "start" and "stop"
+	* `messageTimeline = { start: now(), stop: now() + 1 }`
+* see the OneNote Piano App doc for more details
+
+### Versioning
+
+(see "Piano App Design.one" for more details on my thought process behind this)
+
+* we are used to thinking about programs in terms of changes and events
+* eg "for every click, increment the counter"
+* this is why imperative languages can feel natural
+* we can usually solve this using a mapreduce
+
+```
+for (click in clicks) {
+	next.counter = prev.counter + 1
+}
+```
+
+* the `counter` variable is actually a sequence of states that "flows" from the first click event to the last
+* we can manually remove an event, and the mapreduce will rearrange and change the output accordingly
+* we can't do this in imperative languages
+
+* however, it gets complicated when we introduce multiple events that affect the same variable
+* for example, "for every click or keypress, increment the counter"
+* in imperative langs, it's simple: just increment the counter in the click eventlistener and keypress eventlistener
+* in dataflow however, we would need to share a variable across mapreduces
+	* but how should the sequence of states "flow" between the two mapreduces?
+	* if the sequence of events is [click, keypress, click, click, keypress], then the states need to flow between the mapreduces accordingly
+* we need some way to order the states by time
+* in imperative langs, variable modifications are already time-based
+	* always holds the value of the most recent modification
+* we can create a similar construct for dataflow, a special variable that:
+	* when assigned a new value during an event, pushes the new version onto the version stack, along with the event time
+	* when referenced during an event, peeks at the latest version of the variable that occured before the event
+* notice that this variable can only be assigned and referenced during events, because it needs timestamps to order the versions
+
+Sidenote:
+
+* note that we _could_ combine the events and mapreduce across the entire group
+	* `for (event in {clicks, keypresses}) ...`)
+* however, if we have other actions that occur on only clicks, or only keypresses, then we have to create separate mapreduces
+* in complex scenarios involving $n$ events, we could require up to $2^n$ mapreduces for every possible combination of events
+* another way we could solve it is using a single large mapreduce that combines all events, and then inside the mapreduce, filter for different kinds of events
+* also pretty ugly
+
+### Versioning and Indexes
+
+* we can extend versioning to work outside of time-based contexts
+* after all, in Arcane, time is just data
+* versions need an "index", a way to order the versions
+* most cases, the index is time
+* but it could be something else
+* if we were creating a card counting algorithm, the index might be the sequence in which the cards were dealt
+* then we create separate mapreduces for cards > 10 and cards < 5
+	* increment the counter for cards > 10
+	* decrement the counter for cards < 5
+
+### Implicit Arguments
+
+* if some arguments can be implied from context (as long as its named the same as the argument), then they don't to be specified
+* for example:
+
+```
+module calcBMI (name, age, height, weight, gender, ethnicity) {
+	bmi = ...
+} (bmi)
+```
+
+```js
+import BMI
+
+name = "charlie"
+age = 13
+height = 60
+weight = 100
+
+bmi = calcBMI(gender: male, ethnicity: white)
+```
+
+### Inferring Context
+
+* in versioning variables, we saw how the versioning index in many cases can be inferred, to keep the code from getting too cluttered
+* this is similar to how scopes work in imperative languages, to create a sense of contextt
+* however, in many cases, the context is not so obvious, and not as simple as just pulling from scope
+* especially when one is "sketching" code
+* one can explicitely define these contexts in the more detailed sketches
+* an AI can look at the rough sketches and the detailed sketches and start to learn how to infer these contexts automatically
+* this is the same mechanism by which optimizer AI works as well
+* so in a way, this is just an extension of the optimizer AI
+* this is similar to how, in the English language and other human languages, much grammatical detail can be left out and inferred through context
+
+### Layers of Complexity, not Abstraction
+
+* Arcane is based on creating layers of complexity, not abstraction
+* abstraction requires details and edge cases to still be referenced
+	* indirectly referenced through functions and variables but still specified in the top-level code
+* Arcane allows these details to be left out completely
+* An analogy using a set of classroom guidelines
+
+Simple (Arcane) version:
+* pay attention
+* do your homework
+* don't be late
+
+Abstract (Imperative) version:
+* while (teaching), focus()
+* do homework before dueDate
+* sit in seat by 2nd bell
+
+Full specification:
+* while teacher is actively teaching, focus on the material
+* finish homework by due date
+* be in your designated seat by the second bell
+
+### Metaprogramming and Syntactic Sugar 
+
+* in the above section, "Layers of Complexity, not Abstraction", we discussed the differences between metaprogramming vs abstraction
+* another way of thinking about it:
+* abstraction allows encapsulation of long procedures into a single object, eg a function or a class
+* represents a complex structure with a single name/reference
+* Arcane and metaprogramming allows us to represent complex structures using simple structures
+* we are not just restricted to using a name to represent structures
+* we have the full expressive power of the language itself to represent a structure
+
+* for example we can use `for (nums) addAll(num == prime-1)` to represent
+
+```js
+var sum = 0
+for (num in nums) {
+	if (isPrime(num+1)) {
+		sum += num
+	}
+}
+return sum
+```
+
+* this is much better than encapsulating it in a function `addAllNumbersOneLessThanAPrime()`
+* in a way, syntactic sugar is just metaprogramming
+* creating a flexible system for metaprogramming allows programmers to create their own syntactic sugars
+* kind of like macros
+
+### Inferring Context is Natural Extension of Optimizer AI
+
+* Optimizer works by analyzing how programmers add complexity between layers
+* optimizations are an example of the complexity added by programmers
+* context is also another example of complexity added
+* often times an optimization changes the output in small ways, adds small side effects
+* thus, optimizations are often just added detail and edge cases and complexity
+
+### Array Operations
+
+* operations like array.push() and stuff require time to be taken into account
+	* uses timestamp as an index
+* this is where implicit indexing by timestamp can be useful
+* however, note that arrays and array.push() use a numerical index, not a timestamp index
+* we are actually mapping timestamps to numbers
+* so what should the syntax look like?
+
+### Versioning is just Arrays/Maps
+
+* remember that every "version" needs a value and an index
+* and usually those indexes don't collide (eg. timestamps)
+* so we aren't really changing or reassigning a variable, we are just defining an array/map of versions
+* dataflow languages aren't suited for variable modification anyways
+* this is a paradigm for defining variables, not changing them
+
+* arrays and maps are the data equivalent of mapreduces (which represent program flow)
+* data/flow duality
+
+### Functional vs Dataflow
+
+* data flow is just functional with continuously updating inputs
+* functional has all the same benefits
+	* parallelization
+	* lazy evaluation
+	* data/procedure duality
+* dataflow has to account for streaming data though
+* one way is to convert data streams into events, like Arcane does
+* so in a way, Arcane is more functional than dataflow
+* however, the philosophy of Arcane is more about dataflow
+
+
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+
+* Haskell
+	* Haskell seems like a very powerful language with ways to represent very abstract and generic ideas
+	* eg monads and functors
+	* however, rarely does a programmer put in the time to understand the mathematical structure behind his program to utilize these tools
+	* for example, nondeterministic list monads can be useful in some cases, but a programmer will rarely think to use it
+
+* constraints and type systems
+	? what happens when data leaves the constraint system, gets modified, and re-enters the system?
+		* those modificatioms might not follow the rules of the system
+		* allows for loopholes, bad data
+	* if everybody defines their own systems, then it can be hard to make code compatible between systems
+		* eg javascript "strict" and "non-strict" mode
+		* though I guess in a way this already happens, with everybody using corporate domain-specific languages
+
+* metaprogramming allows for defining your own syntactic sugar
+	* could this be too flexible? allows for hiding malicious code?
+
+* defining arrays and objects
+	? how to map timestamps to numerical indexes
+	* in order for Arcane to mimic state variables using version arrays, we need to be able to push new versions from anywhere (analogous to being able to reassign a variable almost anywhere)
+		* this is basically allowing object properties to be defined from anywhere within the object context
+		* seems useful enough
+		? however, should we prevent feedback, aka using an object to define its own properties?
+
+? is it always possible to infer version timetamps from event contexts?
+
+* satellites
+	* in imperative languages, classes can contain many methods, each with their own inputs
+	* in Arcane, every input to every method has to be an input to the entire module
+	* thus, large classes/modules like `Person` can have tons and tons of inputs and outputs
+	* we need a way to separate them
+	* satellites are like pieces of a module that are visually separate from the main module, but share scope
+	* eg `Person.arm`, `Person.mouth`, etc
+	* or maybe these can just be normal submodules?
+	? inputs to these sub-modules are inferred inputs of the main module?
+
+* objects often follow this model (for the way data travels through the object):
+	* events -> state variables -> dataflow variables -> outputs
+	* should we distinguish between state variables and dataflow variables?
+
+* different types of versioning
+	* main type: timestamps and events
+	* versioning in program flow (how to deal with feedback)?
+	* versioning in mapreduce
+	* versioning in recursion (based on recursion depth)?
+* a single variable spanning multiple types of versioning?
+* are any of these other types of versioning really necessary?
+	* while we could have versioning in regular flow, we don't need it
+	* we can always just use multiple variable names
+	* only place it seems useful is in MapReduces and recursion
+		* variables are dynamically created, so in order to tie them all together, there has to be a shared variable name
+
+* Facades
+* Sometimes you want to view the simple definition based view, sometimes you want to view the action based view.
+* Stuff like caching and stuff is possible in imperative langauges using annotations, eg @memoize
+
+
+* summary of Conditionals.one
+
 
 ----------------------------------------------------------------------------------------------------
 
@@ -3014,3 +3459,5 @@ Decomposition and Analyzing Shared Paths
 * more collaborative
 	* loose coupling and no "side-effects" means that you can import modules with less worry
 	* the community can compete to optimize popular modules, and everybody can benefit without changing their code
+* flexible, allows sketching of rough and incomplete ideas
+	* mathematical languages like prolog and haskell allow for very elegant representation of complex ideas, but require a deep understanding of the structure of those ideas before they can be represented as such
