@@ -1,0 +1,1449 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"tims",
+				"timestamp"
+			],
+			[
+				"fon",
+				"font-size"
+			],
+			[
+				"cha",
+				"changeDirectory"
+			],
+			[
+				"shu",
+				"shuffled"
+			],
+			[
+				"shuff",
+				"shuffled"
+			],
+			[
+				"sum",
+				"sum_of_before_last"
+			],
+			[
+				"t",
+				"triggered"
+			],
+			[
+				"thm",
+				"thumb-image"
+			],
+			[
+				"thumb",
+				"thumb-image"
+			],
+			[
+				"acti",
+				"activeSlide"
+			],
+			[
+				"dele",
+				"deleteLightboxes"
+			],
+			[
+				"next",
+				"nextElementSibling"
+			],
+			[
+				"earlie",
+				"earliestTimestamp"
+			],
+			[
+				"tim",
+				"timestamp_precise"
+			],
+			[
+				"res",
+				"response"
+			],
+			[
+				"respo",
+				"responseText"
+			],
+			[
+				"e",
+				"elem"
+			],
+			[
+				"in",
+				"interval"
+			],
+			[
+				"anim",
+				"animateAlongPath"
+			],
+			[
+				"offset",
+				"offsetRel"
+			],
+			[
+				"of",
+				"offset"
+			],
+			[
+				"miles",
+				"milestones"
+			],
+			[
+				"stop",
+				"stopFnObj"
+			],
+			[
+				"milest",
+				"milestoneElems"
+			],
+			[
+				"closes",
+				"closestPt"
+			],
+			[
+				"off",
+				"offsetY"
+			],
+			[
+				"offs",
+				"offsetY"
+			],
+			[
+				"full",
+				"fulltilt-debug"
+			],
+			[
+				"img",
+				"imgBase64"
+			],
+			[
+				"canva",
+				"canvasElem"
+			],
+			[
+				"camera",
+				"cameraABG"
+			],
+			[
+				"camer",
+				"cameraOffset"
+			],
+			[
+				"IMG",
+				"IMG_FOLDER_PATH"
+			],
+			[
+				"Triang",
+				"TriangleMeshSimpleCartesia"
+			],
+			[
+				"tex",
+				"texture"
+			],
+			[
+				"text",
+				"TextureSquare"
+			],
+			[
+				"Tex",
+				"Texture"
+			],
+			[
+				"cal",
+				"calcTexCoords"
+			],
+			[
+				"aniamte",
+				"animateAlongPath"
+			],
+			[
+				"anima",
+				"animateAlongPath"
+			],
+			[
+				"curr",
+				"current-path"
+			],
+			[
+				"crrent",
+				"current-path"
+			],
+			[
+				"trsna",
+				"translateY"
+			],
+			[
+				"change",
+				"changed"
+			],
+			[
+				"backg",
+				"background"
+			],
+			[
+				"curre",
+				"current-path"
+			],
+			[
+				"sele",
+				"selected"
+			],
+			[
+				"gl",
+				"glwrapper"
+			],
+			[
+				"map",
+				"mapping"
+			],
+			[
+				"regu",
+				"regularBind"
+			],
+			[
+				"sub",
+				"submoduleAnonId"
+			],
+			[
+				"to",
+				"toBites"
+			],
+			[
+				"reduce",
+				"reducefnstart"
+			],
+			[
+				"get",
+				"getListeners"
+			],
+			[
+				"tr",
+				"triggerVals"
+			],
+			[
+				"tri",
+				"trigger"
+			],
+			[
+				"pare",
+				"parent"
+			],
+			[
+				"l",
+				"length"
+			],
+			[
+				"li",
+				"listeners"
+			],
+			[
+				"coll",
+				"collection"
+			],
+			[
+				"va",
+				"value"
+			],
+			[
+				"LEE",
+				"LEETHAX_eventUri"
+			],
+			[
+				"co",
+				"collectionbind"
+			],
+			[
+				"proto",
+				"prototype"
+			],
+			[
+				"ex",
+				"expression"
+			],
+			[
+				"subs",
+				"subscopeAlias"
+			],
+			[
+				"ti",
+				"title"
+			],
+			[
+				"play",
+				"playing"
+			],
+			[
+				"nora",
+				"normalizedT"
+			],
+			[
+				"nor",
+				"normalizedT"
+			],
+			[
+				"mag",
+				"magnitude"
+			],
+			[
+				"arg",
+				"arguments"
+			],
+			[
+				"pr",
+				"print"
+			],
+			[
+				"a",
+				"apply"
+			],
+			[
+				"ext",
+				"extender"
+			],
+			[
+				"n",
+				"newproto"
+			],
+			[
+				"new",
+				"newCreateFn"
+			],
+			[
+				"S",
+				"StudentProto"
+			],
+			[
+				"ite",
+				"itemsToAdd"
+			],
+			[
+				"sc",
+				"scopeAlias"
+			],
+			[
+				"fun",
+				"function"
+			],
+			[
+				"con",
+				"console"
+			],
+			[
+				"p",
+				"path"
+			],
+			[
+				"s",
+				"scope"
+			],
+			[
+				"v",
+				"value"
+			],
+			[
+				"reru",
+				"recurs"
+			],
+			[
+				"liste",
+				"listener"
+			],
+			[
+				"weight",
+				"weightedItems"
+			],
+			[
+				"GRID",
+				"GRID_DOT_SIZE"
+			],
+			[
+				"drawGr",
+				"drawGridLines"
+			],
+			[
+				"defa",
+				"defaultColors"
+			],
+			[
+				"ori",
+				"originOffset"
+			],
+			[
+				"originOffsetF",
+				"originOffsetFromCenter"
+			],
+			[
+				"orgi",
+				"originOffset"
+			],
+			[
+				"MIN",
+				"MIN_GRID_MARGIN"
+			],
+			[
+				"orig",
+				"originOffsetFromTop"
+			],
+			[
+				"origin",
+				"originOffsetFromLeft"
+			],
+			[
+				"origiO",
+				"originOffsetFromTop"
+			],
+			[
+				"origi",
+				"originOffsetFromLeft"
+			],
+			[
+				"I",
+				"IN_PROGRESS_KEY"
+			],
+			[
+				"regist",
+				"registerAsStrict"
+			],
+			[
+				"test",
+				"testingpaymentid"
+			],
+			[
+				"payme",
+				"paymentId"
+			],
+			[
+				"paym",
+				"paymentId"
+			],
+			[
+				"user",
+				"user_id"
+			],
+			[
+				"resg",
+				"registerPayment"
+			],
+			[
+				"acce",
+				"accessToken"
+			],
+			[
+				"c",
+				"console"
+			],
+			[
+				"uri",
+				"uri_params"
+			],
+			[
+				"acc",
+				"accessToken"
+			],
+			[
+				"cli",
+				"client_id"
+			],
+			[
+				"scope",
+				"SCOPES"
+			],
+			[
+				"CLIE",
+				"CLIENT_ID"
+			],
+			[
+				"CL",
+				"CLIENT_ID"
+			],
+			[
+				"Cl",
+				"CLIENT_ID"
+			],
+			[
+				"C",
+				"CLIENT_ID"
+			],
+			[
+				"init",
+				"initiatedSet"
+			],
+			[
+				"worlbo",
+				"worldobj"
+			],
+			[
+				"bound",
+				"boundingSpheres"
+			],
+			[
+				"bou",
+				"boundingSphere"
+			],
+			[
+				"parent",
+				"parentTransform"
+			],
+			[
+				"boun",
+				"boundingSpheres"
+			],
+			[
+				"swordAtt",
+				"swordAttack1"
+			],
+			[
+				"swordAt",
+				"swordAttack2"
+			],
+			[
+				"swoa",
+				"swordAttack1"
+			],
+			[
+				"specu",
+				"specularFactor"
+			],
+			[
+				"r",
+				"relative"
+			],
+			[
+				"ligh",
+				"lightPosition"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"contents": "{\n    \"folders\":\n    [\n        {\n            \"path\": \".\"\n        }\n    ],\n    \"SublimeLinter\":\n    {\n        \"linters\":\n        {\n            \"eslint\": {\n                \"disable\": false\n            }\n        }\n    }\n}\n",
+			"settings":
+			{
+				"buffer_size": 219,
+				"line_ending": "Windows",
+				"name": "{"
+			}
+		},
+		{
+			"file": ".sublime-project",
+			"settings":
+			{
+				"buffer_size": 189,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "notes.mdown",
+			"settings":
+			{
+				"buffer_size": 191382,
+				"line_ending": "Windows"
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+		[
+			[
+				[
+					"Packages/Pandown/Pandown HTML.sublime-build",
+					""
+				],
+				[
+					"Packages/Pandown/Pandown HTML.sublime-build",
+					"Pandown: PDF"
+				],
+				[
+					"Packages/Pandown/Pandown HTML.sublime-build",
+					"Pandown: Plain Text"
+				],
+				[
+					"Packages/Pandown/Pandown HTML.sublime-build",
+					"Pandown: LaTeX"
+				],
+				[
+					"Packages/Pandown/Pandown HTML.sublime-build",
+					"Pandown: Word Document"
+				],
+				[
+					"Packages/Pandown/Pandown HTML.sublime-build",
+					"Pandown: Rich Text (RTF)"
+				]
+			],
+			[
+				"Packages/Pandown/Pandown HTML.sublime-build",
+				""
+			]
+		],
+		[
+			[
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					""
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Run"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Native Haskell"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: JSON"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Plain Text"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Markdown"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: reStructuredText"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: XHTML 1"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: HTML 5"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: LaTeX"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: LaTeX - PDF"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: LaTeX Beamer Slideshow"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: LaTeX Beamer Slideshow - PDF"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: ConTeXt"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Groff Man"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: MediaWiki Markup"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Textile"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Emacs Org-Mode"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: GNU Texinfo"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: DocBook XML"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: OpenDocument XML"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: OpenOffice Document"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Word Document"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: EPUB Book"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: EPUB3"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: FictionBooks 2"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: AsciiDoc"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Slidy HTML/JS Slideshow"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Slideous HTML/JS Slideshow"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: DZSlides HTML5/JS Slideshow"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: S5 HTML/JS Slideshow"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Rich Text (RTF)"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Markdown with Literate Haskell"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: reStructuredText with Literate Haskell"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: LaTeX with Literate Haskell"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Beamer with Literate Haskell"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: XHTML 1 with Literate Haskell"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: HTML5 with Literate Haskell"
+				],
+				[
+					"Packages/Pandown/Pandown Markdown.sublime-build",
+					"Pandown: Reveal.js Slideshow"
+				]
+			],
+			[
+				"Packages/Pandown/Pandown Markdown.sublime-build",
+				""
+			]
+		]
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 588.0,
+		"last_filter": "exten",
+		"selected_items":
+		[
+			[
+				"exten",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"package",
+				"Package Control: Remove Package"
+			],
+			[
+				"html",
+				"Set Syntax: HTML"
+			],
+			[
+				"markdown",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"pack",
+				"Package Control: List Packages"
+			],
+			[
+				"java",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"javasc",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"package control",
+				"Package Control: List Packages"
+			],
+			[
+				"javascr",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"javas",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"json",
+				"Set Syntax: JSON"
+			],
+			[
+				"jso",
+				"Set Syntax: JSON"
+			],
+			[
+				"mark",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"mdown",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"markdow",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"markd",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"jav",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"css",
+				"Set Syntax: CSS"
+			],
+			[
+				"markdown ex",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"markdo",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"build",
+				"Build With: Pandown Markdown - Pandown: HTML 5"
+			],
+			[
+				"makdown",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"latex",
+				"Set Syntax: LaTeX"
+			],
+			[
+				"mardown",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			],
+			[
+				"remove",
+				"Package Control: Remove Package"
+			],
+			[
+				"pandoc",
+				"Pandoc"
+			],
+			[
+				"pandown late",
+				"Build With: Pandown Markdown - Pandown: LaTeX"
+			],
+			[
+				"pandown pdf",
+				"Build With: Pandown Markdown - Pandown: LaTeX - PDF"
+			],
+			[
+				"pando",
+				"Build With: Pandown Markdown - Pandown: LaTeX"
+			],
+			[
+				"list",
+				"Package Control: List Packages"
+			],
+			[
+				"pretti",
+				"HTMLPrettify"
+			],
+			[
+				"htmlpre",
+				"HTMLPrettify"
+			],
+			[
+				"javsc",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"prett",
+				"HTMLPrettify"
+			],
+			[
+				"pret",
+				"HTMLPrettify"
+			],
+			[
+				"pug",
+				"Set Syntax: Pug"
+			],
+			[
+				"angula",
+				"Set Syntax: HTML (Angular.js)"
+			],
+			[
+				"install pa",
+				"Package Control: Install Package"
+			],
+			[
+				"remove rep",
+				"Package Control: Remove Repository"
+			],
+			[
+				"removep",
+				"Package Control: Remove Package"
+			],
+			[
+				"list p",
+				"Package Control: List Packages"
+			],
+			[
+				"reposi",
+				"Package Control: Add Repository"
+			],
+			[
+				"jade",
+				"Set Syntax: Jade"
+			],
+			[
+				"instal",
+				"Package Control: Install Package"
+			],
+			[
+				"remove pack",
+				"Package Control: Remove Package"
+			],
+			[
+				"package control upg",
+				"Package Control: Upgrade Package"
+			],
+			[
+				"angular",
+				"Set Syntax: HTML (Angular.js)"
+			],
+			[
+				"markdown extend",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"indent tab",
+				"Indentation: Convert to Tabs"
+			],
+			[
+				"package install",
+				"Package Control: Install Package"
+			],
+			[
+				"indentation tab",
+				"Indentation: Convert to Tabs"
+			],
+			[
+				"subli",
+				"SublimeLinter: Lint This View"
+			],
+			[
+				"eslint",
+				"Preferences: SublimeLinter Settings – User"
+			],
+			[
+				"list pac",
+				"Package Control: List Packages"
+			],
+			[
+				"upgra",
+				"Package Control: Upgrade Package"
+			],
+			[
+				"matlab",
+				"Set Syntax: MATLAB"
+			],
+			[
+				"python",
+				"Set Syntax: Python"
+			],
+			[
+				"matl",
+				"Build With: Pandown Markdown - Pandown: LaTeX"
+			],
+			[
+				"matla",
+				"Set Syntax: MATLAB"
+			],
+			[
+				"package control list",
+				"Package Control: List Packages"
+			],
+			[
+				"c++",
+				"Set Syntax: C++"
+			],
+			[
+				"javascrip",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"markdown ",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"markdown e",
+				"Markdown Preview: Export HTML in Sublime Text"
+			],
+			[
+				"preview",
+				"Markdown Preview: Preview in Browser"
+			],
+			[
+				"extende",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"markdown ext",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"javascript",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"install pack",
+				"Package Control: Install Package"
+			],
+			[
+				"remove p",
+				"Package Control: Remove Package"
+			],
+			[
+				"syntax c",
+				"Set Syntax: C"
+			],
+			[
+				"c",
+				"Set Syntax: C++"
+			],
+			[
+				"markdown exte",
+				"Set Syntax: Markdown Extended"
+			],
+			[
+				"scheme",
+				"Set Syntax: Scheme"
+			],
+			[
+				"verilo",
+				"Set Syntax: Verilog"
+			],
+			[
+				"insta",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 966.0
+	},
+	"console":
+	{
+		"height": 186.0,
+		"history":
+		[
+			"import urllib.request,os,hashlib; h = 'eb2297e1a458f27d836c04bb0cbaf282' + 'd0e7a3098092775ccb37ca9d6b2e4b7d'; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); by = urllib.request.urlopen( 'http://packagecontrol.io/' + pf.replace(' ', '%20')).read(); dh = hashlib.sha256(by).hexdigest(); print('Error validating download (got %s instead of %s), please try manual install' % (dh, h)) if dh != h else open(os.path.join( ipp, pf), 'wb' ).write(by)"
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/C/Users/Max/Documents/WebDev/Angular/data binding tests"
+	],
+	"file_history":
+	[
+		"/C/Users/Max/.eslintrc",
+		"/C/Users/Max/Documents/WebDev/Angular/data binding tests/angular.min.js",
+		"/C/Users/Max/Documents/WebDev/test.js",
+		"/C/Users/Max/Documents/WebDev/Angular/data binding tests/.jshintrc",
+		"/C/Users/Max/Documents/WebDev/NoZaic/.eslintrc.js",
+		"/C/Users/Max/AppData/Local/Atlassian/SourceTree.exe_Url_ophsntvuwjsmouunxdk0uqssbe3qlonp/2.3.1.0/user.config",
+		"/C/Users/Max/Downloads/Android/android-sdk-windows/platform-tools/hellrider.ab",
+		"/C/Users/Max/Downloads/Android/android-sdk-windows/platform-tools/fatbunny.ab",
+		"/C/Users/Max/Downloads/Android/android-sdk-windows/platform-tools/fatbunny2.ab",
+		"/C/Users/Max/Downloads/vincent.txt",
+		"/C/Users/Max/Downloads/Applications/JDownloader/build.json",
+		"/C/Users/Max/Documents/WebDev/Angular/data binding tests/FloModuleTest.html",
+		"/C/Users/Max/Documents/WebDev/NoZaic/app.js",
+		"/C/Users/Max/Documents/WebDev/NoZaic/index.pug",
+		"/C/Users/Max/Pictures/Study/drawabox/lesson 2/Dian Xiang/details.txt",
+		"/C/Users/Max/Downloads/Sheet Music/h.html",
+		"/C/Users/Max/Downloads/Applications/cookies10.txt",
+		"/C/Users/Max/Downloads/Applications/cookies11.txt",
+		"/C/Users/Max/Downloads/Applications/cookies10.txt.bak.txt",
+		"/C/Users/Max/Downloads/kodi.log",
+		"/C/Users/Max/AppData/Roaming/Kodi/kodi_crashlog-17.1-RC1 Git_20170223-1a80820-20171106-195614.dmp",
+		"/C/Users/Max/Documents/WebDev/Angular/angularAliasing.html",
+		"/C/Users/Max/Documents/bluetooth headphones.md",
+		"/C/Users/Max/Documents/synesthetic/mood-detect.js",
+		"/C/Users/Max/Documents/WebDev/kifi/index.html",
+		"/C/Users/Max/Documents/WebDev/ashley-fancy-squarespace-gallery/gallery-inject-code.html",
+		"/C/Users/Max/Documents/WebDev/Angular/data binding tests/name brainstorm",
+		"/C/Users/Max/Pictures/2017-10-13/051.AAE",
+		"/C/Users/Max/Documents/Creative Labs/a-day-in-la/scripts/scene1.js",
+		"/C/Users/Max/Documents/Creative Labs/a-day-in-la/scripts/milestonebuilder.js",
+		"/C/Users/Max/Documents/Creative Labs/a-day-in-la/scripts/Scene.js",
+		"/C/Users/Max/Documents/WebDev/fb-message-history/script.js",
+		"/D/Backups/Kifi/8-25-16/[Kifi Export]Max-Woo-ad325e21-65fa-41e4-b234-ceed1f69eda9/explorer/export.js",
+		"/C/Users/Max/Downloads/vincent3.txt",
+		"/C/Users/Max/Downloads/vincent2.txt",
+		"/C/Users/Max/Downloads/vishvanand.txt",
+		"/C/Users/Max/Downloads/allMyMessages.txt",
+		"/F/iPhone 5s/Apps/Free Music Downloader/Library/com.shangkaii.freemp3down/SKDownloader/SKDownloaderUserData.plist",
+		"/C/Users/Max/Documents/WebDev/css sucks.md",
+		"/C/Users/Max/Documents/POSTtester/app.js",
+		"/C/Users/Max/Documents/NeonBard/viz.html",
+		"/C/Users/Max/Documents/WebDev/fancy-search-animation.html",
+		"/C/Users/Max/Downloads/Applications/cookies.txt.old",
+		"/C/Users/Max/Documents/School/CS118/Project 2/client.cpp",
+		"/C/Users/Max/Downloads/My.Sassy.Girl.Directors.Cut.2001.DVDRip.XviD.AC3.iNT-CNXP/My.Sassy.Girl.Directors.Cut.2001.DVDRip.XviD.AC3.iNT-CNXP.CD1.srt",
+		"/C/Users/Max/Documents/VRPuzzle/UnityDemo/Assets/MoveCameraNew.cs",
+		"/C/Users/Max/Documents/WebDev/reddit-place/app.js",
+		"/C/Users/Max/Documents/cookies3.txt",
+		"/C/Users/Max/Downloads/Applications/cookies.txt",
+		"/C/Users/Max/Downloads/Applications/cookies.txt.old2",
+		"/C/Users/Max/Documents/cookies5.txt",
+		"/C/Users/Max/Documents/cookies.txt",
+		"/C/Users/Max/AppData/LocalLow/Microsoft/Silverlight/is/1ba4s1l0.ok5/cicke0f5.1gv/1/s/bhwbssry5od0vvrn4bqcbvkz3n2mbi4onico0kcalolezirkg5aaacba/f/Playlist.xml",
+		"/C/Users/Max/Documents/School/CS188/ps5/hw5.md",
+		"/C/Users/Max/Documents/School/CS188/ps4/hw4.md",
+		"/C/Users/Max/Documents/School/CS181 (Sahai)/final/final.md",
+		"/C/Users/Max/Documents/School/CS181 (Sahai)/hw4/hw4.md",
+		"/C/Users/Max/Documents/School/CS181 (Sahai)/hw5/hw5.md",
+		"/C/Users/Max/Documents/School/CS188/ps5/hw5.mdown",
+		"/C/Users/Max/Documents/synaesthetic/js/colors.js",
+		"/C/Users/Max/Documents/synaesthetic/js/script.js",
+		"/C/Users/Max/Documents/synaesthetic/js/youtubeAudioClass.js",
+		"/C/Users/Max/Documents/synaesthetic/js/visuals.js",
+		"/C/Users/Max/Documents/School/CS181 (Sahai)/hw6/hw6.md",
+		"/C/Users/Max/Documents/a-day-in-la/scripts/milestonebuilder.js",
+		"/C/Users/Max/Documents/a-day-in-la/scripts/animatealongpath.js",
+		"/C/Users/Max/Documents/a-day-in-la/testpath.svg",
+		"/C/Users/Max/Documents/Cartesia/MultiLighting/deferredRendering.html",
+		"/C/Users/Max/Documents/Cartesia/src/Cartesia.js",
+		"/C/Users/Max/Documents/HexusPregame/trainer/server.js",
+		"/C/Users/Max/Documents/Hexus/public/invert-perspective.html",
+		"/C/Users/Max/Documents/HexusPregame/trainer/public/demo.html",
+		"/C/Users/Max/Documents/Hexus/public/fulltilt-test.html",
+		"/C/Users/Max/Documents/Hexus/PhotoMicrosoftRequest.py",
+		"/C/Users/Max/Documents/Hexus/public/index.html",
+		"/C/Users/Max/Documents/Hexus/public/searching.html",
+		"/C/Users/Max/Documents/Hexus/public/fulltilt-debug.html",
+		"/C/Users/Max/Documents/Hexus/public/template1.html",
+		"/C/Users/Max/Documents/Hexus/public/scan.js",
+		"/C/Users/Max/Documents/Hexus/public/video.html",
+		"/C/Users/Max/Documents/HexusPregame/Photobooth.htm",
+		"/C/Users/Max/Documents/Hexus/public/barebones.html",
+		"/C/Users/Max/Documents/Hexus/public/qrcode/test.html",
+		"/C/Users/Max/Documents/Hexus/public/qrcode/scan.js",
+		"/C/Users/Max/Documents/WebDev/InTouch/intouch/views/layout.jade",
+		"/C/Users/Max/Documents/Hexus/public/qrcode/canvasResize.js",
+		"/C/Users/Max/Documents/Hexus/public/qrcode/jquery.canvasResize.js",
+		"/C/Users/Max/Documents/WebDev/InTouch/intouch/views/u_addtag.jade",
+		"/C/Users/Max/Documents/Hexus/public/microsoftrequest.js",
+		"/C/Users/Max/Documents/Hexus/public/default.html",
+		"/C/Users/Max/Documents/Hexus/public/animations.css",
+		"/C/Users/Max/Documents/WebDev/Angular/angular_deep_vs_reference_watch.html",
+		"/C/Users/Max/Documents/Hexus/public/animate.css",
+		"/C/Users/Max/Documents/Hexus/public/template2.html",
+		"/C/Users/Max/Documents/a-day-in-la/animate-along-path.html",
+		"/C/Users/Max/Documents/Hexus/landing.svg",
+		"/C/Users/Max/Documents/a-day-in-la/scripts/Scene.js",
+		"/C/Users/Max/Documents/a-day-in-la/scripts/scene1.js",
+		"/C/Users/Max/Documents/a-day-in-la/index.html",
+		"/C/Users/Max/Documents/Hexus/logo.svg",
+		"/C/Users/Max/Documents/Hexus/test.svg",
+		"/C/Users/Max/Documents/Cartesia/src/Transformation.js",
+		"/C/Users/Max/Documents/Hexus/public/test.html",
+		"/C/Users/Max/Documents/Cartesia/src/WebGLWrapper.js",
+		"/C/Users/Max/Documents/Cartesia/src/Camera.js",
+		"/C/Users/Max/Documents/Cartesia/src/ShaderHandler.js",
+		"/C/Users/Max/Documents/Cartesia/src/Mesh.js",
+		"/C/Users/Max/Documents/HexusPregame/trainer/public/index.html",
+		"/C/Users/Max/Documents/Hexus/bower.json",
+		"/C/Users/Max/Documents/Hexus/chrome-spells/leapExtension.js",
+		"/C/Users/Max/Documents/Hexus/chrome-spells/soundcloud.js",
+		"/C/Users/Max/Documents/Hexus/chrome-spells/inject.js",
+		"/C/Users/Max/Documents/Hexus/chrome-spells/manifest.json",
+		"/C/Users/Max/Documents/Hexus/LeapExtension/inject.js",
+		"/C/Users/Max/Documents/Hexus/LeapExtension/leapExtension.js",
+		"/E/Lenovo Yoga-Max/Documents/HTML_Projects/Chrome_Dev/LeapExtension/manifest.json",
+		"/E/Lenovo Yoga-Max/Documents/HTML_Projects/Chrome_Dev/LeapExtension/inject.js",
+		"/E/Lenovo Yoga-Max/Documents/HTML_Projects/Chrome_Dev/LeapExtension/leapExtension.js",
+		"/C/Users/Max/Documents/Hexus/public/components/fulltilt/bower.json",
+		"/C/Users/Max/Documents/Hexus/.bowerrc",
+		"/C/Users/Max/Documents/Hexus/index.html",
+		"/C/Users/Max/Documents/School/CS188/ps2/hw2.md",
+		"/C/Users/Max/Documents/School/CS188/ps3/hw3.md",
+		"/C/Users/Max/Documents/School/CS181 (Sahai)/hw2/hw2.md",
+		"/C/Users/Max/Documents/School/CS181 (Sahai)/hw3/hw3.md",
+		"/E/Lenovo Yoga-Max/Documents/HackSC/InTouch/intouch/views/home.jade",
+		"/E/Lenovo Yoga-Max/Documents/HackSC/InTouch/intouch/views/landing.jade",
+		"/E/Lenovo Yoga-Max/Documents/HackSC/InTouch/intouch/views/recruit.jade"
+	],
+	"find":
+	{
+		"height": 39.0
+	},
+	"find_in_files":
+	{
+		"height": 138.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": true,
+		"find_history":
+		[
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": true,
+		"regex": true,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 2,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 219,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								216,
+								73
+							]
+						],
+						"settings":
+						{
+							"auto_name": "{",
+							"git_gutter_is_enabled": false,
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": ".sublime-project",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 189,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								43,
+								43
+							]
+						],
+						"settings":
+						{
+							"git_gutter_is_enabled": true,
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "notes.mdown",
+					"semi_transient": true,
+					"settings":
+					{
+						"buffer_size": 191382,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"git_gutter_is_enabled": true,
+							"syntax": "Packages/Markdown Extended/Syntaxes/Markdown Extended.sublime-syntax",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 100180.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 39.0
+	},
+	"input":
+	{
+		"height": 43.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.SublimeLinter":
+	{
+		"height": 0.0
+	},
+	"output.SublimeLinter Messages":
+	{
+		"height": 182.0
+	},
+	"output.exec":
+	{
+		"height": 121.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"output.mdpopups":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "Packages/Pandown/Pandown Markdown.sublime-build",
+	"project": ".sublime-project",
+	"replace":
+	{
+		"height": 72.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 331.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+		"max_columns": 1
+	}
+}

@@ -1,0 +1,94 @@
+setup:
+for each source table
+	for each protobuf
+		get all foreign key fields
+		group them
+		get the destination tables for each field
+		get parent tables
+		construct the path
+		add shared path parts
+		use complete paths to create traverser
+
+verification:
+for each source table/protobuf
+	for each entry
+		use protobuf traverser to retrieve path groups
+		fill in shared keys
+		for each destination table
+			right inner join destination table and foriegnkey field entries
+
+
+where did we use hashmultimap? something involving protobuf path, key type and group id
+works for individual, doesn't work for groups?
+one things based on source table, other thing based on destination table?
+
+multiple ways to get list of all destination tables
+	for each source table, get list of destination tables, and join them all at the end
+	use accumulator and continuation passing style
+		faster
+		requires changing of functions, becomes aware of global context/state, doesn't work as independent function anymore
+		we had a separate instance for each source table, so combine all source tables at the end with an accumulator...how to break up the procedure?
+
+
+get value for destination tables
+check if satisfies condition
+
+
+get all destination tables
+go from destination tables to groups?
+
+
+need to check:
+	valid foreign key
+	table exists
+	field group forms valid path
+	all path parts exist
+
+
+need to know:
+	all destination tables
+	all groups
+	protobuf graph traverser for each source table
+
+
+groups:
+	source tables (used for filling in shared keys)
+	protobuf group (traversal results)
+	path group
+	destination table (entry retrieval)
+
+
+
+
+table Person
+	protobuf Order
+		order [table: Orders]
+		transaction [table: Transaction]
+		item [table: transactionitem]
+
+table Orders
+	table Transaction
+		table TransactionUnit
+			protobuf transactionitem
+				person seller
+				person buyer
+				item item [table: Items]
+				int quantity
+
+table Items
+	protobuf item
+		name
+		price
+		description
+
+
+
+
+get all transaction items
+get all transactions
+get all orders
+outer join on person id
+
+
+
+

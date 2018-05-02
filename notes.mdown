@@ -2782,6 +2782,10 @@ timeline leading to a timeline? timelines should specify exactly what to track, 
 	* on the other hand, it's impossible to reference the local property inside submodules unless the container module has a name
 * hmm I guess javascript has this as well, just do `this.localProp = new Symbol()` inside a function
 
+* Java already had this concept of symbol properties
+* you can use objects as keys in a hashmap, and it will use the object's reference address (which serves as a unique id for that object)
+* I think this is where I got the idea
+
 ### Optimizers
 
 * optimizers are basically metaprogramming, reconfiguring code to make it more efficient
@@ -3196,6 +3200,14 @@ return sum
 * often times an optimization changes the output in small ways, adds small side effects
 * thus, optimizations are often just added detail and edge cases and complexity
 
+* to train the AI, I was going to have it observe how programmers metaprogram and optimize their programs
+* basically, just feed the AI a lot of regular programs and their (manually) optimized counterparts
+* basically, any time a user uses metaprogramming, have the AI observe what changes the user makes
+* and over time, start to suggest similar changes to similar scenarios
+* but users aren't just using metaprogramming for optimization, they also use it to turn sketches into implementation
+* so the AI is learning how to do that as well
+* the AI was already capable of learning how to infer context and interpretting code sketches
+
 ### Array Operations
 
 * operations like array.push() and stuff require time to be taken into account
@@ -3228,6 +3240,9 @@ return sum
 * so in a way, Arcane is more functional than dataflow
 * however, the philosophy of Arcane is more about dataflow
 
+### Functional: caching and parallelizing
+* seems like functional already has caching and parallelization optimization
+* see https://mostly-adequate.gitbooks.io/mostly-adequate-guide/ch03.html#the-case-for-purity
 
 vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
@@ -3288,7 +3303,334 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vv
 * Stuff like caching and stuff is possible in imperative langauges using annotations, eg @memoize
 
 
-* summary of Conditionals.one
+summary of Conditionals.one:
+* see "Conditionals.one" for full context
+* recall that conditionals and muxes achieve the same thing
+* also, conditionals are forward moving, and muxes are backward moving (see section "Persistence, Multiplexors and Branches")
+* recall that I also decided to stick with muxes because they don't require any new constructs, and I can fake conditional blocks like those in imperative languages using UI tricks
+	* just wrap each input of the mux into blocks, and when you hover over each block, show what conditional "enables" that block
+	* I can't seem to find where I discussed this, but I do recall discussing it with Vish about a year ago
+* dynamic conditional blocks seemed like they required new constructs, because it required bindings to be dynamically created and destroyed
+* however, note that mapreduces already have dynamically created/destroyed bindings, eg if a list changes size
+* 
+
+
+### Undefined Inputs
+
+* one of the other issues was that dynamically created binds could result in "undefined" inputs
+
+For example, assume `a` is true:
+
+```
+      ,-- if (a) ----[ m1 ]----
+x ---<--- else -    -[ m2 ]----
+```
+
+* notice that the input to m2 is undefined
+
+* many other ways to get undefined inputs
+* eg, referencing an undefined property, or an out of bounds array index
+
+```js
+factorial (linkedlist) => (linkedlist == undefined) ? 1 : linkedlist.value*factorial (linkedlist.next)
+```
+
+* no need for a special `if undefined` construct...just treat `undefined` like any other symbol
+* no infinite loops here either
+* note that in most cases, `undefined` passed to an operator will give `undefined` output
+* 	eg `+`, `concat`, `mapreduce`etc
+* this is simply because the case hasn't been defined yet
+* but for `==`, `undefined == undefined => true`
+* `==` has implemented the case for all symbols, whereas `+` and `concat` haven't
+* datatypes: number, string, symbol/object, char, set, array
+
+local variables as properties
+* runs danger of overshadowing inner module outputs
+* we need a way of easily carrying nested module outputs all the way out, so they don't get overshadowed
+* also need a way to reference local variables even if they are overshadowed by nested module outputs being carried out
+	* essentially, we need a way of referencing program structure directly, that isn't affected by scoping and shadowing rules
+
+### State Variables and Versioning in Other Languages
+
+* note that imperative provides an easy way to define state-ful objects and processes
+* state-ful objects and processes are intuitive and natural
+* in functional, the common way to handle state is to use recursive function stacks ([source](https://stackoverflow.com/q/1020653/1852456))
+* this is pretty similar to versioning
+* however function stacks are normally executed level-by-level, whereas a version stack has more flexibility in execution arrangements
+	* though this is really just implementation issues
+* though it's easier to make version lists in Arcane because they're dictionaries, so properties can be added/removed from anywhere, instead of pushing/popping from top of stack
+
+* functional languages create the same structures as Arcane
+* do it in a different way
+* Arcane allows for easier methods for constructing those structures
+* it seems like Arcane and functional are the same: defining graphs backwards
+	* dataflow is just functional re-evaluated when inputs change
+	* so how come the part with version lists is different?
+	* you can actually define it in the same way using 
+
+```js
+combine( // combines both arrays into a single ordered array
+	clicks.map((timestamp) => { // create an array of <timestamp, fn> items for each click
+		return {timestamp: (x) => x+1}
+	}),
+	keypresses.map((timestamp) => { // create an array of <timestamp, fn> items for each keypress
+		return {timestamp: (x) => x*x}
+	}),
+).values() // extract the ordered list of functions
+.apply(10) // input a starting value into the chain of functions
+```
+
+* though it's a little uglier because you have to pass around functions instead of directly assigning to variables
+* Arcane would be more like
+
+```js
+x[0] = 10
+clicks.map((timestamp) => {
+	x[timestamp] = x[<timestamp]+1
+})
+keypresses.map((timestamp) => {
+	x[timestamp] = x[<timestamp]*x[<timestamp]
+})
+```
+
+* we can make it a little cleaner if we create a special type of block scope for these things
+
+```js
+x[0] = 10
+clicks.mapBy('timestamp', () => {
+	x[] = x[]+1
+})
+keypresses.mapBy('timestamp', () => {
+	x[] = x[]*x[]
+})
+```
+
+* additionally, because mapping by timestamp is so common, it should be the default
+
+```js
+x. = 10
+clicks.map(() => {
+	x. = x.+1
+})
+keypresses.map(() => {
+	x. = x.*x.
+})
+```
+
+? dataflow allows data to be mutated and changed, without manually triggering or knowing about who's listening for updates
+	? how does this work for functional?
+	* i think in functional, while inputs might be "impure" and implemented using imperative (manually triggering updates through the graph), the graph can be created using function calls, created in a "backwards" manner, just like Arcane
+	* so its still the same?
+
+
+
+Lisp has metaprogramming?
+
+
+is undefined necessary?
+* most reduced form:
+	* each node contains:
+		* input edges, arrows going into the node
+		* set of rules that generate output edges?
+		* the rules are created from conditionals?
+		* undefined means a certain input doesn't exist?
+		* I think the only conditional requires is Node equality, whether or not two inputs point to the same node
+
+specificity and context
+* the more you specify, the less context you need
+* this is true for human languages as well
+* eg in weakly typed languages, you might have to backtrace to last assignment of the variable to figure out what type it is
+	* in strongly typed languages, the compiler already knows the type at any given line of the execution
+* there might be stuff that an AI can infer though, eg if the programmer is only doing array operations, then the variable is most likely an array
+* 
+
+
+
+preview view
+* instead of viewing the program, sometimes its more intuitive to see the structure of the program with a test input
+* for example, with the fibonacci program
+
+
+
+
+cloning/branching
+* used for creating a separate state variable
+* used for instantiating class instances
+* used for "calling" a function with different arguments
+* normally, in imperative languages this is achieved through function definitions vs function calls
+* distinction between definition and usage
+* we need a `extend` operator that goes from definition to usage
+* basically what this operator does is "wraps" the definition into a new object
+
+* makes sense for versioning because when you wrap the original state variable, it stores the timestamp, and so it knows exactly what version of the original state variable to branch from, and new versions are stored in the new wrapper, not modifying the original state variable
+* also, unlike the assignment/versioning operator, which can be used anywhere, the `extend` operator can only be used once to create the new variable
+* perhaps the `extend` variable is like rebinding in elixir, and like graph-order versioning (eh not sure about this)
+
+* take a module, `extend` it and bind some inputs, then `extend` it again and use it multiple times
+* eg Person module, `extend` it with the inputs 
+
+* very similar to prototypal inheritance in javascript
+* or function.bind()
+
+
+* in imperative langs, assignment and extension both use the same operator: `=`
+* eg `x = 5; x = 10; y = x; y = 15` => `x: 10, y: 15`
+	* notice that the first two statements were assignment, the 3rd was extension, and the 4th was another assignment
+* Arcane uses different operators for these two operations
+* this creates another distinction when using modules (in imperative terms, "calling functions")
+* java and javascript use "call-by-reference", aka any assignments done to function arguments will simply rebind the variable, not affect the original variable
+* in Arcane, revisions made to the variable affect the original (because it's actually modifying the properties of the original, eg `myVar[timestamp] = 5`)
+* in javascript, if you want to modify a variable passed into a function, you have to wrap it, eg `(wrapper) => wrapper.myVar = 5`
+* in Arcane, if you don't want to modify the original variable passed in, you have to extend it, eg `onClick(myVar) => newVar. = myVar.`
+	* and then you can change the new variable however you want: `newVar. = 10` => `myVar: 5, newVar: 10`
+	* if you do `onClick(myVar) => newVar = myVar`, now `newVar` tracks `myVar`: `newVar. = 10` => `myVar: 10, newVar = 10`
+
+
+### AI and the Future of Programming
+
+* using AI to create programs is not a new idea
+* there has been a lot of research recently into AI programming
+	* using neural nets to generate other neural nets, etc
+* people dream about being able to give pseudocode to AI, and have the AI convert it into a real program
+* but I think it's important to realize that AI cannot fully replace human programming
+* because ultimately, **programming is art**
+* AI is a tool to help us: to fill in gaps and edge cases, to suggest solutions, to optimize code
+* however, there is no objectively right way for a program to behave, so we have to decide that for ourselves
+* in addition, the AI's result has to be understandable by humans:
+	* so that we can assess it and modify it further
+	* to support collaboration, eg if somebody wants to improve upon the project or repurpose it for a different project
+* as an analogy, AI can help an artist paint, suggest colors and straighten lines and such, but ultimately it is up to the artist what the finished product will look like
+
+------------------------
+
+
+should local variables be carried into the scope of all nested modules, of any depth?
+* in imperative, variables are only in scope in nested definitions, not nested usage
+
+```js
+function nestedUsage() {
+	console.log(localVar);
+}
+
+function fn() {
+	var localVar = 10;
+	function nested() {
+		console.log(localVar);
+	}
+	nested(); // output: 10
+	nestedUsage(); // output: undefined
+}
+```
+
+* however, so far in Arcane we haven't cared where a module is defined
+* however, if we allow deeply nested modules to inherit top-level local variables, then it could cause unexpected behavior
+	* cause modules to change based on context created far away
+
+```js
+function a () { b(); }
+function b () { c(); }
+function c () { d(); }
+function d () { e(); }
+// ... continued
+function y () { z(); }
+function z () { console.log(foo); }
+
+function main() {
+	a(); // output: undefined
+	foo = 10;
+	a(); // output: 10
+}
+```
+
+* maybe it should matter where modules are defined, because modules are data, so modules can be defined programmatically
+
+```js
+function fn(localVar) {
+	localVar = 'bar';
+	var modules = [10,11,12,13].map((item) => {
+		return (a) => a+localVar+item;
+	})
+	modules[2]('foo'); //output: 'foobar12'
+}
+```
+* note that this might affect autofill arguments and also versioning
+
+* in Arcane, modules are created in a similar fashion as Javascript prototyping
+* there is no distinction of "definition" and "usage", every module is a "definition", and any module can be extended to create another one
+	* think of it as every function call being a new function definition
+
+
+### Scope as a Search Function
+
+* scopes and context are one of the things that would probably benefit the most from AI
+* because our brains don't process scope/context in the hiearchal fashion that programming languages do
+* (i think) our brains work like a network/graph, reaching out to connected neurons up to a certain (and kinda arbitrary) depth
+* that means that context is more flexible, but also less deterministic
+* with the hierarchal model, less flexible but we know exactly what is in scope and what isn't
+
+* scope is actually an adirected graph, so searching for a variable is actually a finite operation
+* in hierarchal model, scope only expands as you go deeper
+	* scope starts at zero (no variables)
+	* as you go deeper and deeper into nested modules, more variables get added to the scope
+* in graph model, this is also true, as you navigate the graph finding linked variables and adding them to your collection
+	* even if there's a cycle, you just stop when you hit a variable you already added to the collection
+* scope is really just a _search_ for a variable of a certain name
+* it's possible for variables to have the same name, but the search ends when it finds the closest one
+* the key part of scope is how that search is performed and what structure we are searching
+	* could be a hierarchal model, or a breadth-first-search through a graph, or a neural net, etc
+* so it's not necessarily finite, if you are searching for a variable that could be generated, eg a lazy-generated stream of propery names+values
+	* most imperative languages don't even allow the generation of variables
+	* in javascript, object properties can be generated, and prototypal inheritance is kind of like scope, but properties cannot be generated at the same time as the scope search (the scope search happens "instantaneously" and only searches already generated variables)
+
+* however, in a language where all data is public, scope is really just for convenience
+* even data that is private (like local properties), can be made public simply by making it an output
+
+### Infinite Streams
+
+* Haskell and other languages have the concept of [streams](https://hackage.haskell.org/package/Stream-0.4.7.2/docs/Data-Stream.html), infinite lists (generating values by need, lazy-evaluation)
+* eg `primeNumbers` could be a stream, generating more primes when needed using sieve of eranthoses
+* I was debating for a while whether or not to include streams
+* however, streams naturally arise if we consider modules that generate infinite lists, and that module outputs are supposed to be "persistent"
+* essentially, if we have a module that generates an infinite list, then the "persistent" output of that module is the "stream"
+* thus, streams are already a part of Arcane
+* in fact, Arcane streams are more powerful than infinite lists, because they are infinite objects
+	* the property keys can be anything, not just numbers
+	* infinite list: `[2,3,5,7,11...]`
+	* infinite object: `[a: 2, aa: 3, aaa: 5, aaaa: 7...]`
+
+### Implementing Streams
+
+* programmer starts by making a simple infinite generator, e.g. natural numbers: `out = [i: 0 < i < infinity]`
+* to turn it into lazy-evaluation, we need to track which list elements are actually being queried
+* instead of outputting a simple object, we output a special object with a special property accessor
+* special property accessor doesn't just access properties, it generates them if needed
+
+* streams are a great example of where meta-programming can be useful, because the low-level implementation is quite different from the high-level sketch
+* the `out = [i: 0 < i < infinity]` is an "extremely slow" (read: non-halting) version of the program
+* the lazy-evaluation + special property accessor version is faster, but much more complicated
+
+----------------
+
+
+
+
+there is the main layer of program, input and output
+but it's more than just input/output
+metaprogramming is about how a program was created, and how it's presented to the user
+the IDE plays a big factor in this
+	for example, sketches
+	for example, displaying examples
+
+
+pen+paper: extremely simple, can be extremely powerful
+
+
+
+i wonder if versioning is like the state monad in haskell...
+
+
+
+
 
 
 ----------------------------------------------------------------------------------------------------
@@ -3308,11 +3650,13 @@ All findings so far...
 5. Modules are self contained. A module can have any internal implementation as long as the inputs/outputs follow these rules
 6. All inputs and outputs are key/value pairs (just like in javascript), and values can point to modules (aka values can be collections)
 7. Output values with no input binding are implicitly undefined
-8. Undefined input values forces the outputs to be undefined (skipping evaluation of the binding function) unless the "undefined" case is explicitely accounted for in the binding function
-	* this means an undefined input that is not accounted for basically "voids" the binding, making it behave as if the binding disappeared (forcing the outputs undefined by rule #6)
+8. No errors, only special output values like `undefined`
 9. Value bindings are for defining values
 10. Reference bindings are for defining structures
 11. Dynamic bindings are for conditional logic
+12. Modules can be treated as data and vice versa
+13. All local variables are properties
+14. No return statements
 
 ### Implementation Rules
 
@@ -3451,6 +3795,13 @@ Decomposition and Analyzing Shared Paths
 * while there can be multiple ways to achieve one output, so focus on the output and less on the implementation
 * define the structure and the relationships between the data, and let the compiler/interpreter determine the optimal procedure
 	* interpretted? compiled for single-threaded systems? compiled for multiple-threaded systems? etc...
+* programming is an art
+	* we should be comfortable expressing incomplete, rough, high-level ideas
+	* details can be filled in over time
+	* programs are built in layers of increasing complexity
+	* AI can be used to suggest how to fill in those details, generating the lower levels
+* code should speak for itself
+	* less comments, hide extraneous details and complexity
 
 ### Advantages
 
@@ -3461,3 +3812,15 @@ Decomposition and Analyzing Shared Paths
 	* the community can compete to optimize popular modules, and everybody can benefit without changing their code
 * flexible, allows sketching of rough and incomplete ideas
 	* mathematical languages like prolog and haskell allow for very elegant representation of complex ideas, but require a deep understanding of the structure of those ideas before they can be represented as such
+* simpler, because objects = functions
+	* no callbacks or closures or weird patterns, just declaring variables and relationships 
+
+### Acknowledgements
+* Javascript - simplicity, dynamic typing, everything is either an object or function
+	* AngularJS - data binding
+* Functional programming - everything is a function, elegant
+	* no complications from block scopes, race conditions, call by value vs reference, etc
+* Prolog - persistence, focus on data/logic, not procedure
+* Verilog - dataflow programming
+* CSS Matchers and OCaml - pattern matching
+* Haskell - nondeterministic list monads (elegant, prolog-like )
