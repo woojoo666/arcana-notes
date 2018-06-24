@@ -2197,11 +2197,7 @@ hold -------------'
 * basically uses a mux to switch between `D` or holding its current value (using a feedback loop)
 * note that while doable, these loops and EE tricks are not very intuitive...
 
-### Closures
-
-### Meta-Programming
-
-
+### Metaprogramming
 
 * meta-programming
 	* maybe allow modules to be modified in layers?
@@ -2212,35 +2208,51 @@ hold -------------'
 	* is this needed tho? in Javascript we just have everything be an object and modify it directly
 	* however, in javascript we can only modify properties and stuff, we can't modify the code inside a function
 	* so if we want to have a section of a function be modifiable, we have to pull it out into another function, and then override that new function
+
+### Classes?
+
 * classes
 	* a new system for classes? or just use dictionaries like Flo
 	* stuff like Array.map and Array.reduce, built-in functions, should they be segregated or just exist as regular properties like in javascript
+
+### Dynamic Modules
+
 * functions as objects
 	* what syntax to use when turning a module definition into a variable, and vice versa?
+		* in javascript, this is like `var x = function () {...}`
 	* when you define a module, you can easily use it within the same context just by drawing another module with the same name
 	* but what if you want to use the module outside the context? aka pass it around
+		* in javascript, this is like returning a function, `function outer() { ... return function inner() {...} }`
 	* libraries would leverage the same system
-	* note that this isn't totally necessary. Functions can't be "pulled out" in C++ or Java, only in things like Javascript
-
+	* note that this isn't totally necessary
+		* functions can't be "returned" or "pulled out" in C++ or Java, only in langs like Javascript
+* dynamic functions
 	* this is actually less about "functions as objects" and more about having dynamic functions, aka being able to create functions dynamically and then pass them around
-
+* context and scope
 	* there are two types of contexts to worry about: the context the function was created in, and the context the function was called from
 	* the context the function was created in is more important, the function can be called from anywhere, if its passed around it becomes more like a "remote" that can be called from anywhere, but runs within its original environment
 	* one example would be like, a button that makes a robot wave his arm, created within the robot but passed outside the robot so that anybody can make the robot wave his arm
 	* we can have similar functionality by passing around modules in Flo
-	* however, in Flo, stuff is communicated through data, not through function calls
-	* so instead of pressing a button to make the robot to wave his arm, the button-press triggers a flag, which is then registered by the robot, who waves his arm
+
+### Flag-Watcher Model
+
+* flags and watchers
+	* perhaps in Flo, it doesn't make sense to pass around functions and letting other people call them
+	* Flo is about communicating through data, not through function calls
+	* instead, we can raise "flags" and have a "watcher" register the flags and act appropriately
+	* this is similar to the event+listener model of imperative langs
+		* things like button presses create events (data) and then the listener consumes the event
+* robot example
+	* going back to the robot example of the previous section:
+	* instead of pressing a button to make the robot to wave his arm, we do:
+		* the button-press raises a flag, which is registered by the robot, who waves his arm
+* encapsulation
 	* this is possibly better as well because the locus of control remains within the robot, instead of being controlled from outside
 	* better interface isolation, loose coupling
 	* everything is asynchronous too, because the person pressing the button wouldn't have to wait until the robot waves to move onto the next thing
 		* in synchronous code, when you call a function you have to wait for it to return to continue
-
+* multiple listeners
 	* this can get complicated tho if, for example, the button press flag needs to get registered by multiple robots who all need to wave their arms
-
-	* normal imperative languages are function call based
-	* Flo uses a data based model, can be thought of as an event+listener model
-		* things like button presses create events (data) and then the listener consumes the event
-
 	* to handle multiple listeners, you have each of the listeners register the event and then create another event indicating that the event was registered
 	* then you have a garbage collector for the original event that waits for the event to get registered by all listeners, before deleting the event
 	* the garbage collector on the listener side waits for the event to get deleted, then deletes the event-registered event
@@ -2248,17 +2260,15 @@ hold -------------'
 	* no race conditions
 	* even for just one listener, this method is more loosely coupled than the method of having the listener "consume" the event
 		* though much more complicated
-
-	
-currying
+currying?
 	* vishvanand brought up that functions are passed around not just for passing control, but also for currying
 	* how does this fit into Flo?
 	* currying is really just for convenience
 	* all about dynamic creation of functions that were created with different scopes
 	* a way of "hiding" inputs
 
-* array.reduce
-* selectors
+### Closures and Dynamic Functions
+
 * scopes and closures and enviroments
 	* in Javascript we have closures, aka a function can be "pulled out" of its environment, but it still holds onto its environment
 	* it makes sense to have implicit environments/scoping, aka not every variable used in a module has to be declared as an input
@@ -2266,6 +2276,8 @@ currying
 		* problems and solutions often only make sense within a certain context, and its unreasonable for the entire context to be declared as inputs
 	* but when you "return" a module, aka use a module outside of where it was defined, does it still hold onto the scope?
 	* useful, but counter-intuitive? Maybe theres a better way?
+
+### Modifying Data: Imperative vs Dataflow
 
 * one of the annoying things about Flo is that it takes a lot of work to modify data
 	* for example, in imperative languages, anybody can modify a piece of data using something like `myScope.data = 10`
@@ -2291,18 +2303,21 @@ currying
 				EXPLAIN.................
 
 
-* turing machine using Flo, 2 complications
-	* ensuring simultaneous operations (write at tape head, move tape head, change state)
-	* "modifying" data, overwriting existing data, infinite tape
-* time is an input
-* much of these complications (output needs to be aware of all inputs) comes from the "backwards" nature of Flo (outputs are defined in terms of inputs)
-	* in javascript, we have like a little robot that goes to a memory location and writes at that location
-	* in Flo, we start at the memory location, and then define how the robot's actions affect the data at that location
+* the "backwards" nature of Flo (outputs are defined in terms of inputs)
+	* in javascript, we have like a bunch of little robots that go to a memory location and writes at that location
+	* in Flo, we start at the memory location, and then define which robots and which actions affect the data at that location
 * the "dynamic inputs" are a kind of way of adding pseudo-forward logic into Flo
 
 * variables are not memory
 * we are used to re-using variables to save memory
 * but in Flo, that makes things more complicated and ugly
+
+### Synchronization using States and Lock->Flush System
+
+* turing machine using Flo, 2 complications
+	* ensuring simultaneous operations (write at tape head, move tape head, change state)
+	* "modifying" data, overwriting existing data, infinite tape
+* time is an input
 
 * synchronization can be implemented using states!
 	* just have a master-slave lock system, kind of like [master-slave flip flops](http://www10.edacafe.com/book/ASIC/Book/CH02/CH02.5.php) in EE, or [canal locks](https://en.wikipedia.org/wiki/Lock_(water_navigation)) and [airlocks](https://en.wikipedia.org/wiki/Airlock) in mechanical systems
@@ -2312,6 +2327,8 @@ currying
 * stack reduction should only occur for time-insensitive inputs
 	* if an input gets tons of "update" events, just calculate ....................
 
+### Flag-Watcher Model - Interfaces
+
 * "public" objects and contract systems:
 	* in Flo its impossible to make an object "public", aka modifiable by anybody
 		* e.g. a light switch that anybody can turn on/off
@@ -2319,6 +2336,10 @@ currying
 	* in Flo, instead we can have a contract system where the public object provides an interface through which actors can submit requests to change the object
 	* each actor just "implements" the interface, and the public object automatically monitors all active instances of the interface
 
+	* this is just another way of looking at the flag-watcher model
+	* the interface is just a set of flags provided and recognized by the watcher
+
+### Flo - Reviewing Original Motivations
 
 * the original ideas behind Flo
 	* be able to draw anything high level
@@ -2333,13 +2354,74 @@ currying
 	* tags?
 		* how to apply a map operation to every element of a tree structure
 
+### Defaults for Select, Map, and Reduce
+
 * select, map, reduce
+	* so far, in our diagram syntax, we use a fan-out to select/filter items in a list, and a "fan-in" to reduce/combine the items
+
+		    /             \
+		---<----  map  ---->----
+		    \             /
+		 select         reduce
+
+	* we can specify start/end and filters for the `select`, and similar parameters for `reduce`
+	* but we also have defaults in case none of those are specified
 	* default select: each property of the object
 	* default reduce: append all to a list
 	* connect select and reduce
 		* do things like rebuild the structure of a tree after applying an operation on each node
 
 ### READ THE NOTES FROM ONENOTE!!
+
+* "Flo Brainstorm and Discussion.one"
+* "Monads and Sample Spaces and Infinities.one"
+* "More Flo Notes.one"
+* "Sequential Logic in Dataflow Languages.one"
+* "Wijit Brainstorm.one"
+
+### Event Lists
+
+* context: "Collecting an array of Changes" and "Timelines and Event Lists" in "More Flo Notes.one"
+
+* often we have a time-varying input and we want to listen for changes in that input
+* for example, incrementing a counter every time the mouse is clicked
+
+* to handle these cases, we have a special module, `changetracker`, that tracks changes and creates a list of them
+* you can then use `filter` and `reduce` to operate on the list, just like any other list
+* eg if we wanted to count the number of spacebar presses
+
+```js
+keypresses = changetracker(keyboard)
+spaceBarPresses = keypresses.filter(event => event.key == spacebar).length
+```
+
+* this is not really a language feature, and more of a programming paradigm
+* instead of trying to handle the time-varying input using synchronization and sequential logic, we convert it to a list of events
+* anytime we are working with time-based data, we probably want to use event lists
+
+* we treat time as just another piece of data to work with
+* event lists are just lists that are indexed by time
+* we turn dynamic changing data into a persistent static timeline of those changes
+* kind of like treating time as just another dimension, another facet of our data
+* once time is integrated into the language as data, we can operate on time just like any other piece of data
+
+### Event Lists vs Sequential Logic Blocks
+
+* Verilog and other dataflow languages often use some special syntax for sequential logic like this
+	* Verilog uses the `@ (myinput) { stuff to do when myinput changes }`
+
+* in these languages, sequential blocks are isolated from combinational blocks
+* they operate on different rules (using operations like assignment and `+=` and stuff)
+* represent instantaneous operations, unlike the persistent bindings of combinational logic
+
+* eventlists provide an easy way to bring sequential logic back into the domain of combinational logic
+* just treat time as data (as noted in the previous section)
+* no need to define special blocks with special operations
+* intuitive
+* can leverage existing constructs like `filter` and `reduce`
+* allows "sequential" logic to be interwoven and integrated into combinational logic, into one unified dataflow graph
+
+* even has some possible performance benefits, as discussed in "Sequential Logic in Dataflow Languages.one"
 
 ### Muxes, Execution Order, and Infinite Loops
 
@@ -2364,8 +2446,8 @@ currying
 * essentially, an if-else conditional is just a true-false mux with lazy evaluation!
 
 * ok actually, one issue
-* the blocks aren't explicitely defined for the "TRUE BLOCK" and "FALSE BLOCK"
-* where would you define the blocks here?
+* in a large network graph, how do we determine which part of the graph is part of the "TRUE BLOCK" and "FALSE BLOCK"?
+* for example, where would you define the blocks for the network below?
 
 ```
         ,------|\
@@ -2440,19 +2522,20 @@ else
 	* bad method: one thread generates ids without waiting at all, one thread pulls search results, first thread will infinite loop but oh well
 	* technically all methods are valid, represent different execution methods
 
-
-
 * in fact, we can extend lazy evaluation to all muxes
 * all muxes have the potential of containing conditional recursion, that would lead to infinite recursion if evaluated forward
 * we could either try to detect these loops, 
-......................................
+* or something else?
+* I'll have to think about this more...
+
+(continued in "Muxes, Execution Order, and Infinite Loops - Part II")
 
 ### Context and Environment
 
 * in imperative languages, the "global variables" are the context and environment
-* they represent values in a function that are relatively static, 
-........................................
-
+* they represent values in a function that are
+	* relatively static (relative to values in the function)
+	* shared across functions
 
 * in javascript, "global" variable use is detected at runtime
 	* if a line of code referenced an undefined variable, it'll throw an error at runtime
@@ -2460,6 +2543,9 @@ else
 * for forwards evaluation, the binding is created before runtime so that changes to the global variable will propagate properly
 * for lazy evaluation, the binding is created only when needed, so missing global dependencies will be detected at runtime
 
+* (6/22/18 revisit)
+* I'm not entirely sure where I was going with this lol
+* might have been exploring how and when variables should be bound to their context/scope?
 
 ### Angular, React, Vue?
 
@@ -2473,7 +2559,13 @@ else
 * what would be nice is for the IDE to dynamically adapt to the best way of presenting code and information
 * this really shouldn't be an issue that the language/framework should solve, but a problem that the IDE should solve
 
+### PowerSet - Nondeterministic Monads and Sample Sapces
 
+* see "Monads and Sample Spaces and Infinities.one" for a visualization of what I'm talking about here
+
+* Haskell has something called a "list monad" that uses nondeterminism to do cool shit
+* more specifically, using list monads to define `powerset()` is extremely elegant
+* so how does it do it?
 * List monad powerset is just a way of converting a set of sets into exponentiation
 * List monad == multiplication/exponentiation
 * Multiplication is a way of combining sets
@@ -2493,6 +2585,8 @@ else
 * Extension to data types? How to create an order-agnostic multi-dimensional array without using "set of sets"?
 	* Use properties. Instead of using Grid[5][7] use Grid[row: 5][col: 7], and optimize the datatype in the background to fit the use case
 
+### Variable Number of Inputs
+
 * imperative languages like to use "stacking", taking operations with fixed number of inputs, and stacking them to allow for variable number of inputs
 	* recursion, nested for-loops, arrays of arrays, etc
 * however, many of these operations are commutative, aka order doesn't matter
@@ -2502,6 +2596,8 @@ else
 * "repeat" operator enables us to do multiplication and exponentiation
 * the hard part is defining all the different ways of combining these "repeated" modules
 * maybe have a "multi" input which takes a normal operator and, when fed multiple inputs, automatically stacks them?
+
+### Powerset - Sample Spaces and Preserving Labels
 
 * context
 * filterM (list monad version) preserves the link between list element and include/exclude
@@ -2547,8 +2643,6 @@ else
 	* adding properties to objects without changing everything else
 * eg if we have `myArray.concat([1,2,3])`, we can add tags to `myArray` without having to change it to `myObject.myArray.concat([1,2,3])`
 
------- stuff below is still in progress -----
-
 ? how to we specify whether an operation works on the Node's value or on the tags?
 	* only the property accessor operator works on tags (think the `.` and `[]` operator in javascript)
 	* every other operator works on the value
@@ -2563,6 +2657,7 @@ else
 	? what assignment? should it by default pass on only the value? or the entire node?
 	? what about combination operators
 
+### Types as Tags
 
 * "types" are tags as well
 	* can implement a type system by adding "type" tags to everything
@@ -2654,19 +2749,23 @@ else
 	* eg `color.BLACK = {}`, now you can use `color.BLACK` as a unique value
 * Java, C++, and other imperative languages can technically use this trick as well
 
+* however, in javascript you can't use these pointers as property names (`filter.INCLUDE` will be cast to the string `"[object Object]"`)
+* in Java, you can. Using objects as keys in a `Map` will by default use the object's reference (aka memory location) as the key
 
-
-	* however, in javascript you can't use these pointers as property names (`filter.INCLUDE` will be cast to the string `"[object Object]"`)
-
-
-* the problem is that maybe you'll have a flow that inspects and modifies and rearranges some objects
-	* how can you add a tag while ensuring that it won't interfere with existing object properties?
-	* eg: traversing a graph of nodes, where each node has a `children` property, but each node stores an object
+* symbols can help preventing key name collision as well
+* let's say you have a flow that inspects/modifies/rearranges some objects
+* how can you add a tag while ensuring that it won't interfere with existing object properties?
+* eg: traversing a graph of nodes, where each node has a `children` property, but each node stores an object
 	* traditionally, you'd have a `node` object that has a `children` property and a `value` property, where the object is stored in `value`
 	* now, if you want to do a BFS traversal, you might want to add a `visited` tag, which you could add onto `node`
 	* but for a generic BFS traversal function, we don't know if the input `node` objects already have the `visited` property
 	* so we have to add yet another wrapper, `BFS_node`, that is just used for the traversal, and has a `node` property and a `visited` property
-* we create "local" properties, kind of like Scheme's symbols, which are guaranteed not to collide with existing properties
+* so instead of making wrappers, we use "local" properties
+	* local properties are using local symbols as property keys
+	* guaranteed not to collide with existing properties
+		* just like Scheme symbols
+* localized to the scope of the symbol
+* if you can't see the symbol, you can't retrieve the symbol property
 
 
 ? we can also use symbols as namespaces?
@@ -2700,7 +2799,17 @@ else
 	* eg when adding a property to a object, have to make sure you're not overriding existing properties
 	* collisions become much more likely at a global distributed scale
 * Arcane however is designed to be a distributed language, encouraging collaboration between live processes across the internet
-* thus, Arcane needs to have a system to ????????????????????????????
+* thus, Arcane needs to have a system to ensure program namespaces don't collide with eachother across the internet
+* generate a unique namespace for each program
+* we can use a system like IP addresses to add prefixes to program namespaces
+	* when passing data across the internet, as the data reaches broader and broader scopes, prefixes are added to keep it unique
+* eg, when passing mail between two home addresses
+	* mail starts with just the street address
+	* if recipient is in the same city, then that's all that is needed
+	* once the mail leaves the city, the city's name is added to the address on the mail
+	* once the mail leaves the state, the state's name is added to the address
+	* etc...
+	* the address contains the minimum amount of information needed to reach it's destination
 
 ### Add-ons
 
@@ -2732,9 +2841,9 @@ else
 	* might involve some backtracking, but how far back should we backtrack?
 
 
-? myModule.localProp vs this.localProp
-	? myModule.localProp is visible to everything inside the module, including submodules
-	? this.localProp is visible only to everything directly inside the module, discluding submodules
+? have two ways of declaring/referencing local properties, `myModule.localProp` and `this.localProp`?
+	? `myModule.localProp` is a normal local property, visible within the module, including submodules
+	? this.localProp is only visible directly within the module, excluding submodules
 		? even though an object might be tagged `myObj[this.localProp] = 5`, it will be invisible within submodules, until it comes out of the submodule
 
 
@@ -2754,11 +2863,12 @@ else
 ? local properties can still collide with local properties from ancestors
 	* eg if module called `TypeSystem` has local property `type`, then even though it's hidden, we can't make another local property `type` inside submodules simply because the variable names collide
 	* how would we know which `type` symbol we are referring to, when we want to use one of them?
-
-
-python decorations?
-timeline leading to a timeline? timelines should specify exactly what to track, otherwise prone to tracking noise
-	input to timeline should be synchronized to something
+* revisit 6/22/18:
+	* not sure why I thought this
+	* preventing name collisions was one of the main motivations behind local properties
+	* descendent variable names will "shadow" ancestor variable names
+	* to explicitly access ancestor local properties, just use `mObject[mAncestor.prop]`
+	* to explicitly access descendent local properties: `mObject[mDescendent.prop]`
 
 * programmer needs a way to specify particular aspects to change, while leaving the rest untouched
 * for example, a type system changes the way operators behave (numbers => addition, strings => concatenation)
@@ -2766,6 +2876,33 @@ timeline leading to a timeline? timelines should specify exactly what to track, 
 * lets programmer explicitly define where the behavior needs to change, without changing anything else
 * Flo programs can be thought of as data, and operated on, re-arranging and modifying the program behavior
 
+python decorations?
+
+### Synchronization, Event Lists, and ChangeTracker
+
+* Vish and Vincent mentioned chaining multiple changelists, and the complications around that (check gopro footage)
+* most changelists are provided by the system, eg mouse-clicks and key-presses
+* however, what if we wanted to use the changelist converter ourselves
+	* recall that the changelist converter takes a changing value and converts it to a list of changes/events
+* let's say we wanted to create a graph of how a poll winner changes over time
+
+```
+votes --->[ballot box]--->[counter]--->[current winner]----(changetracker)-->[winner over time]
+```
+
+* the `current winner` just counts up the votes and outputs the current winning candidate
+* then the `(changelist)` tracks how the current winner changes over time, and gives the array of changes to `winner over time`
+* however, note that depending on how `current winner` is implemented, there could be transient noise every time a vote is submitted
+	* takes some time for the final result to stabilize
+* the changelist will track these irrelevant changes
+* so instead of tracking all changes, we synchronize the output of `current winner` to `votes`
+	* so that every vote only creates a single change in output
+* that way, the winner over time graphs only a single change per vote
+
+* in fact, `changetracker` is probably almost always used with synchronizations
+* inputs to `changetracker` should be synchronized to something, to distinguish between legitimate changes and noise
+
+### Javascript Symbol Properties
 
 * aw shit looks like javascript has local properties, called "symbol properties"
 * found it when going through [Mozilla's javascript inheritance tutorial](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Objects/Inheritance), and I looked up [`Object.getOwnPropertyNames()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyNames)
@@ -3028,7 +3165,7 @@ edge cases:
 * just like when we treated events as data, we can use the same idea to treat data as events
 * output a list of events
 
-```
+```js
 // for every personEntered event, create a lights.onEvent
 for (event in room.personEnteredEvents)
 	lights.onEvent
@@ -3036,7 +3173,7 @@ for (event in room.personEnteredEvents)
 
 * note that we can actually model this simply as
 
-```
+```js
 light.on = room.hasPerson
 ```
 
@@ -3044,7 +3181,7 @@ light.on = room.hasPerson
 
 ### Timelines
 
-* eventlists give us a way to treat events/actions as data, for both inputs and outputs
+* changelist/eventlists give us a way to treat events/actions as data, for both inputs and outputs
 * not enough, we need ways of specifying time and duration, not just events
 * for example, if we were designing an app like Guitar Hero
 * maybe we want to display a message for 2 seconds after the user hits a note
@@ -3052,7 +3189,7 @@ light.on = room.hasPerson
 
 * I guess an easy way to define these timelines is using events, eg "start" and "stop"
 	* `messageTimeline = { start: now(), stop: now() + 1 }`
-* see the OneNote Piano App doc for more details
+* see "Piano App Design.one" for more details
 
 ### Versioning
 
@@ -3063,7 +3200,7 @@ light.on = room.hasPerson
 * this is why imperative languages can feel natural
 * we can usually solve this using a mapreduce
 
-```
+```js
 for (click in clicks) {
 	next.counter = prev.counter + 1
 }
@@ -3128,6 +3265,7 @@ height = 60
 weight = 100
 
 bmi = calcBMI(gender: male, ethnicity: white)
+_
 ```
 
 ### Inferring Context
@@ -3244,13 +3382,15 @@ return sum
 * seems like functional already has caching and parallelization optimization
 * see https://mostly-adequate.gitbooks.io/mostly-adequate-guide/ch03.html#the-case-for-purity
 
-vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+### Haskell vs Arcane
 
 * Haskell
 	* Haskell seems like a very powerful language with ways to represent very abstract and generic ideas
 	* eg monads and functors
 	* however, rarely does a programmer put in the time to understand the mathematical structure behind his program to utilize these tools
 	* for example, nondeterministic list monads can be useful in some cases, but a programmer will rarely think to use it
+
+### Constraints and Type Systems - Possible Issues
 
 * constraints and type systems
 	? what happens when data leaves the constraint system, gets modified, and re-enters the system?
@@ -3260,8 +3400,7 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vv
 		* eg javascript "strict" and "non-strict" mode
 		* though I guess in a way this already happens, with everybody using corporate domain-specific languages
 
-* metaprogramming allows for defining your own syntactic sugar
-	* could this be too flexible? allows for hiding malicious code?
+### Versioning Mechanics?
 
 * defining arrays and objects
 	? how to map timestamps to numerical indexes
@@ -3271,6 +3410,12 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vv
 		? however, should we prevent feedback, aka using an object to define its own properties?
 
 ? is it always possible to infer version timetamps from event contexts?
+
+* objects often follow this model (for the way data travels through the object):
+	* events -> state variables -> dataflow variables -> outputs
+	* should we distinguish between state variables and dataflow variables?
+
+### Satellites?
 
 * satellites
 	* in imperative languages, classes can contain many methods, each with their own inputs
@@ -3282,9 +3427,7 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vv
 	* or maybe these can just be normal submodules?
 	? inputs to these sub-modules are inferred inputs of the main module?
 
-* objects often follow this model (for the way data travels through the object):
-	* events -> state variables -> dataflow variables -> outputs
-	* should we distinguish between state variables and dataflow variables?
+### Versioning Types
 
 * different types of versioning
 	* main type: timestamps and events
@@ -3298,12 +3441,19 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv UNDER CONSTRUCTION BELOW vv
 	* only place it seems useful is in MapReduces and recursion
 		* variables are dynamically created, so in order to tie them all together, there has to be a shared variable name
 
+### Metaprogramming Uses
+
+* metaprogramming allows for defining your own syntactic sugar
+	* could this be too flexible? allows for hiding malicious code?
+	* see the section "Metaprogramming and Syntactic Sugar" for more on this
+
 * Facades
-* Sometimes you want to view the simple definition based view, sometimes you want to view the action based view.
-* Stuff like caching and stuff is possible in imperative langauges using annotations, eg @memoize
+	* Sometimes you want to view the simple definition based view, sometimes you want to view the action based view.
+	* Stuff like caching and stuff is possible in imperative langauges using annotations, eg @memoize
 
 
-summary of Conditionals.one:
+### summary of Conditionals.one
+
 * see "Conditionals.one" for full context
 * recall that conditionals and muxes achieve the same thing
 * also, conditionals are forward moving, and muxes are backward moving (see section "Persistence, Multiplexors and Branches")
@@ -3332,7 +3482,8 @@ x ---<--- else -    -[ m2 ]----
 * eg, referencing an undefined property, or an out of bounds array index
 
 ```js
-factorial (linkedlist) => (linkedlist == undefined) ? 1 : linkedlist.value*factorial (linkedlist.next)
+factorial = (linkedlist) => (linkedlist == undefined) ? 1 : linkedlist.value*factorial (linkedlist.next)
+_
 ```
 
 * no need for a special `if undefined` construct...just treat `undefined` like any other symbol
@@ -3343,6 +3494,8 @@ factorial (linkedlist) => (linkedlist == undefined) ? 1 : linkedlist.value*facto
 * but for `==`, `undefined == undefined => true`
 * `==` has implemented the case for all symbols, whereas `+` and `concat` haven't
 * datatypes: number, string, symbol/object, char, set, array
+
+### Carrying Out Deeply Nested Outputs
 
 local variables as properties
 * runs danger of overshadowing inner module outputs
@@ -3378,9 +3531,15 @@ combine( // combines both arrays into a single ordered array
 	}),
 ).values() // extract the ordered list of functions
 .apply(10) // input a starting value into the chain of functions
+``
 ```
 
 * though it's a little uglier because you have to pass around functions instead of directly assigning to variables
+* see the next section for how Arcane does it
+
+### Versioning Syntax Brainstorm
+
+* the previous section showed how functional languages would implement a versioning-like syntax
 * Arcane would be more like
 
 ```js
@@ -3391,6 +3550,7 @@ clicks.map((timestamp) => {
 keypresses.map((timestamp) => {
 	x[timestamp] = x[<timestamp]*x[<timestamp]
 })
+_
 ```
 
 * we can make it a little cleaner if we create a special type of block scope for these things
@@ -3403,6 +3563,7 @@ clicks.mapBy('timestamp', () => {
 keypresses.mapBy('timestamp', () => {
 	x[] = x[]*x[]
 })
+_
 ```
 
 * additionally, because mapping by timestamp is so common, it should be the default
@@ -3415,6 +3576,7 @@ clicks.map(() => {
 keypresses.map(() => {
 	x. = x.*x.
 })
+_
 ```
 
 ? dataflow allows data to be mutated and changed, without manually triggering or knowing about who's listening for updates
@@ -3422,41 +3584,56 @@ keypresses.map(() => {
 	* i think in functional, while inputs might be "impure" and implemented using imperative (manually triggering updates through the graph), the graph can be created using function calls, created in a "backwards" manner, just like Arcane
 	* so its still the same?
 
+### Fundamental Components of a Module/Node
 
-
-Lisp has metaprogramming?
-
-
-is undefined necessary?
-* most reduced form:
+* the most reduced form:
 	* each node contains:
 		* input edges, arrows going into the node
 		* set of rules that generate output edges?
 		* the rules are created from conditionals?
 		* undefined means a certain input doesn't exist?
 		* I think the only conditional requires is Node equality, whether or not two inputs point to the same node
+* is undefined necessary?
 
-specificity and context
+### Specificity and Context
+
 * the more you specify, the less context you need
 * this is true for human languages as well
 * eg in weakly typed languages, you might have to backtrace to last assignment of the variable to figure out what type it is
 	* in strongly typed languages, the compiler already knows the type at any given line of the execution
 * there might be stuff that an AI can infer though, eg if the programmer is only doing array operations, then the variable is most likely an array
-* 
 
+### Preview View
 
-
-preview view
 * instead of viewing the program, sometimes its more intuitive to see the structure of the program with a test input
 * for example, with the fibonacci program
+	* input an example input number
+	* as you are writing code, it not only generates the output, but the resulting recursional structure
+	* including all the submodules created when calculating the output
+* for example:
 
+```js
+// definition
+fibo = (n) => n > 1 ? fibo(n-1)+fibo(n-2) : n
 
+// test case visualization
+fibo(3) = 
+	3 > 1 => fibo(2)+fibo(1) => 2
+		fibo(2) = 
+			2 > 1 => fibo(1) + fibo(0) => 1
+			fibo(1) = 1 !> 1 => 1
+			fibo(0) = 0 !> 1 => 0
+		fibo(1) = 1 !> 1 => 1
+_
+```
 
+### Cloning and Branching
 
-cloning/branching
-* used for creating a separate state variable
-* used for instantiating class instances
-* used for "calling" a function with different arguments
+* cloning is:
+	* used for creating a separate state variable
+	* used for instantiating class instances
+	* used for "calling" a function with different arguments
+
 * normally, in imperative languages this is achieved through function definitions vs function calls
 * distinction between definition and usage
 * we need a `extend` operator that goes from definition to usage
@@ -3501,8 +3678,7 @@ cloning/branching
 	* to support collaboration, eg if somebody wants to improve upon the project or repurpose it for a different project
 * as an analogy, AI can help an artist paint, suggest colors and straighten lines and such, but ultimately it is up to the artist what the finished product will look like
 
-------------------------
-
+### Cloning and Scopes - Clone Equivalence
 
 should local variables be carried into the scope of all nested modules, of any depth?
 * in imperative, variables are only in scope in nested definitions, not nested usage
@@ -3523,6 +3699,13 @@ function fn() {
 ```
 
 * however, so far in Arcane we haven't cared where a module is defined
+* every module is created equal, there is no difference between a clone and a definition (aside from arguments)
+* this is called **Clone Equivalence**
+* also makes it simpler: we don't have to treat definitions differently from clones
+* another perspective: a function definition is (1) defining a function in blank space and (2) calling it in the definition context
+* in the section "Implicit Arguments" we talked about how modules inherit arguments from context
+* this is a natural consequence of Cloning Equivalence
+
 * however, if we allow deeply nested modules to inherit top-level local variables, then it could cause unexpected behavior
 	* cause modules to change based on context created far away
 
@@ -3558,7 +3741,6 @@ function fn(localVar) {
 * in Arcane, modules are created in a similar fashion as Javascript prototyping
 * there is no distinction of "definition" and "usage", every module is a "definition", and any module can be extended to create another one
 	* think of it as every function call being a new function definition
-
 
 ### Scope as a Search Function
 
@@ -3609,27 +3791,14 @@ function fn(localVar) {
 * the `out = [i: 0 < i < infinity]` is an "extremely slow" (read: non-halting) version of the program
 * the lazy-evaluation + special property accessor version is faster, but much more complicated
 
-----------------
-
-
-
+### Metaprogramming Thoughts
 
 there is the main layer of program, input and output
 but it's more than just input/output
 metaprogramming is about how a program was created, and how it's presented to the user
 the IDE plays a big factor in this
-	for example, sketches
-	for example, displaying examples
-
-
-pen+paper: extremely simple, can be extremely powerful
-
-
-
-i wonder if versioning is like the state monad in haskell...
-
-
-
+	for example, sketches (see section "Layers of Complexity, not Abstraction" and "Metaprogramming and Syntactic Sugar")
+	for example, displaying examples (see section "Preview View")
 
 
 
@@ -3656,7 +3825,10 @@ All findings so far...
 11. Dynamic bindings are for conditional logic
 12. Modules can be treated as data and vice versa
 13. All local variables are properties
-14. No return statements
+14. Encapsulation: modules can only modify and control things inside the module, no control over anything external
+15. All properties are public information (aside from symbol properties)
+16. Clone Equivalence: calling/cloning a module is the same as redefining it. Variables are inherited from context/scope
+
 
 ### Implementation Rules
 
@@ -3715,11 +3887,11 @@ Muxes
 * modify property
 * declare module
 * use module
-* timeline
+* changetracker
 * pattern match / for loop
 * combine
 
-### Typed Syntax
+### Text-Based Syntax
 
 	x = a + b
 	set = (3 5 7)
