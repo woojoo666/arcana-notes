@@ -1,0 +1,25 @@
+<html>
+
+<body ng-app="MyApp" ng-controller="MyCtrl">
+
+	<h1>{{title}}</h1>
+	<br>
+	<br>
+	<div>{{code}}</div>
+	<textarea ng-model="code" ng-change="interpret($event)"></textarea>
+	<script src="angular.min.js"></script>
+
+<script>
+angular.module('MyApp', [])
+.controller('MyCtrl', function($scope) {
+	$scope.title = 'Concept IDE';
+
+	$scope.interpret = function (event) {
+		console.log($scope.code);
+	}
+});
+</script>
+
+</body>
+
+</html>
