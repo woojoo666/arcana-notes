@@ -1,11 +1,19 @@
 <html>
 
+<head>
+<style>
+	textarea {
+		width: 80%;
+		height: 80%;
+	}
+</style>
+</head>
+
 <body ng-app="MyApp" ng-controller="MyCtrl">
 
 	<h1>{{title}}</h1>
 	<br>
 	<br>
-	<div>{{code}}</div>
 	<textarea ng-model="code" ng-change="interpret($event)"></textarea>
 	<script src="angular.min.js"></script>
 
@@ -14,9 +22,52 @@ angular.module('MyApp', [])
 .controller('MyCtrl', function($scope) {
 	$scope.title = 'Concept IDE';
 
+	$scope.graph = {};
+	$scope.rawtree = {}
+
+	// start with some test cases
+	$scope.code = `
+outer:
+	test: hello
+	blaa
+	nested:
+		10
+
+	foo(x: 10)
+	`;
+
 	$scope.interpret = function (event) {
-		console.log($scope.code);
+		console.log('--------- Begin Parse --------');
+		parse($scope.code);
+	};
+
+	function parse (code) {
+		var depth = 0;
+		code.split('\n').forEach(line => {
+			var regexResults; // used throughout for regex results
+
+			regexResults = line.match(/^(\t+)?(.*)/);
+			var indentation = (regexResults[1] || '').length;
+			line = regexResults[2];
+
+			var key = '';
+			var value = line;
+			regexResults = line.match(/^(\w+):(.*)/);
+			if (regexResults) {
+				key = regexResults[1];
+				value = regexResults[2]
+			}
+
+			console.log('indentation: ' + indentation + ', key: ' + key + ', value: ' + value);
+		});
 	}
+
+	// given a scope of defined symbols, finds all unbounds symbols used in a module
+	function findUnboundSymbols(scope, code) {
+
+	}
+
+	$scope.interpret(); // interpret initial textarea (before any changes)
 });
 </script>
 
