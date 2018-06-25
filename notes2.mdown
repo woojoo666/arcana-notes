@@ -1,3 +1,8 @@
+### Arcane is now Arcana!
+
+* sounds nicer lol
+
+### Functional vs Dataflow
 
 difference between functional and dataflow
 * in dataflow, we don't wait for all inputs to finish before computing the output
@@ -42,6 +47,8 @@ difference between functional and dataflow
 * if functional were to use a selective recomputation pattern, it would basically be dataflow
 * the only way to do efficient updates for dynamic inputs is through incremental updates
 
+
+currently in my dataflow model:
 
 * changes in input move forward
 * changes in muxes and conditionals move backwards
@@ -161,9 +168,7 @@ selfadder (bad feedback): `ans: ans + 1` aka `ans { value: ans.value + 1 }`
 * this way, the state of the program can only become more and more defined, cannot become less defined
 * this is a little undesirable as well though, setting values to `undefined` can 
 
--------------
-
-
+### Functional vs Dataflow - data vs signals
 
 * another main difference is that inputs/outputs of functional are data, whereas for dataflow all inputs/outputs are signals
 * most of the time we think of the output of a dataflow module as the steady-state limit of the signal
@@ -174,7 +179,7 @@ selfadder (bad feedback): `ans: ans + 1` aka `ans { value: ans.value + 1 }`
 	* the transient differences can cause feedback loops to diverge into different output steady-states
 	* in functional terms, this would mean identical inputs can result in differing outputs
 
-
+### Metaprogramming Thoughts II
 
 * in almost all art forms, the process goes like:
 	1. imagine complex art piece
@@ -193,14 +198,16 @@ selfadder (bad feedback): `ans: ans + 1` aka `ans { value: ans.value + 1 }`
 * but we can still see the simplicity of the program from the high-level diagrams
 * this is kind of like saving all your layers in photoshop so you can see how you constructed the painting/drawing
 
-
+### Imperative vs Functional
 
 imperative is superset of functional?
 we can have imperative elements in Arcane as well
 
-
+### Filtering Names vs Values
 
 * filter names vs values
+* how do we specify whether we are filtering for property names or values?
+* eg. `array.filter(item.index % 2 == 0)` vs `array.filter(item.value % 2 = 0)`
 * special syntax for a filter? takes in a list/item, outputs all items that pass the filter
 * what if we want to filter values, but retain the names in the result list?
 * what if we use a pattern matcher on the names, but we want to retain the names in the result list
@@ -213,6 +220,7 @@ we can have imperative elements in Arcane as well
 * we can filter more than just values, we can filter properties, subgraphs
 * just give a condition and it'll pull out all subgraphs that match, kind of like advanced regex
 
+### Metaprogramming Example - Subset Sum and Generators
 
 * another example of metaprogramming
 * `list.subsets().filter(sub => (sum(sub) == 100))`
@@ -224,31 +232,18 @@ we can have imperative elements in Arcane as well
 		* self-explanatory, easy to understand
 		* gives a general structure of the procedure
 
+generators:
+* are a good example of metaprogramming
+* obviously very slow, but intuitive to understand
+* `stream(ints).filter(> 1, < 100).forEach(fn(...))`
+* subsets()
 
-* generators
-	* stream(ints).filter(> 1, < 100).forEach(fn())
-	* subsets()
-
-
-determining which values were defined in the current view and which werent
-for autofill purposes
-
-
-
-true "write once read anywhere"
-tons of optimizations for single threaded process
-but now we can optimize for all sorts of systems
-we need to know which layers/modules we can touch, and which we can't
-powerset module, maybe some people want the recursive method, some people just want tne nondeterministic definition
-
-
+### Parallelizing Versioning
 
 if we can do if statements and do versioning, then can we convert imperative to arcana?
 that means that imperative is parallelizable
 
-
 every time theres a reassignment, we need to keep track of where it is 
-
 
 ```js
 var x = 2;
@@ -263,24 +258,35 @@ for (var i = 0; i < 1000; i++) {
 }
 ```
 
-
 doesn't seem that beneficial to parallelize versioning
 but imagine if we had a mllion people calling the same function
-we can use a look-up table???
+maybe we can use a look-up table?
+	* different versioning flows may converge to the same version at some point
+	* kinda like dynamic programming
+	* this is where a look-up table could be useful
 
+"write once read anywhere"
+tons of optimizations for single threaded process
+but now we can optimize for all sorts of systems
+we need to know which layers/modules we can touch, and which we can't
+powerset module, maybe some people want the recursive method, some people just want tne nondeterministic definition
 
+### Implicit Arguments II
 
+* recall how autofilling worked (see "Implicit Arguments")
 
-autofill and extending
-* when autofilling, we don't want to autofill all the properties of an object
-* only the properties that are defined within the module
+```js
+module caller {
+	a = 0;
+	b = 'hello';
+	x = callee(); // autofills `a` and `b` if they are parameters of `callee`
+};
+```
 
-we have to make a distinction between which properties of the object were created in 
-
-
-
-
-
+* when autofilling arguments of a callee, we don't want to pull from all caller properties
+* only the properties that are defined directly within the caller module
+	* or perhaps within the current "view" of the IDE
+* so any properties that are inherited or passed into the module, or dynamically generated, should not be used to autofill arguments
 
 ### Implicit Outputs
 
@@ -294,9 +300,10 @@ function sum (a, b) {
 }
 
 myoutput = sum(3,5).output
+_
 ```
 
-* un-named outputs are also allowed, just use the `return` keyword
+* anonymous un-named outputs are also allowed, just use the `return` keyword
 * just like how function inputs don't need names
 
 ```js
@@ -305,15 +312,16 @@ function sum (a, b) {
 }
 
 myoutput = sum(3,5) // yes, it does look exactly like javascript now lol
+_
 ```
 
-### Multiple Unnamed Outputs?
+### Multiple Anonymous Outputs?
 
 * note that in imperative languages you can have multiple unnamed inputs
 	* named inputs: `x = sum(a: 5, b: 10)`
 	* unnamed inputs: `x = sum(5, 10)`
 * perhaps with outputs we can have the same thing?
-* multiple unnamed outputs, with a specified order
+* multiple anonymous outputs, with a specified order
 
 * eg `x, y, z = fn(a, b, c);`
 
@@ -325,6 +333,7 @@ myoutput = sum(3,5) // yes, it does look exactly like javascript now lol
 if (x < 0)
 	return "invalid"
 return Math.sqrt(x)
+_
 ```
 
 ```js
@@ -344,7 +353,7 @@ else
 return out
 ```
 
-### Implicit Inputs
+### Implicit Inputs and Unbound Variables
 
 * note that we don't need to specify inputs either
 * we can just refer to them in the code
@@ -352,10 +361,10 @@ return out
 
 ```js
 sum: {
-	output = a + b // because a + b are "unbound", they are 
+	output = a + b // because a + b are "unbound", they are implicit inputs
 }
 
-mysum = sum(a: 10, b: 20)
+mysum = sum(a: 10, b: 20);
 ```
 
 * in the IDE, you can hover over a module to scan it and find unbound variables, aka implicit inputs
@@ -374,7 +383,7 @@ foo: {
 	return this[symbol2]
 }
 
-foo(symbol1: 5, symbol2: 5) // what should this output?? maybe `overdefined`??
+foo(symbol1: 5, symbol2: 5); // what should this output?? maybe `overdefined`??
 ```
 
 * I guess this is the same as
@@ -390,47 +399,89 @@ return foo[5]
 ```js
 a.b.c.d = 10
 a.b = 12 // doesn't override b, just sets the "value" property
-a.b = { foo: 20 } // does override b
+a.b = { foo: 20 }; // does override b
 ```
 
+### Anonymous Arguments
 
+(note: this section was added 6/24/18, but I added it here because I already had the idea,
+ as evident by the message I sent to Nylo over reddit on 5/11/2018, I just never wrote it down)
 
-
-
-
-
-
+* unbound variables are implicit inputs
+	* shown by the IDE at the top of the module
+	* no need to manually declare parameters anymore
+* we can also leverage this to work with "anonymous arguments", or arguments without a specified property name
 
 ```js
-var tablist = document.getElementById("history-app").shadowRoot.getElementById("synced-devices").shadowRoot.getElementById("synced-device-list").children[0].shadowRoot.querySelectorAll(".website-title")
+sum: {
+	output = a + b // because a + b are "unbound", they are implicit inputs
+}
+
+mysum = sum(10, 20); // 10 and 20 automatically bind to the implicit inputs, `a` and `b`
 ```
 
-then I wanted to add a textarea
+* they are bound in the order that the unbound variables appear in the module
+
+? what happens if there are more anonymous arguments than unbound variables?
+	* extra arguments are ignored?
+	* starts overriding bound variables?
+? what happens if we mix anonymous arguments with regular arguments?
+
+```js
+foo: { a, b:'hi', c: 10, d }
+
+bar: foo(1, 2, a: 'world');
+```
+
+* should anonymous variables be bound first? or last? or everything happens in order?
+* but function arguments is supposed to be like defining a module, and overriding the called module with the new module
+	* in this case the new module is `{1, 2, a: 'world'}`, which is overriding `foo`
+* and when we define modules, order shouldn't matter...
+
+
+### Branching
+
+* I was writing a quick script to run in the browser console
+* I was using a very long "flow" to pull a list of items from the page:
+
+```js
+var tablist = document.getElementById("history-app").shadowRoot.getElementById("synced-devices").shadowRoot.getElementById("synced-device-list").children[0].shadowRoot.querySelectorAll(".website-title");
+```
+
+* then I wanted to add a textarea, `mytextarea` (assume it is already defined)
+* wanted to add it in the middle of the flow
+* kind of a like a fork in the road
+* another way of thinking about it is: adding a branch
 
 ```js
 var tablistcontainer = document.getElementById("history-app").shadowRoot.getElementById("synced-devices").shadowRoot.getElementById("synced-device-list").children[0].shadowRoot.getElementById("history-item-container")
 tablistcontainer.appendChild(mytextarea)
-var tablist = tablistcontainer.querySelectorAll(".website-title")
+var tablist = tablistcontainer.querySelectorAll(".website-title");
 ```
 
-notice that we had to move everything to tablistcontainer
-now if we want to change where to put the textarea, we have to move everything again
+* notice that we had to move everything to tablistcontainer
+* big restructuring just to add a branch
+* now if we want to change where to put the textarea, we have to restructure everything again
 
-
-
-
+* in Arcana, at least in the diagram-based language, it's easy to add a branch
+* just draw the branch, and connect it to the main flow wherever you want
+* we don't even need to restructure the original flow, or define a new variable `tablistcontainer`
+* diagram-based languages make it easy to make/break connections like this
 
 ### Scope and Implicit Arguments
 
-defining is the same as calling
+( a lot of this was discussed previously in the section "Implicit Arguments" )
+( this is more about giving the idea a more concrete basis using scopes and cloning )
 
-but then how do we decide what is inherited, and what is passed in
-we can't just make everything implied and inherited, because then it would override everything
+* defining is the same as calling
 
+* but then how do we decide what is inherited, and what is passed in
+* too much implicit inheritance make it hard to prevent things from being inherited
+	* how to we prevent inheritance from overriding everything?
 
-* objects can be extended as a way to create partial transformations
+* recall that objects can be extended as a way to create partial transformations
 * when a module is defined, it binds its scope (just like in js)
-* unlike js, when you "call" a function, you are actually defining a new one
+* unlike js, when you "call" a function, you are actually defining a new one, cloning it
 	* pulls arguments from the entire scope, and not just the ones passed in
 * using parenthesis in Arcana, eg `fn(2)`, is like javascript prototypal extension, eg `Object.create(fn, 2)`)
 
@@ -445,7 +496,7 @@ def test:
 	out = bla() # inherits b from scope, basically the same as bla(b: 10)
 ```
 
-we are basically making copies of objects
+we are basically making copies/clones of objects
 when you first define the object, it grabs values from the scope around it, binding them to the variables
 
 ```js
@@ -456,24 +507,23 @@ function obj () {
 }
 ```
 
-afterwards, the object is "complete", with variables bound
-	if some variables are left unbound, they act like symbols, like symbolic expressions in math
-	the object is still considered "complete" even if variables are left unbound, and it can be passed around like any other object
+* afterwards, the object is "complete", with variables bound
+	* if some variables are left unbound, they act like symbols, like symbolic expressions in math
+	* the object is still considered "complete" even if variables are left unbound, and it can be passed around like any other object
 
-when you create a copy, it tries to bind unbound variables?
-	how to tell undefined vs unbound?
-	maybe we should only bind when explicitly declaring
-		calling, eg `fn(a: 5, b: x)` will bind properties `a` and `b`
-		extending, eg `fn() {a = 5, b = x}` will bind properties `a` and `b`
-	overriding variables/properties
+* when you create a copy, it tries to bind unbound variables?
+	* how to tell undefined vs unbound?
+		* aren't unbound "symbols" like undefined variables? but sometimes we want to explicitly bind a variable value to `undefined`
+	* maybe we should only bind when explicitly declaring
+		* calling, eg `fn(a: 5, b: x)` will bind properties `a` and `b`
+		* extending, eg `fn() {a = 5, b = x}` will bind properties `a` and `b`
+	* overriding variables/properties
 
-you can extend the object, defining new properties and rules
-what about redefining outputs?
-
-
+* you can extend the object, defining new properties and rules
+* what about redefining outputs?
 
 * perhaps it can be confusing to automatically pull arguments from the scope
-* maybe we can use a keyword to explicitely pull arguments from scope
+* maybe we can use a keyword to explicitly pull arguments from scope
 
 ```python
 def container:
@@ -489,15 +539,19 @@ def test:
 	}
 ```
 
+### Conditional Syntax Brainstorm
+
+* two ways of defining conditionals
 
 ```python
+# this method is for defining multiple properties in a single conditional
 def conditional:
 	(x > 0):
 		out: 3
 	else:
 		out: 7
 
-# another way
+# this method is for defining multiple conditions for a single property
 def conditional:
 	out:
 		(x > 0): 3
@@ -505,7 +559,6 @@ def conditional:
 
 print(conditional.out)
 ```
-
 
 ### Null is Evil?
 
@@ -539,34 +592,44 @@ print(conditional.out)
 * so in a sense, outputting `undefined` is kind of like throwing a compiler error
 * it's "illegal" or "undefined" behavior 
 
-
-
+### Feedback - Referencing an Object Before It's Made?
 
 does modifying variables introduce feedback?
-	* possibly, variables aren't technically allowed to be modified, but 
+	* possibly, variables aren't technically allowed to be modified, but you can introduce new bindings when cloning them
+	* `foo: { x: y+1 }` and then `bar: foo(y: x+1)`, now `bar` has feedback
+	* notice that we did not need to do any "self-referencing", eg `foo: { k: k+1 }`, where we referenced `k` in its own definition
+	* though techically if bar doesn't reference itself, and references foo, then maybe `bar` is actually more like:
+		`bar.y: foo.x+1, bar.x: bar.y+1`
 what about using "this"
+	* possibly introduces feedback, because it is referencing itself in it's own definition
 can be useful
 references something before it's made?
+
+## Scope as a Variable?
 
 what about "scope" as a variable
 technically possible using a stream, an infinite object of all variables in scope?
 	`{ x | name in allNames(), this[name] != undefined, x = this[name] }`?
+	allNames() is the stream in this case
 	note that since this is an infinite function, we would be unable to output the size of the output array, even though it must be finite
-core tenet of Arcana: a module only knows it's internals, and knows nothing about it's externals
-	* thus, doesn't make sense for a module to be able to "pull" and "bind" variables from it's surroundings, the way scoping usually works
-	* instead, modules pass in all variables they declare to nested modules
-	this explains why wecan pass it to our copy objects now
-	*
-	this explains why certain tag properties are not iterated using forAllProperties
-	the function forAllProperties is only passed text properties?
-	*
-	a module knows everything about it's internals
-	that means it can pass any internal variable it wants to a nested module
-	what if it wants to pass in all internal variables?
-	then it just needs to create a set of all internal variables, and pass it in
-	but we already have a set of all internal variables, the module itself!
-	so maybe modules can pass themselves into nested modules?
-	and don't they already pass in all their declared internal variables anyways?
+
+### Scope Passing and Nested Modules
+
+* core tenet of Arcana: a module only knows it's internals, and knows nothing about it's externals
+* thus, doesn't make sense for a module to be able to "pull" and "bind" variables from it's surroundings, the way scoping usually works
+* instead, modules pass in all variables they declare to nested modules
+this explains why we can pass it to our copy objects now
+
+* maybe this explains why certain tag properties are not iterated using forAllProperties
+	* the function forAllProperties is only passed text properties?
+
+* a module knows everything about it's internals
+* that means it can pass any local variable it wants to a nested module
+* what if it wants to pass in all internal variables?
+* then it just needs to create a set of all internal variables, and pass it in
+* but we already have a set of all internal variables, the module itself!
+* so maybe modules can pass themselves into nested modules?
+* and don't they already pass in all their declared internal variables anyways?
 
 recall that local variables are just another way of defining outputs
 nested modules are just another way of defining inputs
@@ -586,7 +649,7 @@ how do we ensure that people don't abuse it, and manually assign `parent`, possi
 * we can have some sort of system for this
 * need to make sure it doesn't use up variable names that people might want to use themselves
 
-
+### Encapsulation - Scopes and Feedback
 
 core tenets:
 a module knows everything about it's internals, has all power over the inside world
@@ -595,9 +658,6 @@ a module is just a set of variables and rules
 	has no distinction over what's an "output" and what's an "input", can't make variables public/private
 no feedback, a variable can only be defined once, and all it's dependencies must be defined first
 `undefined` is the default value of all variables
-
-
-
 
 ### Synchronization and Turing Completeness
 
@@ -616,8 +676,12 @@ for i in range(0, infinity):
 
 
 
-use `next` and `prev` as keywords to reference/create versions and states
+use `next` and `prev` as keywords to reference/create versions and states?
 
+```js
+for click in clicks
+	counter.next = counter + 1
+```
 
 ### Return to Zork
 
@@ -656,8 +720,16 @@ neighbors = rooms.with{
 	distance(this, neighbor) == 1
 	origin: this
 	direction: switch(...) {...}
-}
+};
+```
 
+### The `with` keyword
+
+* notice the `with` keyword in the "Return to Zork" code
+* this keyword is used both filter properties and add new ones
+
+```js
+// looks for all triplets that can form valid triangles
 triangles = nums.triples.with {
 	a > b + c
 	b > a + c
@@ -665,8 +737,9 @@ triangles = nums.triples.with {
 }
 
 students = people.with {
-	occupation: "student"
-}
+	occupation: "student" // filter for people that have the occupation "student"
+	type: "Student" // add the type tag "Student"
+};
 ```
 
 however, how can it tell whether or not we're trying to add a property or check them?
@@ -677,13 +750,15 @@ we could add a special keyword? use `:` when specifying new properties, use `==`
 	so in the above examples, it should have been `students = people.with { occupation == "student" }`
 or maybe we only allow one condition at the front (use parenthesis and `and` or `or` if you want more conditions)
 
+### The `value` keyword?
 
+* `value` is a special property that is used by strings, numbers, etc
+* eg `evens = nums.with{ value % 2 == 0 }`
+* it's an internal property, local variable, only accessible through certain scopes
+* allows us to add properties and tags to numbers
+	* without changing the numeric value associated with the number
 
-"value" is a special property that is used by strings, numbers, etc
-
-evens = nums.with{ value % 2 == 0 }
-
-
+### Using `with` on Single Objects?
 
 `with` is basically filter so it should only be used on lists/sets
 but could you use it to add tags to single objects? 
@@ -697,7 +772,7 @@ mmm not really, because if the object leaves the scope, it shouldn't have the ta
 yeah I think we are extending it, creating a new object
 any time you change or add tags, you are modifying the object, so you are essentially extending/copying it
 
-
+### Return to Zork II
 
 ```js
 //input: a bunch of rooms
@@ -741,36 +816,27 @@ player: {
 		exitsMsg: "There are open doors to your " + current.unlockedNeighbors.getEach(direction).join(", ") + ". "
 		itemsMsg: 
 	}
-}
-
+};
 ```
 
 notice that we define a lot of variables
 we create a sort of "bank" of knowledge
 instead of stringing together functions inline, we add to our bank of knowledge, in case we want to reuse some info later
 
-we started with
+we started with `unlocked` inside `player.look`:
 
 ```js
 unlocked: lockedDoors.with{ value == [room, otherRoom] } == EMPTY // otherRoom is "unbound", input variable
 exitsMsg: "There are open doors to your " + current.neighbors.with{unlocked(current.room, this)}.getEach(direction).join(", ") + ". "
 ```
 
-but then I realized I might want to use unlocked rooms in another place, so I simply moved the definition above
-
-```js
-
-```
+but then I realized I might want to use unlocked rooms in another place, so I simply moved the definition into `current`
 
 I don't have to worry about whether or not the variable is initialized, or updated, I can just move it wherever
 
-in imperative:
+how would this look in imperative?
 
-```js
-var to_be_continued
-```
-
-### Typed Syntax Brainstorm
+### Text-Based Syntax Brainstorm
 
 `:` is for defining variables?
 `=` is for state variables and versioning?
@@ -781,15 +847,10 @@ var to_be_continued
 `module {x: a, y: b}` for extending modules?
 `module.with{conditions}` for filter
 
-
-
 * `list.matches{ prop1: 10, prop2: { a: __match1__, b: 35 }}` vs `list.with{ prop1 == 10, prop2.b == 35, __match1__: prop2.a }`
 * `matches` is probably better for deeply nested structures, `with` is better for conditionals
 * we can combine the two
 	* `list.with{ prop1 == 10, prop2.with{ __match1__: a, b == 35 }} ??????????`
-
-
-
 
 ### Overdefined
 
@@ -838,6 +899,7 @@ bindingCreator:
 
 bindingCreator()
 bindingCreator()
+;
 ```
 
 * this is creating side effects
@@ -879,4 +941,13 @@ graph.nodes:
 	return visited
 ```
 
+### Nylo
 
+* as I was browsing [reddit r/programminglanguages](www.reddit.com/r/programminglanguages), I found somebody working on a similar language
+* called "Nylo"
+* [here is the original comment thread](https://www.reddit.com/r/ProgrammingLanguages/comments/8g8mru/monthly_what_are_you_working_on_how_is_it_coming/dya5uw2/)
+* also was based on the concept that everything is data
+* also seemed to be very dynamic
+* syntax is also very similar (except he doesn't wrap his modules with `{}` brackets, and uses `->` instead of return)
+* I started messaging him over reddit, and we started collaborating
+* from here on forward, while the ideas in these notes are still mostly my own (unless noted otherwise), there is probably some influence from Nylo as well

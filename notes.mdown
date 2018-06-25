@@ -120,7 +120,7 @@ Scopes
 ```js
 repeat(items, function (item) {
 	return handlebars(item + foo);
-})
+});
 ```
 * more on scopes further down
 
@@ -284,7 +284,7 @@ SongModule song0 (
 ```js
 scope.bind([scope.var1, scope.var2], function () {
 	scope.x = scope.var1 + scope.var2;
-})
+});
 ```
 * this example will bind the result of `scope.var1 + scope.var2` to `scope.x`
 * syntax for bind function: `bind(result_variable, [trigger_variables], evaluator)`
@@ -440,7 +440,7 @@ will result in:
 ```js
 // eval1: (x = a.a.a), eval2: (y = x+b), eval3: (z = a.a*b)
 bindings: { "a": [eval1], "a.a": [eval1, eval3], "a.a.a": [eval1], "b": [eval2, eval3], "x": [eval2] }
-values: { a: {a: {a: 4} }, b: 11, x: 4, y: 15, z: 44}
+values: { a: {a: {a: 4} }, b: 11, x: 4, y: 15, z: 44};
 ```
 
 ### Event Listeners for Optimization, Re-evaluation by default
@@ -479,7 +479,7 @@ bind('squared = array.map(x => x*x)');
 // results in
 var mapFn = (x => x*x)
 evaluator = () => { scope.squared = scope.array.map(mapFn) }
-evaluator.onset = (key, value) => { scope.squared[key] = mapFn(value) }
+evaluator.onset = (key, value) => { scope.squared[key] = mapFn(value) };
 ```
 
 * map binds can also use item-to-item bindings in place of onset (which is how the repeat wijit works)
@@ -490,7 +490,7 @@ bind('squared = array.map(x => x*x)');
 var mapFn = (x => x*x)
 evaluator = () => { scope.array.forEach(evaluator.onpush) } // use onpush to create item-to-item bindings between scope.array and scope.squared
 evaluator.onset = () => true // don't do anything
-evaluator.onpush = (value, index) => { scope.squared.push(value); scope.bind('squared['+index+'] = mapFn(scope.array['+index+']') }
+evaluator.onpush = (value, index) => { scope.squared.push(value); scope.bind('squared['+index+'] = mapFn(scope.array['+index+']') };
 ```
 
 ### ReactiveArrays
@@ -696,7 +696,7 @@ scope.delete = function (collectionPath, key) {
 	delete collection[key]
 	trigger(collectionPath + '.' + key) // trigger regular binding
 	trigger(collectionPath) // trigger collection binding
-}
+};
 ```
 
 * also events are no longer propagated to ancestors (b/c children are now responsible for monitoring their own values)
@@ -757,7 +757,7 @@ sum = temp.collectionListener(function () {
 	return res
 });
 
-foo.mapbind(sumAll)
+foo.mapbind(sumAll);
 ```
 
 * note that we could have leveraged a shallow reduce function and used recursion to get the same functionality
@@ -829,7 +829,7 @@ foo - b ------------ sum
 FloModule.set = function (key, value) {
 	this.get('inputs')[key] = value;
 	this.mirrorbind(key, '_inputs.'+key);
-}
+};
 ```
 
 ### FilterBind, MapBind, ReduceBind
@@ -1204,7 +1204,7 @@ FloModule.bind(dest, [src], (innerbind, inneraliasbind, array) => {
 	for (var i = 0; i < array.length; i++) {
 		inneraliasbind(dest+'.'+(array.length-i), src+'.'+i);
 	}
-})
+});
 ```
 * I could group `innerbind` and `inneraliasbind` into a object:
 
@@ -1213,7 +1213,7 @@ FloModule.bind(dest, [src], (innerscope, array) => {
 	for (var i = 0; i < array.length; i++) {
 		innerscope.aliasbind(dest+'.'+(array.length-i), src+'.'+i);
 	}
-})
+});
 ```
 * notice that FloModule already has the `bind` and `aliasbind` functions, so it seems like for `innerscope` I could just pass in a new FloModule object
 * this made me realize that thats exactly what dynamic binds do
@@ -3268,6 +3268,8 @@ bmi = calcBMI(gender: male, ethnicity: white)
 _
 ```
 
+* this process is called **autofilling arguments**
+
 ### Inferring Context
 
 * in versioning variables, we saw how the versioning index in many cases can be inferred, to keep the code from getting too cluttered
@@ -3530,8 +3532,7 @@ combine( // combines both arrays into a single ordered array
 		return {timestamp: (x) => x*x}
 	}),
 ).values() // extract the ordered list of functions
-.apply(10) // input a starting value into the chain of functions
-``
+.apply(10); // input a starting value into the chain of functions
 ```
 
 * though it's a little uglier because you have to pass around functions instead of directly assigning to variables
