@@ -2,9 +2,20 @@
 
 <head>
 <style>
+	.textarea-container {
+		position: relative;
+	}
+
 	textarea {
 		width: 80%;
 		height: 80%;
+		line-height: 1;
+		font-size: 20px;
+	}
+
+	.unbound-symbols {
+		position: absolute;
+		z-index: 10;
 	}
 </style>
 </head>
@@ -14,10 +25,16 @@
 	<h1>{{title}}</h1>
 	<br>
 	<br>
-	<textarea ng-model="code" ng-change="interpret($event)"></textarea>
+	<div id="ide" class="textarea-container">
+		<textarea ng-model="code" ng-change="interpret($event)"></textarea>
+	</div>
 	<script src="angular.min.js"></script>
 
 <script>
+var ideContainer = document.getElementById('ide');
+var IDE_FONT_SIZE = 20;
+var IDE_LINE_HEIGHT = IDE_FONT_SIZE;
+
 angular.module('MyApp', [])
 .controller('MyCtrl', function($scope) {
 	$scope.title = 'Concept IDE';
@@ -40,6 +57,7 @@ outer:
 		console.log('--------- Begin Parse --------');
 		parse($scope.code);
 		findUnboundSymbols(rawtree);
+		displayUnboundSymbols();
 	};
 
 	function parse (code) {
@@ -92,6 +110,17 @@ outer:
 	function findUnboundSymbols(node) {
 		node.unbound = node.values.filter(x => !node.scope[x.value]);
 		node.properties.forEach(prop => findUnboundSymbols(prop));
+	}
+
+	function displayUnboundSymbols() {
+		var displayText = document.createElement('div');
+		displayText.innerHTML = ['hello','world'].toString();
+		displayText.classList.add('unbound-symbols');
+		displayText.style.fontSize = IDE_FONT_SIZE;
+		displayText.style.top = 3*IDE_LINE_HEIGHT;
+		displayText.style.left = 30;
+
+		ideContainer.appendChild(displayText);
 	}
 
 	$scope.interpret(); // interpret initial textarea (before any changes)
