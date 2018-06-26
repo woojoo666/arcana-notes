@@ -23,7 +23,7 @@ angular.module('MyApp', [])
 	$scope.title = 'Concept IDE';
 
 	$scope.graph = {};
-	var rawtree = {properties: [], values: []};
+	var rawtree = {properties: [], values: [], scope: {}};
 
 	// start with some test cases
 	$scope.code = `
@@ -31,7 +31,7 @@ outer:
 	test: hello
 	blaa
 	nested:
-		10
+		10, test
 
 	foo(x: 10)
 	`;
@@ -39,6 +39,7 @@ outer:
 	$scope.interpret = function (event) {
 		console.log('--------- Begin Parse --------');
 		parse($scope.code);
+		findUnboundSymbols(rawtree);
 	};
 
 	function parse (code) {
@@ -70,23 +71,27 @@ outer:
 			}
 
 			if (key) { // if we have a key, we start building a nested object
-				var newNode = {key, values, lineNum, properties: [], parent: currentNode};
+				var newNode = {key, values, lineNum, properties: [], parent: currentNode,
+						scope: Object.create(currentNode.scope)}; // leverage javascript inheritance for scopes
+
 				currentNode.properties.push(newNode);
+				currentNode.scope[key] = true;
 				currentNode = newNode;
 				currentDepth++; // if there is a key, we increase our depth
 			} else {
 				currentNode.values.push(...values);
 			}
 
-			console.log('indentation: ' + indentation + ', key: ' + key + ', values: ' + values.map(x => x.value));
+			// console.log('indentation: ' + indentation + ', key: ' + key + ', values: ' + values.map(x => x.value));
 		});
 
 		console.log(rawtree);
 	}
 
 	// given a scope of defined symbols, finds all unbounds symbols used in a module
-	function findUnboundSymbols(scope, code) {
-
+	function findUnboundSymbols(node) {
+		node.unbound = node.values.filter(x => !node.scope[x.value]);
+		node.properties.forEach(prop => findUnboundSymbols(prop));
 	}
 
 	$scope.interpret(); // interpret initial textarea (before any changes)
