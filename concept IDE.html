@@ -16,6 +16,7 @@
 	.unbound-symbols {
 		position: absolute;
 		z-index: 10;
+		color: red;
 	}
 </style>
 </head>
@@ -26,7 +27,7 @@
 	<br>
 	<br>
 	<div id="ide" class="textarea-container">
-		<textarea ng-model="code" ng-change="interpret($event)"></textarea>
+		<textarea ng-model="code" ng-change="interpret($event)" ng-trim="false"></textarea>
 	</div>
 	<script src="angular.min.js"></script>
 
@@ -35,12 +36,16 @@ var ideContainer = document.getElementById('ide');
 var IDE_FONT_SIZE = 20;
 var IDE_LINE_HEIGHT = IDE_FONT_SIZE;
 
+var IDE_CHAR_WIDTH = 20; // TODO: actually figure out this value
+var IDE_INDENT_WIDTH = IDE_CHAR_WIDTH*4; // TODO: actually figure out this value
+
 angular.module('MyApp', [])
 .controller('MyCtrl', function($scope) {
 	$scope.title = 'Concept IDE';
 
-	$scope.graph = {};
-	var rawtree = {properties: [], values: [], scope: {}};
+	var rawtree;
+
+	var tooltips = [];
 
 	// start with some test cases
 	$scope.code = `
@@ -55,9 +60,14 @@ outer:
 
 	$scope.interpret = function (event) {
 		console.log('--------- Begin Parse --------');
+		tooltips.forEach(elem => elem.parentNode.removeChild(elem));
+
+		rawtree = {key: '', properties: [], values: [], scope: {}}; // key: '' is a hack so that displayUnboundSymbols doesn't fail on root node 
+		tooltips = [];
+
 		parse($scope.code);
 		findUnboundSymbols(rawtree);
-		displayUnboundSymbols();
+		displayUnboundSymbols(rawtree);
 	};
 
 	function parse (code) {
@@ -89,7 +99,7 @@ outer:
 			}
 
 			if (key) { // if we have a key, we start building a nested object
-				var newNode = {key, values, lineNum, properties: [], parent: currentNode,
+				var newNode = {key, values, lineNum, properties: [], parent: currentNode, indentation,
 						scope: Object.create(currentNode.scope)}; // leverage javascript inheritance for scopes
 
 				currentNode.properties.push(newNode);
@@ -112,15 +122,18 @@ outer:
 		node.properties.forEach(prop => findUnboundSymbols(prop));
 	}
 
-	function displayUnboundSymbols() {
+	function displayUnboundSymbols(node) {
 		var displayText = document.createElement('div');
-		displayText.innerHTML = ['hello','world'].toString();
+		displayText.innerHTML = node.unbound.map(x => x.value).toString();
 		displayText.classList.add('unbound-symbols');
 		displayText.style.fontSize = IDE_FONT_SIZE;
-		displayText.style.top = 3*IDE_LINE_HEIGHT;
-		displayText.style.left = 30;
+		displayText.style.top = node.lineNum*IDE_LINE_HEIGHT;
+		displayText.style.left = (node.indentation*IDE_INDENT_WIDTH)+(node.key.length*IDE_CHAR_WIDTH);
 
 		ideContainer.appendChild(displayText);
+		tooltips.push(displayText);
+
+		node.properties.forEach(prop => displayUnboundSymbols(prop));
 	}
 
 	$scope.interpret(); // interpret initial textarea (before any changes)
