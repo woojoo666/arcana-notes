@@ -23,7 +23,7 @@ angular.module('MyApp', [])
 	$scope.title = 'Concept IDE';
 
 	$scope.graph = {};
-	$scope.rawtree = {}
+	var rawtree = {properties: [], values: []};
 
 	// start with some test cases
 	$scope.code = `
@@ -42,8 +42,11 @@ outer:
 	};
 
 	function parse (code) {
-		var depth = 0;
-		code.split('\n').forEach(line => {
+		var currentDepth = 0;
+		var currentNode = rawtree;
+		code.split('\n').forEach((line, lineNum) => {
+			if (/^\s*$/.test(line)) return; // skip blank lines
+
 			var regexResults; // used throughout for regex results
 
 			regexResults = line.match(/^(\t+)?(.*)/);
@@ -51,15 +54,34 @@ outer:
 			line = regexResults[2];
 
 			var key = '';
-			var value = line;
 			regexResults = line.match(/^(\w+):(.*)/);
 			if (regexResults) {
 				key = regexResults[1];
-				value = regexResults[2]
+				line = regexResults[2]
 			}
 
-			console.log('indentation: ' + indentation + ', key: ' + key + ', value: ' + value);
+			// note: this regex doesn't account for parenthesis
+			// explanation of `source`: for something like foo(1,2), the value is {1,2} and foo is the source
+			var values = (line.match(/\w+/g) || []).map(x => ({value: x, lineNum, source: null}));
+
+			while (indentation < currentDepth) {
+				currentNode = currentNode.parent;
+				currentDepth--;
+			}
+
+			if (key) { // if we have a key, we start building a nested object
+				var newNode = {key, values, lineNum, properties: [], parent: currentNode};
+				currentNode.properties.push(newNode);
+				currentNode = newNode;
+				currentDepth++; // if there is a key, we increase our depth
+			} else {
+				currentNode.values.push(...values);
+			}
+
+			console.log('indentation: ' + indentation + ', key: ' + key + ', values: ' + values.map(x => x.value));
 		});
+
+		console.log(rawtree);
 	}
 
 	// given a scope of defined symbols, finds all unbounds symbols used in a module
