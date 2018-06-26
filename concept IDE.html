@@ -106,6 +106,8 @@ outer:
 				currentNode.scope[key] = true;
 				currentNode = newNode;
 				currentDepth++; // if there is a key, we increase our depth
+
+				if (values.length) newNode.disableTooltip = true;
 			} else {
 				currentNode.values.push(...values);
 			}
@@ -123,15 +125,17 @@ outer:
 	}
 
 	function displayUnboundSymbols(node) {
-		var displayText = document.createElement('div');
-		displayText.innerHTML = node.unbound.map(x => x.value).toString();
-		displayText.classList.add('unbound-symbols');
-		displayText.style.fontSize = IDE_FONT_SIZE;
-		displayText.style.top = node.lineNum*IDE_LINE_HEIGHT;
-		displayText.style.left = (node.indentation*IDE_INDENT_WIDTH)+(node.key.length*IDE_CHAR_WIDTH);
+		if (!node.disableTooltip) {
+			var displayText = document.createElement('div');
+			displayText.innerHTML = node.unbound.map(x => x.value).toString();
+			displayText.classList.add('unbound-symbols');
+			displayText.style.fontSize = IDE_FONT_SIZE;
+			displayText.style.top = node.lineNum*IDE_LINE_HEIGHT;
+			displayText.style.left = (node.indentation*IDE_INDENT_WIDTH)+(node.key.length*IDE_CHAR_WIDTH);
 
-		ideContainer.appendChild(displayText);
-		tooltips.push(displayText);
+			ideContainer.appendChild(displayText);
+			tooltips.push(displayText);
+		}
 
 		node.properties.forEach(prop => displayUnboundSymbols(prop));
 	}
