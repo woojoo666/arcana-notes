@@ -36,8 +36,18 @@ var ideContainer = document.getElementById('ide');
 var IDE_FONT_SIZE = 20;
 var IDE_LINE_HEIGHT = IDE_FONT_SIZE;
 
-var IDE_CHAR_WIDTH = 20; // TODO: actually figure out this value
-var IDE_INDENT_WIDTH = IDE_CHAR_WIDTH*4; // TODO: actually figure out this value
+var IDE_CHAR_WIDTH = 15; // TODO: actually figure out this value
+var IDE_INDENT_WIDTH = IDE_CHAR_WIDTH*8; // TODO: actually figure out this value
+
+// allow tabbing in textarea
+document.getElementsByTagName('textarea')[0].onkeydown = function(e) {
+	if(e.keyCode==9){
+		e.preventDefault();
+		var s = this.selectionStart;
+		this.value = this.value.substring(0,this.selectionStart) + "\t" + this.value.substring(this.selectionEnd);
+		this.selectionEnd = s+1; 
+	}
+};
 
 angular.module('MyApp', [])
 .controller('MyCtrl', function($scope) {
@@ -71,6 +81,7 @@ outer:
 	};
 
 	function parse (code) {
+		console.log(code);
 		var currentDepth = 0;
 		var currentNode = rawtree;
 		code.split('\n').forEach((line, lineNum) => {
