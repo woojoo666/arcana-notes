@@ -195,19 +195,22 @@ state machine for opening/closing the box:
 	box.closed --(switch.on)--> box.open
 	box.open --(20 seconds since last switch reset)--> box.closed
 
+perhaps we can use metaprogramming?
 
-```
+```python
+# this is the rough overview
 @metaprogramming
 for switch in switches:
 	when switch.opened:
 		switch.close()
 
+# this is the detailed version (unfinished...)
 switch = simpleUselessMachine.switch (
-	close: 
+	close:
 )
 ```
 
-
+### State Variables and Flag-Watcher Model
 
 doesn't make sense to be able to modify state variables outside current object, eg:
 
@@ -254,6 +257,8 @@ I guess major differences would be
 	all local variables are visible
 	dynamically calculated inputs
 
+### Syntax and Mechanics Brainstorm
+
 note that I'm using Nylo syntax for now
 	* more specifically, no more braces `{}` around every object, implied by indentation (like python)
 	* `->` for return statements
@@ -296,8 +301,7 @@ divide:
 	temp: a/b
 	-> (quotient: Math.floor(temp), remainder: a%b)
 
-x: divide(100,7) // x will have property temp
-''
+x: divide(100,7); // x will have property temp
 ```
 
 * though perhaps the right way to do this is
@@ -308,10 +312,10 @@ divide:
 	quotient: Math.floor(temp)
 	remainder: a%b
 
-x: divide(100,7)
-`````
+x: divide(100,7);
+```
 
-
+### Numbers and Hidden Properties
 
 * normally we've been saying numbers are stored in the value property
 * then, operators like `+` and `/` operate on the value property
@@ -326,8 +330,8 @@ print(x+10) // should print 13
 
 y: x.value // y is now "3"
 
-print(y+10) // throws error?
-`````
+print(y+10); // throws error?
+```
 
 * now `y` has no `value` property for the `+` operator to act on, so the `+` operator will throw an error
 * but that's counterintuitive. After all, `y` stores the "true" value of `3`, shouldn't we be able to do arithmetic with it
@@ -403,14 +407,14 @@ fn: divide(
 	...
 	a: x // this is actually incorrect, see later example
 	b: y
-	)
-`````
+	);
+```
 
 looks kinda backwards, because the return type `divide` is at the beginning instead of the end
 but this actually might make more sense
 you know exactly what type of object `fn` is from the beginning
 
-
+### Cloning and Argument Scope
 
 when extending, creates a new scope
 this way we don't have to worry about overriding original variables
@@ -476,8 +480,7 @@ foo: divide(
 		super(x,y)
 	).remainder // accessor at the end...kinda ugles
 
-result: foo()
-''
+result: foo();
 ```
 
 we can use `return` as shorthand for this accessor pattern
@@ -494,8 +497,7 @@ foo: divide(
 		y: ...
 		super(x,y)
 		return super.remainder
-	)
-''
+	);
 ```
 
 * these act like the anonymous un-named outputs mentioned in my OneNote notes and the section "Implicit Outputs"
@@ -505,8 +507,7 @@ foo: divide(
 	* see section "Calling and the Return/Arrow Operator"
 * in a way, the return statement is the first example of metaprogramming syntax
 
------------------------------
-
+### Clone Scoping - Overriding vs Shadowing
 
 there are two ways of handling scope
 we can make it so extending objects allows you to override certain parameters (like calling a function)
@@ -517,16 +518,12 @@ we can make it so that extending objects creates a separate scope
 	* don't have to worry about parent implementation
 	* "variable shadowing"
 
-
-
-use super to override defined variables?
+maybe we can use super to override defined variables?
 this way we don't have to worry about changing behavior
 a lot like inheritance in java/C++
 	overriding in subclass doesn't affect parent class
 undefined variables are like abstract functions
 they automatically override
-
-
 
 ```js
 //javascript style
@@ -541,12 +538,9 @@ x = (function() {
 //arcana style??
 ```
 
+### Syntax and Mechanics Brainstorm II
 
-
-
-### Scope Extension and Inheritance
-
-* below are an exploration of different syntaxes and shorthands
+* below is an exploration of different syntaxes and shorthands
 
 ```python
 a: 10
@@ -563,38 +557,39 @@ e: add(this) # using current scope as inputs
 
 f: add() # implicitly uses current scope as inputs
 
-g: a.add(b) # uses a as first input
+g: a.add(b) # uses a as first input, "caller-argument-inversion"
 ```
 
 * `f` and `g` can't both work
-* `f` 
+* cuz then `x.foo()` can either mean
+	1. calling `x.foo` with current scope as input
+	2. calling `foo` with `x` as first argument
 
+### Add-ons and Clone Scope
 
-```
-a: 10
-b: 20
+* in the section "Add-ons" we mentioned how you can import library functions
+* and use them to transform objects using the object's scope
+* normally, you would have to manually pass in all arguments
 
-add:
-	result: a + b
+```js
+fn: ...
 
-c: add(a b)
-```
-
-plugins
-you can import library functions
-and use them to transform objects
-using the object's scope
-normally, you would have
-
-```
 myobj:
-	foo: fn(a b c ...)
+	a, b, c...
+	foo: fn(a b c ...);
 ```
 
-```
-foo
+clone scopes allows you to just do
 
-foo.apply(myobj)
+```js
+myobj:
+	foo: fn();
+```
+
+it is sort of like the javascript apply function
+
+```js
+myobj.foo = fn.apply(myobj);
 ```
 
 * makes sense that, when you clone an object within a scope, it should try to inherit that scope
@@ -631,16 +626,14 @@ foo.apply(myobj)
 * except in more inconspicuous way
 * 
 
+### Clone Scopes and Dynamic Inputs
 
-* we can handle dynamic inputs differently
+* should we can handle dynamic inputs differently?
 	* have dynamic inputs declared differently, in a different group
 	* that way we can make it so unnamed inputs aren't affected by dynamic inputs
 * but cuz of metaprogramming, dynamic inputs should be the same as normal inputs
 * a program written by a program should be the same as a program written by a human
 * not quite though, programs written by programs don't need unnamed inputs
-
-
-
 
 ```js
 randomStrings: "cds" "ei" "2idkz" "a" "38sk10" "cat"
@@ -652,8 +645,7 @@ mymath:
 		quotient: Math.floor(a/b)
 		remainder: a % b
 
-(q r): divide(100 7) // 100 gets bound to b, 7 is unbound
-''
+(q r): divide(100 7); // 100 gets bound to b, 7 is unbound
 ```
 
 alternatively...
@@ -671,7 +663,11 @@ mymath:
 			result *= x
 ```
 
+### Sum vs Add
 
+* in the section "Syntax and Mechanics Brainstorm II", we noticed that
+	`a.add(b)` (caller-argument-inversion) and `add()` (clone scoping) can't both work
+* however, I realized that, subconsciously, we call them different things anyways
 
 ```js
 // notice the difference between sum and add
@@ -686,6 +682,8 @@ sum(3 4)
 ''
 ```
 
+* `sum` is an object that has two arguments
+* `add` is a function applied to a number, that takes in another number as an argument
 
 ### Nylo's Inverse function and classes
 
@@ -693,9 +691,9 @@ sum(3 4)
 
 ```js
 double:
-    int n: result / 2
-    int result: n * 2
-    -> result
+	int n: result / 2
+	int result: n * 2
+	-> result
 
 double(10) = 20
 double(result: 18 -> n) = 9
@@ -710,11 +708,15 @@ double(result: 18 -> n) = 9
 * while I knew feedback was useful, I never thought of this specific use case
 * very cool
 
+### Dynamic Properties Brainstorm
 
+should tags use `[mytag]`?
 
+```js
+StarWars: [fiction], [sci_fi]
+```
 
-
-tags use [mytag]?
+or maybe symbol properties should use `[mySymbol]: myValue...` syntax?
 
 is a variable number of properties considered a modification?
 dynamic properties?
@@ -723,19 +725,23 @@ can cause very difficult to debug errors
 can also cause exploitable code
 
 
+### State Variables and Actions
 
 one rule of state variables that is different from imperative
 can't be modified twice in the same scope
 also can't be modified where it is defined
 
+```js
+foo:
+	counter. = 10
+	counter++ // not allowed, can't be modified where it is defined
+	onKeyPress:
+		counter++
+		counter+=20 // not allowed, can't be modified twice in the same scope
 
+```
 
-creating chains and state machines:
-
-
-
-
-state variables and actions
+syntax brainstorm:
 
 ```js
 keycounter: // event listener method
@@ -782,8 +788,6 @@ reduceFn: total, x
 sum: mlist.reduce(reduceFn, 0, [5 2 7 8 1]);
 ```
 
-
-
 ### Arrow Returns and Intermediate Scopes
 
 * when using an arrow return, the output of the module does not include the body of the module
@@ -817,22 +821,7 @@ myObj3: Number( // a different way of declaring myObj2, without arrow returns
 * actually, there is another big difference between using arrow returns, and declaring the output object at the top (like in `myObj3`)
 * see the sections "Scopes and Variable Shadowing" and "Cloning and Overriding"
 
-
-
-
-
-
-```python
-fib:
-	(n < 2):
-		-> n
-	else:
-		-> fib(n-1) + fib(n-2)
-```
-
-
-
-
+### String Properties
 
 * normally when we access properties using the dot accessor, like `myObj.myProp`, we are accessing the property outside of the scope it was declared in
 * that means that it can't be a local property, otherwise we wouldn't be able to access it
@@ -855,8 +844,7 @@ math:
 * symbols act as a global unique value, so they shouldn't have a value themself
 * though you might want to give them tags? subproperties?
 
-
-
+### Objects as Property Keys
 
 any object can be a property key
 just like in java
@@ -883,14 +871,11 @@ however, sometimes variables are a switch that points to a concept
 `myAnimal` is either `cat` or `dog`
 
 
-mybe the concept of values
+maybe the concept of values
 default value is object reference itself
 just like java 
 
-
-
-### Objects as Property Keys?
-
+### Objects as Property Keys II
 
 not a question of whether or not objects _can_ be property keys
 we can restrict property keys to numbers if we want, force all keys to be represented by a unique number
@@ -917,8 +902,6 @@ so if you have want a key with structure, like a structured query, then you shou
 structures are also commonly the result of generating information
 so if you want to generate a bunch of keys, instead of hardcoding them like "color" and "model" and "size", then you would want to use objects as keys
 but could you use the alternative structure shown earlier?
-
-
 
 
 
@@ -1060,9 +1043,7 @@ foo:
 
 ```
 
-
-
-
+### Conditionals Syntax Brainstorm
 
 	(first cond) name:
 	else (second cond) name:
@@ -1091,6 +1072,8 @@ foo:
 	then (second state):
 	then (third state):
 
+
+### Symbol Properties - Syntax Brainstorm
 
 ```js
 coffee:
@@ -1154,6 +1137,8 @@ foo:
 
 ### Global Symbols?
 
+* this is a revisit of the ideas in the section "String Properties"
+
 what if we made the default property name symbols instead of strings
 and we made it so all symbols "exist" in the global namespace
 that is why you can define a property and then access it from outside
@@ -1213,8 +1198,7 @@ coffee:
 
 ```
 
-
-
+### Dynamic Properties and Merging Brainstorm
 
 ```js
 (a, b): 10
@@ -1280,20 +1264,24 @@ what about
 ```js
 myObject: 10 // myObject is a number with a tag
 	myTag: 'test'
+```
 
-// could be an alternative to
-
+```js
 foo:
 	point1, point2
 	x: point1.x - point2.x
 	y: point1.y - point2.y
 	-> Math.sqrt(x*x + y*y)
 
+// how does this compare to
+
 foo: Math.sqrt(x*x + y*y)
 	point1, point2
 	x: point1.x - point2.x
 	y: point1.y - point2.y
+```
 
+```js
 foo: sum() // a different way of overriding properties 
 	a: 10
 	b: 20
@@ -1343,7 +1331,6 @@ Person:
 		age: young // not the same though, this overshadows `age`, doesn't override it
 
 ```
-
 
 ### Implied Parenthesis
 
@@ -1397,8 +1384,7 @@ foo:
 
 * because there is no parent object, it is like we are extending a blank object, and adding properties to it
 
-
-
+### Implied Parenthesis II
 
 by this logic, it naturally follows that inline objects should be defined through parenthesis, instead of `{}` braces like previously thought
 * `Person(a: 10)` extends `Person`, so `(a: 10)` extends the blank slate
@@ -1429,19 +1415,52 @@ Student: Person{ age: young }
 mySet: {a b c};
 ```
 
+### Clone Scopes - Scope Wrapping Issues
 
-
-creation context
-doesn't quite make sense
+clone scoping doesn't quite make sense
 because you have your original context
 and now when you clone it, you are wrapping original context with new context
+
+```js
+context1:
+	fn1: ...
+;
+context2:
+	fn2: context1.fn1()
+;
+// fn2 scope looks like
+context2 {
+	context1 {
+		fn1{ fn2 }
+	}
+}
+''
+```
+
+the inheritance chain for the scope of fn2 is like:
+
+	context2 ---> context1 ---> fn1 ---> fn2
+
 however, what if you clone it in a third context
+
+```js
+context3:
+	fn3: context1.fn1()
+;
+```
+
+now the chain becomes
+
+	context2 --.                          ,--> fn2
+	            >--> context1 ---> fn1 --<
+	context3 --'                          '--> fn3
+
 now the original context is being wrapped by two conflicting contexts
 
+another problem with scope wrapping is that context1 should not be affected by context2
+but if we simply wrap context2 around context1, it's possible that context1 variables will get bound to context2
 
-
-
-### Spread Operator
+### Spread Operator Brainstorm
 
 ```js
 division:
@@ -1469,10 +1488,13 @@ SymmetricDivision:
 ;
 ```
 
+### Syntax and Mechanics Brainstorm III
+
+* implicit inputs allow us to use really short syntax
 
 ```js
 // javascript style
-list.map(a -> a + 1) // we have to create a function with one argument
+list.map(a => a + 1) // we have to create a function with one argument
 
 // arcana style
 list.map(a+1) // because a is unbound, it is implicitely the first argument
@@ -1527,9 +1549,6 @@ so basically `->` creates a temporary anonymous object, and accesses a designate
 
 
 
-
-
-
 if we have some default object base properties, like
 
 	clone
@@ -1538,9 +1557,7 @@ if we have some default object base properties, like
 	setProperty
 
 and such, how do we prevent these from showing up in `allProperties`?
-if we create a class system, we don't want these showing up
-
-
+if we're creating subclasses and object instances and such, we don't want these showing up during property enumeration
 
 ### Cloning Objects with a Different Scope, Applying Scopes
 
@@ -1559,7 +1576,60 @@ if we create a class system, we don't want these showing up
 * so now the question is, does it overcomplicate things?
 * is it useful?
 
+### Clone Scopes - Diabetic Example
 
+* so in 6/9/2018, in my conversation with veggero, I was discussing my idea about how cloning inherits the scope around it
+* this was previously discussed in the section "Scope and Implicit Arguments"
+* I thought it was a great example of the benefits of 
+* here is the relevant snippet of the message:
+
+-------------------- BEGIN SNIPPET --------------------
+
+Basically, the idea is that whenever you "call" a module, like `sum(a: 3, b: 4)`, you are actually creating a clone of the module, with certain variables overridden. I was thinking that, because you are making a clone of the module, it is almost like you are redefining it. So it should have the same scoping rules as when you normally define a module. For example, if you had something like this:
+
+```js
+coffee:
+	sugar: (diabetic? 0 : 10) //`diabetic` is unbound
+
+candy:
+	sweetener: (diabetic? "artificial" : "sugar") // `diabetic` is unbound
+
+Joe: // a person
+	diabetic: true
+	drink: coffee() // automatically binds `diabetic`
+	snack: candy() // likewise
+;
+```
+
+notice that `coffee()` and `candy()` automatically bind `diabetic`, almost as if they were defined inside `Joe`, like this:
+
+```js
+Joe:
+	diabetic: true
+	drink:
+		sugar: (diabetic? 0 : 10)
+	snack:
+		sweetener: (diabetic? "artificial" : "sugar")
+;
+```
+
+So I hope you can see how this can simplify coding a bit, with some added "implicit binding". However, I can think of cases where it can get a little messy. It makes variables names very important. For example, if you just started using random letters as property names, like `myClass: { a: 10, b: 4, c: "hello world" }`, then it can be easy for modules to latch onto those variables. My reasoning is this: (1) variables should be named appropriately (2) if you want to prevent any binding, just create the clone outside the scope, and then bring it in, like so
+
+```js
+JoeDrink: coffee() //`diabetic` remains unbound
+
+Joe:
+    diabetic: true
+    drink: JoeDrink
+```
+
+If you instead create a clone inside the scope, like we did before, then it makes sense for that module to be affected by the scope.
+
+-------------------- END SNIPPET --------------------
+
+* what's also interesting is veggero talked about how his cloning worked similarly (though there were some slight differences)
+* even though I can't find any example of any other language using "call scope" or "caller scope" (aside from possibly [L Language?](http://home.cc.gatech.edu/tony/uploads/61/Lpaper.htm#Semantics))
+* both veggero and I came up with such similar ideas independently
 
 ### Default Values
 
@@ -1638,17 +1708,11 @@ bar: 10
 // because `
 ```
 
-
-
-
-
-
-clone every time?
-why use an unbound function if you aren't going to bind it
-
-
+### Using vs Cloning
 
 * veggero mentioned on 6/12 that he rebinds every single time so `x: foo` and `x: foo()` are the same thing
+* basically, every time you use a module, you clone it
+* note that we already (kinda) agreed upon clone scoping at this point
 * would you ever just use an unbound function? without cloning it?
 * what if you had something like
 
@@ -1688,10 +1752,15 @@ list:
 now we have to worry about the implementation of `list`
 any meta-function used purely for rearranging and 
 
-
+however, this is only a problem if we factor in clone scopes
+if `item()` doesn't inherit the scope around it, then we don't have to worry about unintentional bindings
+though if that were the case, then there would also be no point in cloning it in the first place, because the clone would be identical
+so it still wouldn't make sense for `clone` to be the same as `clone()`
 
 
 ### Singleton Sets
+
+* this was first mentioned in the section "Implied Parenthesis"
 
 * should singleton sets, like `{3}`, be treated the same as the object itself?
 * that would mean every object is a singleton set as well
@@ -2243,7 +2312,8 @@ x != x() != x()() // x contains firstProp, x() contains secondProp, x()() contai
 * I have decided to change the way we treat anonymous outputs, aka the `->` operator
 * they are not shorthand for "accessor pattern"
 * they are just set/tuple values
-* `foo: a: 10, b: 20, => sum(a,b)` is now the same as `foo: a: 10, b: 20, sum(a,b)`, not the same as `foo: sum(a: 10, b:20)`
+* instead of `foo: a: 10, b: 20, => sum(a,b)`, we just say `foo: a: 10, b: 20, sum(a,b)`
+	* note that this is not the same as `foo: sum(a: 10, b:20)`
 * in fact we don't even need the arrow operator anymore, now that transformations are treated as regular objects, with no "intermediate scope"
 * all properties in a transformation are included in the output object
 * might as well get used to temporary properties included in the output (even for transformations), they are part of the "history", and we didn't exclude them for normal objects either

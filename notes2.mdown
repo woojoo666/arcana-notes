@@ -498,6 +498,7 @@ def test:
 
 we are basically making copies/clones of objects
 when you first define the object, it grabs values from the scope around it, binding them to the variables
+this is called "clone scope" or "clone scoping"
 
 ```js
 var a = 5
