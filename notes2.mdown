@@ -2,7 +2,7 @@
 
 * sounds nicer lol
 
-### Functional vs Dataflow
+### Functional vs Dataflow II
 
 difference between functional and dataflow
 * in dataflow, we don't wait for all inputs to finish before computing the output

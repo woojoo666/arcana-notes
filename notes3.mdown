@@ -1762,7 +1762,7 @@ so it still wouldn't make sense for `clone` to be the same as `clone()`
 
 * this was first mentioned in the section "Implied Parenthesis"
 
-* should singleton sets, like `{3}`, be treated the same as the object itself?
+* should singleton sets, like `{3}`, be treated the same as the object itself, `3`?
 * that would mean every object is a singleton set as well
 
 * benefits:
@@ -1771,45 +1771,27 @@ so it still wouldn't make sense for `clone` to be the same as `clone()`
 * issues:
 	* now we can't use sets to represent structure, because we can't represent arbitrary structures, like `{x}` vs `{{{{x}}}}`
 
-* more benefits/issues in the section "Singleton Sets Continued"
+* more discussion in the section "Singleton Sets II"
 
+### Imperative vs Functional II 
 
+* in functional, everything is backwards, so there is actually no need for bindings, because the order of execution is static
+* this is why Nylo seems to have no concept of bindings (at least, from what I've seen of the interpreter)
+* but once you have stuff like forward evaluation or persistent changing inputs, then you need bindings
+* this makes dataflow different from functional
 
+* also, maybe state variables make more sense to have now, because it allows each nodes to have persistant, dynamic outputs
+* allows each node to maintain state
 
+--------------------
 
+1. Forward execution
+2. State variables
+3. Execution order
+4. Impure functions
 
-functional, everything is backwards, so there is actually no need for bindings, because the order of execution is static
-but once you have variable execution, from forward evaluation or dynamic inputs, then you need bindings
-this makes dataflow crucially different from functional
-
-also, maybe state variables make more sense to have now, because it allows nodes to have dynamic outputs
-otherwise the only way for a node to have dynamic outputs is if it's inputs change
-
-
-
-
-
-forward execution
-state variables
-execution order
-impure functions
-
-once I introduce one, I introduce all of them
-
-
-
-
-
-
-
-
-
-lazy evaluation, forwards backwards
-graph traversal, `visited` travels forwards, result travels backwards,  possible to lazy evaluate?
-
-
-
-
+* all these things are related
+* once I introduce one, I introduce all of them
 
 ### Type Checking and Assertions
 
@@ -1843,76 +1825,6 @@ x: add(a_arg: 10, b_arg: 3)
 //alt style
 add.with(a is Number, b is Number):
 	
-```
-
-
-
-
-### Scopes and Variable Shadowing
-
-* when reusing a property name in an inner scope, it shadows the outer property
-
-```js
-foo:
-	x: 10
-	y: x*x
-	bar:
-		x: 20
-
-foo.y = 100 // the outer `x` is unaffected by the inner one
-``
-```
-
-* cloning overrides variables, and does not shadow them
-
-```js
-foo:
-	x: 10
-	y: x*x
-
-bar: foo(x: 20)
-
-bar.y = 400 // `x` was overriden
-
-zed: foo
-	x: 20 // as mentioned earlier, this is implied parenthesis, so it should override
-	// but perhaps we can make it shadow instead?
-
-```
-
-hmmmmmmm..................
-
-
-
-
------ IMPORT NOTES FROM CHALKBOARD -------
-
-```js
-foo1: a+b
-	a: 10
-	b: 20
-
-foo2: => a+b // does this imply parenthesis too? then that would make it virtually the same as foo1
-	a: 10
-	b: 20
-
-// these will probably be very easily confused...
-
-foo3:
-	a: 10
-	b: 20
-	=> a+b
-	
-foo4:
-	a+b: // is this a singleton set?
-		a: 10
-		b: 20
-
-
-sets:
-	a: 10 // key is a string
-	b, // then this key must be a string too...not a symbol
-;
 ```
 
 ### Cloning and Overriding
@@ -1957,11 +1869,186 @@ zed: foo(bar: a+b);
 	* this was touched upon in the section "Objects as Property Keys?"
 
 
+### Scopes and Variable Shadowing
+
+* when reusing a property name in an inner scope, it shadows the outer property
+
+```js
+foo:
+	x: 10
+	y: x*x
+	bar:
+		x: 20
+
+foo.y = 100 // the outer `x` is unaffected by the inner one
+``
+```
+
+* cloning overrides variables, and does not shadow them
+
+```js
+foo:
+	x: 10
+	y: x*x
+
+bar: foo(x: 20)
+
+bar.y = 400 // `x` was overriden
+
+zed: foo
+	x: 20 // as mentioned earlier, this is implied parenthesis, so it should override
+	// but perhaps we can make it shadow instead?
+
+```
+
+hmmmmmmm..................
+
+```js
+foo1: a+b
+	a: 10
+	b: 20
+
+foo2: => a+b // does this imply parenthesis too? then that would make it virtually the same as foo1
+	a: 10
+	b: 20
+
+// these^^^ will probably be very easily confused...
+
+foo3:
+	a: 10
+	b: 20
+	=> a+b
+	
+foo4:
+	a+b: // is this a singleton set?
+		a: 10
+		b: 20
 
 
+sets:
+	a: 10 // key is a string
+	b, // then this key must be a string too...not a symbol
+;
+```
+### Scopes, Shadowing, and Overriding
 
+* note: these are trascribed from the notes I wrote on the chalkboard on 6/16/18
+* I should probably make a OneNote doc of these...
 
+Exploring currying:
 
+```js
+foo: a+b
+bar: foo(a, 10)
+zed: bar(20);
+
+// scope visualization:
+zed {
+	a: 20
+	bar {
+		b: 10
+		foo { a + b }
+	}
+};
+```
+
+Exploring shadowing vs overriding:
+
+```js
+outer:
+	z: 7
+	zz: z*z
+	middle:
+		x: 10
+		y: x*x
+		inner:
+			x: 3
+
+foo: outer.middle(x: 3)
+bar: foo(y: z*x) // overrides middle's y
+zed: bar(z: -1) // shadows outer's z
+
+//results:
+outer.middle.inner.y = 100 ; foo.y = 9 ; bar.y = 21 ; zed.y = -3
+bar.zz = 49 ; zed.zz = 49
+```
+
+* notice that `bar.z` and `zed.z` are different, but `bar.zz` and `zed.zz` are the same
+* `zed.zz` uses `z`, but not `zed.z`
+* `zed.zz` uses `outer.z`, which has been shadowed (but not overriden) by `zed.z`
+
+* scope visualization below (note: arrows indicate cloning)
+
+```
+outer {
+	zz: z*z
+	z: 7
+	middle {
+		x: 10
+		y: x*x
+		inner { x: 3 }
+	} --.
+}       |
+        v
+ foo { x: 3 } --> bar { y: z*x } --> zed { z: -1 }
+```
+
+* notice that overriding follows the arrows, because the arrows represent cloning
+
+Exploring overriding vs arrow returns:
+
+```js
+// overriding:
+foo: a+b // note: implicit parenthesis
+	a: 3
+	b: 5
+
+// which is equivalent to:
+foo: sum(a,b)( a: 3, b: 5 )
+
+// scope visualization:
+sum { } ---> { a b } ---> { a: 3, b: 5 }
+```
+
+```js
+// arrow returns
+foo:
+	a: 3
+	b: 5
+	=> a+b
+
+// which is equivalent to
+foo: (a: 3, b: 5, result: sum(a,b)).result // note: accessor pattern
+
+// scope visualization:
+        {  // note: anonymous scope
+            a: 3
+            b: 5
+sum{ } ---> result { a, b }
+        }
+;
+```
+
+Exploring dynamic binds and cloning
+
+```js
+foo: cond ? a : b
+
+// which is kinda equivalent to
+
+foo: (true: a, false: b)[cond] // demux pattern
+
+foo(a: 10) = ___
+```
+
+* notice that `foo` is an object, either `a` or `b`
+* so technically, if we clone `foo`, it should either clone `a` or `b`
+* but doesn't it make more sense to modify the "function body" of `foo`, in this case the conditional?
+* or maybe not...
+
+### Anonymous Outputs and Cloning
+
+* after seeing some of Nylo's examples, I started thinking about how calling works with anonymous outputs and return statements
 
 * the return/arrow property, as noticed previously, is basically like creating and accessing a specified property
 * `add: (a: 10, b: 20 -> a+b)` is equivalent to `add: (a: 10, b: 20, result: a+b).result)`
@@ -1991,11 +2078,7 @@ multiply2: add(-> a*b);
 // is the outer object an object with -> as a property, or is it the object returned by ->
 ```
 
-
-### Anonymous Outputs and Cloning
-
-* after seeing some of Nylo's examples, I started thinking about how calling works with anonymous outputs and return statements
-* calling works a little different for return statements
+* maybe calling should work a little different for return statements
 
 ```js
 foo:
@@ -2023,7 +2106,6 @@ fooA: foo(-> a); // extract the `a` value from foo's intermediate scope
 
 ### Transformations vs Objects
 
-
 when we look back at my diagramatical syntax, we didn't need "arrows" or "return" statements
 we did have default outputs
 modules that use arrow arguments are more like processes or transformations
@@ -2035,16 +2117,14 @@ two ways of viewing transformations (modules with return statements)
 	transformations are a special kind of module, shorthand for accessor pattern, that specifies a default output property
 	regular modules are a special kind of transformation, whose output is the module itself
 
-a third way is talked about in "Duality of Unbound Symbols and Anonymous Properties"
+a third way is talked about in the later section "Duality of Unbound Symbols and Anonymous Properties"
 	* default outputs are just anonymous outputs, kinda like hanging values
-	* what's special is that modules with anonymous outputs, the output is the output, not the module itself
+	* what's special is that modules with anonymous outputs, the output is the returned value, not the module itself
 
-
-how should transformations be affected by the property accessor
+how should transformations be affected by the property accessor?
 	* if we view transformations as just accessor pattern, then it should just access properties of the returned output
 	* but if calling transformations overrides the intermediate scope, should property access go to the intermediate scope as well?
-	* actually, we can access the intermediate scope by overriding the return statement
-
+	* though actually, we can access the intermediate scope by overriding the return statement
 
 ### Default Values II
 
@@ -2067,10 +2147,10 @@ foo2(10,7) = 30 // first argument gets bound to `b`, and second argument gets ig
 
 ```
 
-
 ### Singleton Sets II
 
-* it also could be useful by allowing us to get rid of the arrow operator, and use set/tuple values as default outputs
+* single sets could also be useful by allowing us to get rid of the arrow operator
+* just use set/tuple values as default outputs
 
 ```js
 myset:
@@ -2117,9 +2197,6 @@ zed != 30 // zed is a tuple with 3 values {a, b, x+y} and 2 properties {x, y}
 zed2: zed(3, 4); // binds 
 ```
 
-
-
-
 ### Unbound Keys vs Values
 
 * I have been switching between lvalues and rvalues (aka property keys and values)
@@ -2151,11 +2228,12 @@ set2: {10, 20} // but in this set, makes the most sense that 10 and 20 are value
 ```js
 sum:
 	a, b // input symbols/keys
+	foo: "hello world" // properties
 	=> a+b // output values
 ;
 ```
 
-
+* but so far I haven't been too careful with differentiating the two
 * these mix-ups occured because I was using scopes and "bound" vs "unbound" to determine when to treat things as symbols vs values
 * and I was also treating them differently based on whether the object was a set or a module
 
@@ -2172,7 +2250,7 @@ bar:
 
 // however, I forgot that sets/tuples were defined in the same way
 
-x, y: (10, 20)
+x: 10, y: 20
 zed:
 	a, x, y // zed is a set with three values: a, x, and y. How would I specify if I wanted `a` to be an unbound symbol?
 
@@ -2187,12 +2265,11 @@ foo: a, b // imagine if the `a` key is pressed. Now `a` is bound. Should foo bec
 
 ```
 
-
-
+so how should I distinguish between unbound keys and hanging values?
 
 ### Duality of Unbound Symbols and Anonymous Properties
 
-* aka the truth behind function calls and return statements
+* aka the connection between function calls and return statements
 
 * recall the concept behind unbound symbols, and using anonymous arguments in function calls:
 
@@ -2204,35 +2281,40 @@ bar: foo(10, 20); // 10 and 20 bind to the unbound symbols
 * also recall anonymous output values using return/arrow statements
 
 ```js
-
+foo:
+	a: 10
+	b: 20
+	=> a+b
+_
 ```
 
-* hanging values automatically seek out and bind to unbound symbols
-
-
-
-
+* these are connected
+* hanging/anonymous values automatically seek out and bind to unbound symbols
 
 ```js
-(a, b):
-	p, q // symbols
+(a, b): // symbols
 	x: 10
 	y: 20
-	=> p(x+y), q(x*y) // values
-
+	=> x+y, x*y // values
 
 magnitude:
-	a, b
+	a, b // symbols
 	x: a*a
 	y: b*b
 	=> Math.sqrt(x+y)
 
-mag1: magnitude(10,20)
+mag1: magnitude(10,20); // 10,20 are hanging values
+```
 
+### Sets as Arguments Brainstorm
+
+* here, I was experimenting with different ways of passing sets/objects as arguments
+
+```js
 args: (10, 20)
-mag2: magnitude(args) // this is treating the arguments as a set, and using it as the first argument
+mag2: magnitude(args) // this treats args as a set, and using it as the first argument
 
-mag3: magnitude(args...)
+mag3: magnitude(...args) // Javascript spread operator syntax allows us to map the set items to individual arguments
 
 mag3: magnitude(center: 10, offset: 3 => center+offset, center-offset) // does this return a set/tuple or the two arguments separately
 // in javascript this returns it it as two arguments separately
@@ -2251,25 +2333,45 @@ mag5: magnitude
 		=> center+offset, center-offset
 
 tempargs: (center: 10, offset: 3 => center+offset, center-offset)
-mag6: magnitude(tempargs..., extraArg1, extraArg2)
+mag6: magnitude(...tempargs, extraArg1, extraArg2)
 mag7: magnitude.apply(tempargs)(extraArg1, extraArg2) // alternative way of doing it
 mag8: magnitude.apply(center: 10, offset: 3 => center+offset, center-offset)(extraArg1, extraArg2) // alternative way of doing it
+;```
 
-// hmmm...does this really work?
+* hmmm...do those last examples (using `apply`) really work?
+* a tentative implementation of `apply`:
 
+```js
 object:
 	apply:
 		argSet,
-		=> object(argSet...)
+		=> object(...argSet)
+;```
 
-// since calling transformations overrides the intermediate scope, this means:
+* since calling transformations overrides the intermediate scope, this means:
 
-myObject.apply(argSet)(arg1, arg2) // this overrides apply's scope, not the objects scope
+```js
+myObject.apply(argSet)(arg1, arg2); // argSet overrides apply's scope
+```
 
-// so maybe transformations shouldn't override the immediate scope, because it breaks cloning
+* the first cloning, with `argSet`, works fine
+* but does the second cloning, with `arg1, arg2`, also override apply's scope?
+* or does it override the scope of the object returned by the first `apply`?
 
+* in order for this example to work, it should override the scope of the object returned
+* so it seems like, for transformations, the first call overrides the scope, and returns an object
+* the second call overrides the returned object
+
+### Cloning and The Associative Property
+
+* according to the previous section, "Sets as Arguments Brainstorm", transformation cloning works differently
+* first cloning overrides the transformation scope, second cloning overrides the returned object's scope
+
+* however, this seems to break some fundamental rules about cloning
+
+```js
 x = x() = x()() // this should always be true
-x(a, b) = x(a)(b) // this too
+x(a, b) = x(a)(b) // this too, currying
 
 rotate: // rotates a matrix
 	inputMatrix, angle,
@@ -2301,7 +2403,7 @@ x != x() != x()() // x contains firstProp, x() contains secondProp, x()() contai
 
 ```
 
-### The True Nature of Nodes and Modules
+### A Revised Model for Nodes and Modules
 
 * huge epiphany, brings together ideas from:
 	1. Singleton Sets
@@ -2309,33 +2411,27 @@ x != x() != x()() // x contains firstProp, x() contains secondProp, x()() contai
 	3. Transformations vs Objects
 	4. Unbound Keys vs Values
 
-* I have decided to change the way we treat anonymous outputs, aka the `->` operator
-* they are not shorthand for "accessor pattern"
+* I have decided to change the way we treat anonymous outputs (which formally used the `=>` operator)
+* they are not shorthand for "accessor pattern", or transformations
 * they are just set/tuple values
 * instead of `foo: a: 10, b: 20, => sum(a,b)`, we just say `foo: a: 10, b: 20, sum(a,b)`
 	* note that this is not the same as `foo: sum(a: 10, b:20)`
+
 * in fact we don't even need the arrow operator anymore, now that transformations are treated as regular objects, with no "intermediate scope"
 * all properties in a transformation are included in the output object
-* might as well get used to temporary properties included in the output (even for transformations), they are part of the "history", and we didn't exclude them for normal objects either
-* instead of using => to specify values, and lone symbols are by default treated as keys
+* might as well get used to temporary properties included in the output (even for transformations)
+	* they are part of the "history"
+	* normal objects never excluded temp variables, so transformations shouldn't either
+
+* before, we used `=>` to specify values, and lone symbols as keys (see section "Unbound Keys vs Values")
 * now, lone symbols are by default treated as values, and I haven't yet decided how to specify keys
 * (maybe the first line should be for keys, kind of like function parameters. Note that these are always optional)
-* anonymous outputs are literally anonymous outputs
-* IDE will help show where outputs are, kinda like what => helped do before
- *
-* singletons sets are a thing
-* but only because we keep track of "history"
-* `(3)` is a not a set or a number, its a node
-* its a node containing the numerical value 3
-* structurally, `(3) != 3`
-* but value wise, when you evaluate it, and get the numerical value, its the same
-* the difference between structure and value
-* `,` is an operator, turning nodes into sets of nodes
- *
-* everything is a state variable?
-* that is why singleton sets are a thing?
-* `((((x))))` is a chain of historical states, (four in this case), so the output is both a single value and a set of states
- 
+* anonymous outputs are literally anonymous outputs, values without keys
+* IDE can help show where outputs are, kinda like what `=>` helped do before
+
+* instead of hiding temp variables in intermediate scopes, now everything is visible
+* as a part of the object's "history"
+
 ```js
 sum: a, b, a+b
 product: a, b, a*b
@@ -2360,22 +2456,22 @@ y:
 y.a.a.a = 1
 y.a.a.b = 2
 y.a.a = 2
-
-
-list
-	reduce
-		acc, fn
-		for item in list
-			acc.next: fn(acc, item)
-
-mList: [1, 2, 3, 4]
-mList.reduce(0, (acc, item, => acc+item) )
-mList.reduce(0, acc+item ) // because acc and item are unbound in this scope, it's up to reduce's scope to provide values for them
-
-
-
-Student: Person.with
-	age: 22
-	occupation: undefined
-
 ```
+
+* note that `x` and `y` are singleton sets
+* they are sets of a single item, but they also represent numbers
+* they can also have properties
+* singleton sets make sense because we are representing "history"
+* every node contains both it's value, and all steps leading up to that value
+* kind of like a state variable!
+
+* `(3)` is a not a set or a number, its a node
+* its a node containing the numerical value 3
+* structurally, `(3) != 3`
+* but value wise, when you evaluate it, and get the numerical value, its the same
+* this is the difference between structure and value
+* structure shows us the history of the value
+* every computation step "wraps" the object
+* `((((x))))` is a chain of historical states, (four in this case), so the output is both a single value and a set of states
+
+* `,` is an operator, turning nodes into sets of nodes
