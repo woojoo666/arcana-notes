@@ -507,6 +507,11 @@ foo: divide(
 	* see section "Calling and the Return/Arrow Operator"
 * in a way, the return statement is the first example of metaprogramming syntax
 
+* even later on, I realized that my earlier examples of accessor pattern are wrong
+	* see section "The Evolution of Nodes, A Retrospective Journey"
+* accessor pattern doesn't even work for the `requestedAnimal` example shown above
+* you can't do stuff like `map( (item => result: a+b).result )`, because then the `map` function actually clones `result`, not the inner module
+
 ### Clone Scoping - Overriding vs Shadowing
 
 there are two ways of handling scope
@@ -2403,7 +2408,9 @@ x != x() != x()() // x contains firstProp, x() contains secondProp, x()() contai
 
 ```
 
-### A Revised Model for Nodes and Modules
+### Mixed Modules
+
+A New Model for Nodes and Modules
 
 * huge epiphany, brings together ideas from:
 	1. Singleton Sets
@@ -2475,3 +2482,6 @@ y.a.a = 2
 * `((((x))))` is a chain of historical states, (four in this case), so the output is both a single value and a set of states
 
 * `,` is an operator, turning nodes into sets of nodes
+
+* modules are called "mixed modules" because they contain both properties and hanging values
+* and they can be evaluated as either a module or a value
