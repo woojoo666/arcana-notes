@@ -49,3 +49,8 @@ that way I can get a better understanding of what exactly I mean by metaprogramm
 
 Nodes vs S-Expressions?
 (this seemed especially relevant when I was using the "mixed nodes" model)
+
+
+
+state variables
+have a `self` or `this` variable that references the latest value?

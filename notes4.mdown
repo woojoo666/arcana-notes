@@ -851,29 +851,32 @@ event.time:
 * oftentimes the index or property name doesn't give us enough information
 * we can use sub-properties to learn more
 
-
-
-
-
+### Property Access for Mixed Modules
 
 property access for "mixed" modules?
-which takes precedence?
-it looks kinda similar to inheritance
-but it isn't the same
+does it return properties of the module, or the outputs?
+or are they combined? and if so, which takes precedence?
+	it feels kinda similar to inheritance
+	but it isn't the same
 
-maybe the same as state variables?
+maybe inherits the same way as state variables?
 have a `self` or `this` variable that references the latest value?
+* kinda like how javascript uses `this` inside objects/classes for object properties
+	* `this.x = 10` sets the object member, `x = 10` sets a local variable
+* we can do something similar for state variables
+	* `{x: 10 {x : 20} }` just shadows the variables, they don't affect eachother
+	* `{ this.x: 10 { this.x: 20 } }` now the variables affect eachother, they refer to the same `x` variable
 
 
 two ways of dealing with "mixed" modules
 	1. a special operator to access values
-	2. inheritance
+	2. inheritance (output inherits module properties, or vice versa)
 	3. go back to transformations model
 
 the transformations model kinda makes sense:
 	take a piece of the network graph
 	clone it
-	and then return only the tippy-top last node in the graph
+	and then return only the last nodes in the cloned graph, the "output nodes"
 	we don't want to just clone the last node, but we also don't want to return the entire graph
 
 let's try the inheritance model...
@@ -894,27 +897,76 @@ and the next part pulls out whatever it needs
 
 ### Back to Regular Nodes and Modules
 
-imagine `map()` with only properties
-map gives inputs with property names, and pulls outputs with property names
-works fine
-now take out inputs names
-now take out outputs names
-now look at your man, now look at me
-do the ooga booga and shake it all about
-it's up to map to pull variables out
-the only way to pull hanging variables out is to use unbound symbols
-many ways to do so:
-	deconstruction
-	[] or . operator
-	directly calling a function with it
+* perhaps we should just go back to the old model of just properties
+* no return statements or default outputs
+* cloning just clones the entire module, and returns the entire module
+* basically, the idea of "Nodes" that we established way back in the section "Node datatype"
+	* and in our diagram syntax
 
- it's interesting because this all makes a lot more sense in diagrams
- super intuitive
- so i think the text-based language confused me a little bit
- we are just so used to the idea of "functions"
- 	you call it, it runs the body, and then returns a result
- it's weird to imagine a language where calling a function returns the entire function
- 
+* how would this work with `map`?
+* imagine `map()` with only properties (no returns, unbound variables or hanging values)
+* you give `map` a module to create for each item, `fn`
+* for each list item, `map` clones `fn` and calls it with the item: `fn(item)`
+* from each of these clones, `map` pulls out the result of the module, `fn(item).result`
+
+* so it would look something like this:
+
+```js
+nums: [1 3 4]
+square: x => result: x*x
+// note: a wrapper to make `square` compatible with `map`
+squareMap: item => result: square(x: item).result // basically just changes the property names to ones recognized by `map`
+
+list:
+	map: fn =>
+		mapResult: []
+		for list: item, index =>
+			mapResult[index]: fn(item: item).result
+
+nums.map(squareMap).mapResult = [1 9 16]
+```
+
+* this works fine
+* it only looks ugly because we have these kinda arbitrary names, `x`, `item`, `result` and `mapResult` that we have to keep track of
+* we have to create the intermediate function `squareMap` just to make `square` compatible with `map`
+
+* anonymous keys and values takes care of this annoyance
+* basically, just remove the property names (just like we can do in the diagram-based syntax)
+* we are not introducing any new mechanics, we are just changing the names of properties
+
+```js
+nums: [1 3 4]
+square: x => x*x
+
+list:
+	map: fn =>
+		mapResult: []
+		for list: item, index =>
+			(mapResult[index]): fn(item) // notice the object deconstruction syntax used to pull the anonymous value out of fn(item)
+		mapResult // output mapResult as an anonymous value
+
+nums.map(squareMap)... = [1 9 16]; // notice the anonymous value access, using the spread operator
+```
+
+* notice that we don't need the wrapper function `squareMap` anymore
+
+the only way to pull hanging values out is to use unbound symbols
+many ways to do so:
+	deconstruction, like `(a, b): mNode`
+	[] or . operator without a name (so something like `mNode[]`, or `mNode.`)
+	spread operator, eg `fn(mNode...)` or `mNode... = (1, 2)`
+
+* it's interesting because this all makes a lot more sense in diagrams
+* much more intuitive
+* see "Nodes.one" for more
+* and it's basically how my diagram-based syntax has worked since the beginning
+* so i think the text-based language confused me a little bit
+* we are just so used to the idea of "functions"
+	* you call a function, it runs the body, and then returns a result
+* it's weird to imagine a language where calling a function returns the entire function
+* but that's exactly how nodes work
+* and using value access everywhere is just something you have to get used to, I guess
+
 ### The Evolution of Nodes, A Retrospective Journey
 
 note that, one of the MAJOR examples I was considering for the past like 2 months or so is the `map` example
