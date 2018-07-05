@@ -967,7 +967,7 @@ many ways to do so:
 * but that's exactly how nodes work
 * and using value access everywhere is just something you have to get used to, I guess
 
-### The Evolution of Nodes, A Retrospective Journey
+### The Map Function and the Evolution of Nodes (so far)
 
 note that, one of the MAJOR examples I was considering for the past like 2 months or so is the `map` example
 (even though I barely mention it in the notes)
@@ -1038,3 +1038,518 @@ to solve the associativity problem, I tried to create a concept of "mixed module
 
 * in this example, `output1` should be undefined
 * wouldn't make sense for `output1` to suddenly store the entire object
+
+### Ordered Lists and Indexed Output Access
+
+* I think if we want to access hanging values individually
+* we should use numerical indices
+* but then our sets are basically arrays now... :/
+* Nylo treats it as ordered lists as well
+
+### Mixed Nodes Revisited
+
+everything is a mixed node
+up to the operators how to treat it
+we can make it so inputs to functions automatically spread
+because thats how it looks in diagrams
+we can add an operator if we want to access 
+
+```js
+sum: a, b => a+b
+Person: name, age, id =>
+;
+x: sum(10, 20)
+Bob: Person(name: "Bob", age: 30, id: 0x31da3);
+```
+
+* notice that if you wanted to use `x` stores an object, `( a: 10, b: 20, 30 )`
+* if you wanted to get the value `30`, you would have to use `...x`
+* or we could have declared `x: ...sum(10,20)`
+* thing is, in this case, we would never really ever use `x` as an object
+* so we would either have to use `...x` everywhere, or declare it with `...sum(10,20)`
+* in fact, for most functions like `sum`, things that have an "output", you would rarely ever use it as an object
+
+* the opposite is true for objects
+* while `Bob` technically has an output value of `()` (an empty set), we would rarely ever use that
+
+* so perhaps we can treat objects different depending on whether or not they have outputs
+* treat them as either a "transformation" or an "object"
+* because rarely are they used as both
+
+* so whenever you use `x`, it pulls out the values
+* best understood through diagrams
+* usage vs cloning
+* should be able to clone functions
+* 
+
+* or maybe () is like a general purpose "call", works differently for objects vs functions
+* there is an explicit operator for cloning
+* and an explicit operator for extraction (spread operator `...`)
+
+* foo: sum() actually uses deconstruction
+* if you want to be explicit, and return an object, there's an operator for that
+* `...foo: sum()`
+* wait...or you can just use cloning for that
+
+
+
+
+* note that this is whether or not they have _declared_ outputs
+* for something like this
+
+```js
+foo: cond =>
+	if (cond): 10
+```
+
+* `foo` technically has no outputs if `cond` is false
+* however, because we are declaring outputs, we are viewing `foo` as a function, not a module
+
+
+Cloning should work the same
+Usage could be different
+
+
+
+
+### Diagram vs Text Based Syntax
+
+* I realized a lot of the problems I was having was because it's hard to translate my diagram syntax to text
+* a lot of the stuff giving me trouble are things that work pretty intuitively in the diagram syntax
+
+* for example, in diagrams, it's easy to see whether or not a variable refers to the module itself, or an output
+	* just look at if the variable name is at the top of the module, or at the end of an output
+
+* we can also easily pick specific outputs, without numerical indices, using something like
+
+```
+    ___________
+   |____foo____|
+     ' | ' | |
+```
+
+* this extracts the 2nd, 4th, and 5th output
+
+### Internal Unwrapping
+
+* why can't we use the `internal_value` model we explored for numbers and `sum`?
+
+```js
+sum: (a b) => internal_value: a.internal_value + b.internal_value
+```
+
+* this makes it so we can take results directly and sum them again, like `sum(sum(1,2), sum(3,4))`
+* if we use unbound keys and values, we won't need the arbitrary `internal_value` keyword
+
+```js
+sum: (a b) => ...a + ...b
+;
+```
+
+* so now we can use `sum` like normal
+* however, writing the `sum` function is still weird
+* we have to keep in mind this unwrapping
+* for example, if we wanted to write a function that multiplies two matrices
+
+```js
+matprod: (a b) =>
+	Matrix
+		map a.rows: row =>
+			map b.cols: col =>
+				dot(row, col)
+;
+
+x: Matrix(...);
+xx: matprod(x,x); // this works (but doesn't return a Matrix, rather, an object containing a Matrix)
+xxx: matprod( matprod(x, x) , matprod(x, x) ); // this won't work
+```
+
+* we can't use the results of `matprod` as arguments for another call to `matprod`
+* we have to remember to use `...a` and `...b` if I want to support this recursive behavior
+
+```js
+Matrix.multiply: (a b) =>
+	Matrix
+		map ...a.rows: row =>
+			map ...b.cols: col =>
+				dot(row, col)
+;
+```
+
+* so this unwrapping behavior, we can either do it outside the function, or inside the function
+* but it needs to happen somewhere
+
+
+* unless we make it the default behavior for modules with hanging values?
+* a hanging value is like a return statement
+* when you clone the function, it returns the hanging value as output?
+
+### Object Deconstruction
+
+object deconstruction is just key-value auto-binding!
+`firstVal: foo()`, `firstVal, secondVal: foo()`
+
+maybe property access should access the original object properties, not properties of the values
+`myfunction(foo(10,20).bar)` means we don't want to auto-bind key-values anymore
+but this only works for direct clone access
+if we do `x: foo(10,20), x.bar`, `x` is already the deconstructed first argument
+
+wait but if things get autodeconstructed, `foo(x(), y())` what if `x()` has multiple outputs...shouldn't it treat it as a set? or an object?
+same with `foo: x(), y()`, this shouldn't be equivalent to `foo: ...x(), ...y()` right?
+
+### Currying and Returns
+
+* so I was talking about veggero about cloning and currying
+* because recall that I thought calling broke associativity (see section "Cloning and The Associative Property")
+* aka `x = x() = x()()`
+* however, Nylo supports currying, even though it seems to have function calling
+* so I talked with veggero about it
+* and he seemed to have confirmed my suspicions
+* basically, the way Nylo works, is that even though it has the concept of functions, it waits for it to be "complete" before return the outputs
+* for example, take `sum: a, b -> a+b`
+* `sum(10)` would return a clone of the sum function
+* but `sum(10)(20)` would return the output, `30`
+
+* the problem is, a distributed dataflow language like Arcana, shouldn't have the concept of "incomplete" vs "complete" functions
+* if we are extracting the output of a node, it doesn't matter whether its incomplete or complete
+* an output is an output
+* you never know when an input might go `undefined` temporarily
+* that shouldn't suddenly make the function become "incomplete" and break everything after it
+
+### Imperative Langs and Multiple Outputs
+
+* note that, in normal imperative langs:
+	* if you return one item, its just the item
+	* if you return multiple, it has to be wrapped in a set
+* eg `() => 10` vs `() => [10, 20]`
+* so even in imperative langs, there's a distinction between single and multiple return
+* thought that's sort of because imperative langs are only used to one output
+* but maybe one output is just so much more common than any other case
+* and text-based syntax works best with one output
+
+### Function vs Class - Dynamic Evaluation and Forced Coercion
+
+* maybe we can combine the ideas of nylo and arcana
+* it makes sense to kinda differentiate between classes and functions
+* but at the same time, they should have the same structure (set of keys + values)
+* in nylo, you specify a function using `->`
+	* in nylo, there are some other differences between a function/class, but that's not too relevant here
+* instead, maybe we can have dynamic evaluation of function vs class
+* by default, if there is only one static output, it is a function, otherwise its a class
+* you can force it to be evaluated as a class using `{}`
+	* groups it into one object
+* you can force it to be evaluated as a function using `...`
+	* extracts and spreads the values
+
+* so to defining a function would look like:
+
+```js
+{sum}: a b => a+b
+;
+```
+
+* which basically is
+	1. creating a module, with a single output
+	2. binding the name to the module, not the output
+
+* while this makes it a little uglier, and means we have to use special notation to define functions
+* it's already common in languages to have different syntax for function vs class
+* and we had to do that in nylo's version anyways, using the arrow operator for functions
+
+* it also makes sense if you think about object destructuring
+* recall that something like this
+
+```js
+a, b, c : (x: 10, y: 20, x+y, x*y, x/y)
+```
+
+* binds the values of the right hand side to `a`, `b`, and `c`
+* it follows that this:
+
+```js
+a: (x: 10, y: 20, x+y, x*y, x/y)
+```
+
+* is just binding the first value
+
+### Function/Class Syntax Exploration
+
+* exploring some other syntaxes for defining functions:
+
+```js
+{sum}: a b => a+b // looks like the modules in diagram language
+
+sum(): a b => a+b // looks like imperative function declarations
+
+sum...: a b => a+b // sorta makes sense b/c the spread operator is on the other side, so instead of deconstruction, its like object _construction_
+
+;
+```
+
+* what about when passing functions?
+
+```js
+list.map(a b => a+b)
+;
+```
+
+* hmm, now it's being evaluated as a function, so won't it end up passing it's values to `map`, instead of the entire function?
+* you would have to do `list.map({a b => a+b})`
+
+* the thing is, there is no reason to define a module unless you want it treated as a module
+* if we just wanted to pass the values to `map`, we could have just done `list.map(a+b)`
+* even if we wanted some intermediate variables, we could have defined them in the outer scope
+	* eg: `c: a+b, list.map(c)`
+
+* same with definitions, there is no reason we'd define a module from scratch unless we wanted it treated as a module
+
+```js
+sum: a b => a+b
+;
+```
+
+* in the above example, it get's evaluated as a function, so it passes its values to `sum`
+* but then we could have just done `sum: a+b`
+
+* the only time we might want it evaluated as a function is if we were cloning a function
+
+```js
+add10: a => sum(b: 10)
+;
+```
+
+so it seems like it really does all come back to cloning vs calling after all
+
+### Different Syntax for Calling vs Cloning
+
+* actually the solution seems simple enough
+* just use different syntax for cloning vs calling!
+* `foo(...)` for calling, and `foo{...}` for cloning
+* remember that calling is just shorthand for cloning + spreading (`...foo`)
+* but now, we can actually use `foo()` as shorthand for spreading, `...foo`
+
+* this also makes sense for bracketed expressions
+	* discussed previously in section "Singleton Sets"
+* in `(3+1)`, we are "calling" the blank scope with `4` as an argument, so `4` gets returned
+* if we want to create a set with `4` in it, we have to clone the blank scope, like `{3+1}`
+
+* note that operators, like `+` and `==`, are shorthand for function _calls_, not cloning
+
+* notice that, as discussed in the previous section "Function/Class Syntax Exploration", there's still not much point to using parenthesis when calling/cloning
+* eg `foo(10, (a b => a+b))`
+* because it just evaluates to the values
+* you have to explicitely create it as a module if you want one, `foo(10, {a b => a+b})`
+
+* I have honestly no idea why it took me so long to come up with this idea
+* I guess I was just so obsessed with the idea that calling and cloning were the same thing
+* and to be able to use the `()` bracket for everything
+
+### Implicit Parenthesis III
+
+* so now that we have different brackets for calling and cloning, what does that mean for indentation and implicit parenthesis?
+* makes the most sense for the implicit bracket to be `{}`
+
+```js
+Student: Person
+	occupation: "student"
+
+// is the same as
+
+Student: Person {
+	occupation: "student"
+}
+_
+```
+
+* note that the first line is still interpreted as a value or "expression"
+* because no indentation yet
+
+but then how would we do implicit brackets for calls?
+
+```js
+// this doesn't work because it's cloning sum{}
+x: sum
+	a: 10, b: 20
+
+// this doesn't work either, it's returning the output of sum, and cloning that
+x: sum()
+	a: 10, b: 20
+
+// this works (because the implied brackets takes precedence over the spread operator), but it's ugly
+x: ...sum
+	a: 10, b: 20
+```
+
+### Calling and Map
+
+* note that, now, if you pass an object to `map`, it will "call" the object, and return the output (aka nothing, b/c objects have no output)
+
+* this actually makes sense
+* `list.map` takes a function
+* so if you give it an object, with no return
+* makes sense that it will extract nothing and return nothing
+* likewise, if you have multiple outputs, it will append all of them
+* if you want the multiple outputs to be appended as a set, you have to output the object itself
+	* just like how in regular imperative langs, you have to wrap the outputs in a set
+
+### Dynamic Scoping vs Inheritance - App Creation Example
+
+* if we were making an app, where should we store the data?
+* we could make it a web-app, which automatically makes it session based
+* we could make it a user-app, which makes it persistent
+* depending on where we "attach" the data, determines its lifetime
+* this is sorta like dynamic scoping
+* if we declare the app in the "web" context, it inherits all the methods and properties of web apps
+* if we declare it in "user" context, it inherits all methods and properties of user apps
+* though we could do it a more conventional way using inheritance
+* just extend the prototype `WebApp` or `UserApp`, and it naturally comes with all the appropriate methods/properties
+* so what's the difference?
+
+
+
+
+
+### Summary of Ideas Explored for Nodes
+
+ideas explored so far:
+	returns and arrow operator
+	dynamic interpretation of function vs class
+		based on usage (mixed module)
+		based on number of outputs
+	different syntax for function vs class
+		use {} to force evaluation as a class
+		use ... to force evaluation as a function
+	different syntax for calling vs cloning
+
+### Values are Lists
+
+* I decided to treat hanging values as list values, not set values, like how Nylo does it
+* this means that hanging values are ordered now
+* one benefit is we can now reference values by index
+* another benefit is we can use `()` to define lists
+* one last, huge benefit, is we can now use `[]` for defining modules, and get rid of the ugly `{}` notation
+	* jk we can't actually do that
+	* because then, is `foo[x: 10]` cloning `foo`, or accessing a property of `foo` (whose key is `x: 10`)?* 
+
+* in addition, index makes a bit more sense now
+* if we do `[10, 20, 30]`, it works like python's multidimensional array access, and is equivalent to `[10][20][30]`
+* notice that this wouldn't be possible if it were unordered* 
+
+* we will just use `key: true` for set values, like in every other language (python, javascript)
+
+* maybe we can also use periods for creating sets
+* `foo: a. b. c.` is the same as `foo: ( a: true, b: true, c: true )`
+
+### Lists and Statements
+
+* now that hanging values are ordered...
+* this actually works well with state variables now
+* because we can insert ordered statements directly into the object, and treat them as list values
+	* eg `x++` and `y := 20` and `foo.push('hi')`
+* note that most statements and variable modifications have no returned output
+* so even though they're treated as list values and "executed", they won't show up in the actual output
+
+### Square Brackets without Target
+
+* notice that `()`, `{}`, and `[]` are all operators that
+	1. have a target object
+	2. take an object as input (source object)
+* which is why they all use brackets (whereas other operators like `+` don't need it)
+* however, remember that the idea of using `(x: 10)` without a target object is kinda like calling/extending a "blank slate"
+	* as mentioned in the section "Implied Parenthesis" and "Implied Parenthesis II"
+* thus, shouldn't `[]` without a target object also do something?
+
+* in fact, it makes sense for it to do something
+* access properties in the current scope!
+* obviously we can access properties just using their name
+	* eg `foo: a+b` will access properties `a` and `b` in the scope
+* but if we want to use dynamic keys or object keys, we can use `[]`
+	* eg `foo[a+b]` or `foo[type: number]`
+* note that we can also do `this[a+b]`
+
+* but does `this` and `[]` use the scope or the current object, as the source?
+* this will affect whether or not it can access parent scopes or inherited properties
+
+
+
+### Clone Scopes
+
+* because we have different syntax for cloning vs calling, we can actually leverage this for clone scopes
+* cloning inherits the current scope, calling does not
+* this actually makes a lot of sense, because inheriting scope doesn't really make sense for calling, but it does for cloning
+
+* also, if we want to call and inherit scope, just do `fn{}(...)`
+
+* also, if we want to clone without inheriting scope, just do `{fn(...)}`
+
+* this gets kinda ugly with indentation
+
+```js
+// how to call with indentation?
+
+// cloning without inheriting scope (blank-slate cloning):
+
+foo: { bar(
+	x: 10
+)}
+_
+```
+
+### Calling and Cloning - Edge Cases
+
+* so how does object destructuring work now?
+
+```js
+a: 10 // is a equal to {10} or 10?
+b: 
+	10 // is b equal to {10} or 10?
+c: 10
+	20 // what is c?
+d: (x: 10) // what happens here? is d = {x : 10}? is the line evaluate, and since no outputs, d = null? or a syntax error?
+
+a, b: {10} // what happens here? does it get destructured into a: 10, b: null?
+a, b: 10 // what happens here? does 10 somehow get destructured?
+
+;
+```
+
+
+-------------------------------
+
+
+
+nice thing about accepting objects as keys
+	you can implement your own hashing function
+	(in nylo, it used his hashing function)
+	but what if you wanted to make a custom one
+	maybe like the method python uses for multidimensional arrays
+
+error codes
+	everything is a node
+	so even `undefined` can have tags
+
+matchers
+	you can provide functions as a key
+		if the function returns true when passed the accessor input, then it accesses the property
+	strings and ints are actually functions that return true when passed themselves?
+
+`self` vs `here`, scope vs inheritance (for brackets without a target)
+
+arguments from different places (without cloning or currying)?
+	split up module definitions?
+
+```js
+foo:
+	x: 10
+foo:
+	y: 20
+```
+
+or perhaps we have to use state variables for this, and each new definition is actually a modification
+
+experimental lang: Paren or 1Bracket
+	only one bracket: ()
+	all properties have to have names (so there's actually no difference between calling and cloning)
+	if a module is given a value as an argument, treats it as a key, returns corresponding value
+	if a module is given properties as an argument, clones module while overriding given properties
+	if a module is given both values and properties, then it clones the module, and returns the corresponding values
