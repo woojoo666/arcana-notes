@@ -44,7 +44,11 @@ what are all the types of metaprogramming, and give some examples?
 that way I can get a better understanding of what exactly I mean by metaprogramming
 * generate code, and then modify the generated code
    * when you change the generator, it will try to apply similar modifications
-
+* adding debug statements, or log statements, or progress alerts
+* version control
+* optimizers (eg fibonacci memoization)
+	* write code, and then generate optimized code
+	* if you modify the original code, it will still try to apply the same optimizers
 
 
 Nodes vs S-Expressions?

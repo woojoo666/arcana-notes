@@ -59,6 +59,42 @@ mList.reduce(0, acc+item ) // because acc and item are unbound in this scope, it
 Student: Person.with
 	age: 22
 	occupation: undefined
+
+// ------------------------------------
+
+
+stateVariable. = 0
+for (reduceFn.calls):
+	stateVariable++
+
+
+// if we do standard imperative style
+
+stateVariable. = 0
+reduceFn:
+	stateVariable++
+
+// then we don't have control over how the reduceFn's interact and connect to eachother, versus if we do
+
+stateVariable. = 0
+for ( reduceFn.calls with nthChild(3n+1) ): // using css selector style
+	stateVariable++
+
+nthChildExample:
+	for (n in naturalNumbers)
+		if (3n+1 = index)
+			-> true
+	--> false
+// right now will have overdefined anytime something is true
+// we need some sort of syntax for defaults
+// more discussion in this on the "Defaults" section
+
+nthChild: {expression} // alternative syntax for arguments, it's really just creating a set and then extending it
+	for (n in naturalNumbers)
+		if (expression() = index) // as long as expression uses `n`, then it will be bound to the `n` in the for-loop
+			-> true               // this is because of clone scoping
+	--> false
+
 ```
 
 
@@ -1380,6 +1416,10 @@ x: ...sum
 	a: 10, b: 20
 ```
 
+* note that we could also switch implied brackets to be () instead of {}
+* because there's no reason to clone without arguments,
+	* empty braces `{}` can be used for capturing the subsequent indented block as arguments
+
 ### Calling and Map
 
 * note that, now, if you pass an object to `map`, it will "call" the object, and return the output (aka nothing, b/c objects have no output)
@@ -1472,6 +1512,16 @@ ideas explored so far:
 
 
 
+
+### Square Brackets without Source
+
+* perhaps `[]` should be for keys
+
+source-less []: retrieve values without properties? retrieve all keys?
+
+
+
+
 ### Clone Scopes
 
 * because we have different syntax for cloning vs calling, we can actually leverage this for clone scopes
@@ -1495,6 +1545,8 @@ foo: { bar(
 _
 ```
 
+maybe we can use capture blocks (discussed later in section "Capture Blocks")
+
 ### Calling and Cloning - Edge Cases
 
 * so how does object destructuring work now?
@@ -1513,10 +1565,221 @@ a, b: 10 // what happens here? does 10 somehow get destructured?
 ;
 ```
 
+### Capture Blocks
+
+* the idea of capture blocks, is to "capture" the next indented block as arguments
+* for example, something like 
+
+```js
+foo: ()
+	x: 10
+	x*x + 30
+```
+
+* would be shorthand for this:
+
+```js
+foo: (
+	x: 10
+	x*x + 30
+)
+```
+
+* let's us get rid of those pesky dangling closing brackets
+* you could do the same for square brackets:
+
+```js
+[]
+	x: 10
+```
+
+* and even though you don't need it for objects (because of implied brackets), it makes nested objects look better
+
+```js
+foo:
+	{}
+		x: 10
+		y: 20
+	{}
+		bar: 'hello'
+```
+
+* problem is, it doesn't quite work for function calls
+
+```js
+foo: sum() // looks like capturing block, but it actually is extracting sum() and then cloning the result
+	a: 10
+	b: 20
+```
+
+* perhaps we can make this^^  work by having capture blocks take priority
+* aka, first the parenthesis+capture block is evaluated, and then used as a call to `sum`
+* so if we wanted to do the reverse, and first call `sum` and then treat the block as cloning, we would have to do
+
+```js
+foo: sum(){}
+	tag: "this is attached to the result of sum()"
+```
+
+* we have the same confusion for brackets
+
+```js
+foo: sum[]
+	x: 10
+```
+
+* is this^^ retrieving the keys of sum (which is what `sum[]` does), and then cloning them?
+* or is it a capture block for an object key?
+
+* honestly, the original order made more sense, `sum()` already looks like it's calling `sum` with no arguments
+* to invert the order for capture blocks is unintuitive
+
+### Capture Blocks II
+
+* alternatively, we can also have special notation for capture blocks
+
+```js
+foo(...) // nice but uses a lot of characters
+	x: 10
+foo( ) // whitespace matters? but only for empty braces?
+	x: 10
+foo(_) // ugly, 
+	x: 10
+foo(): // doesn't this conflict with dynamic keys? shouldn't `:` be reserved for binding?
+	x: 10
+foo(…): // ellipses character looks more compact than triple dot. Automatic conversion by IDE? But then you can't use normal text editors
+	x: 10 // oerperhaps make it so ... and … are both recognized the same
+
+```
+
+* I think the ellipses looks the best actually
+* so here is what capture blocks will look like
+
+```js
+(…)
+	10, 20, 30
+
+[…]
+	x: 10
+
+foo:
+	{…}
+		x: 10
+		y: 20
+	{} // note that we can still use this, or even omit it entirely, due to rules for cloning and implicit braces
+		bar: 'hello'
+```
+
+### Brackets Trinity
+
+* the three brackets of power:
+
+* [] is for keys
+* () is for values
+* {} is for nodes/groups
+
+* it's not actually that perfectly symmetric but close enough
+* I kinda came up with a language that only uses one bracket
+* in the next section, "1Bracket: an experimental language"
+
+### 1Bracket: an experimental language
+
+* only one bracket: `()`
+* all properties have to have names (so there's actually no difference between calling and cloning)
+* if a module is given a value as an argument, treats it as a key, returns corresponding value
+* if a module is given properties as an argument, clones module while overriding given properties
+* if a module is given both values and properties, then it clones the module, and returns the corresponding values
+
+* note that this allows us to use implied parenthesis for everything (no need for capture blocks)
+* however, we will also probably have a lot of arbitrary names like `result` and `mapResult`
+	* see section "Back to Regular Nodes and Modules" for why
+
+### `For` Keyword
+
+* so Nylo has the `for` keyword for map operations, which is pretty nice
+* I've been using the keywords `reduce`, `map`, and `filter`, but those are kinda ugly terms
+	* I'm actually not sure how Nylo handles reductions actually
+* recall that in my diagram language, I had the "fan-out" syntax for reduction and map
+* I think I can work that into the `for` syntax
+
+```js
+list: { 1 2 3 4 5 }
+result: for item in list:
+	item*item // any values are appended to the final list, like a map operation
+	if (item % 2) 'x'+item // we can use conditionals for filter operations
+	sum: item+prev.sum // use properties to do reductions. `prev` refers to previous states
+	product: item*prev.sum // this syntax makes it easy to define reductions that pass multiple variables
+
+result = { 1 4 'x2' 9 16 'x4' 25 }
+```
+
+### Indented Expression
+
+* normally indented blocks are evaluated as object/nodes
+* because of implied `{}`
+* but sometimes you just want to move an expression to another line
+* you can actually do something like this
+
+```js
+foo:
+	list => ...
+		for x in list:
+			x*x
+```
+* without the `...`, the block under the `=>` would be viewed as an object, not an expression
+	* the implied `{}` would make it look like `list => { for x in list: x*x }`
+* but with the `...`, it now looks like `list => ...{ for x in list: x*x }`
+* turning the indented block into an expression
+* and we didn't even need to introduce new syntax!
+
+### Dynamic Keys vs Conditionals
+
+* be careful of the difference between dynamic keys and conditionals
+
+```js
+foo:
+	(cond): 10 // dynamic key
+	if (cond): 10 // conditional
+
+```
+
+* the first evaluates to a property, with a dynamic key
+* if `cond` evaluates to `true`, then it becomes `true: 10`
+* on the other hand, if conditionals evaluate to true, the inner values spread into the outer block
+* if `cond` evalutes to `true`, then `foo` evaluates to `{10}`
+
+### Matchers
+
+* the idea behind matcher functions
+* 	you can provide functions as a key
+		if the function returns true when passed the accessor input, then it accesses the property
+	strings and ints are actually functions that return true when passed themselves?
+* matchers have a conditonal, and a value
+	* if the key passes the conditional, then the value is returned
+* they are like dynamic properties
+* for example, we could create an object that looks like `{ a b c a b c a b c... }` from the outside
+* useful for streams
+
+syntax exploration
+
+```js
+multipleOfThree: x -> x % 3 == 0
+
+foo:
+	(multipleOfThree): 'a'
+	(!multipleOfThree):
+		key % 3 + 1 == 0: 'b'
+		else: 'c'
+
+match key -> if even(key): key*2
+
+match if even(key): key*2 // by default, the match function provides a `key` variable
+
+[key]: if even(key) key*2 // alternative syntax?
+
+```
 
 -------------------------------
-
-
 
 nice thing about accepting objects as keys
 	you can implement your own hashing function
@@ -1527,11 +1790,6 @@ nice thing about accepting objects as keys
 error codes
 	everything is a node
 	so even `undefined` can have tags
-
-matchers
-	you can provide functions as a key
-		if the function returns true when passed the accessor input, then it accesses the property
-	strings and ints are actually functions that return true when passed themselves?
 
 `self` vs `here`, scope vs inheritance (for brackets without a target)
 
@@ -1547,9 +1805,12 @@ foo:
 
 or perhaps we have to use state variables for this, and each new definition is actually a modification
 
-experimental lang: Paren or 1Bracket
-	only one bracket: ()
-	all properties have to have names (so there's actually no difference between calling and cloning)
-	if a module is given a value as an argument, treats it as a key, returns corresponding value
-	if a module is given properties as an argument, clones module while overriding given properties
-	if a module is given both values and properties, then it clones the module, and returns the corresponding values
+how to make default variable names?
+	eg, for reduce, if not given a variable name, automatically uses item
+	`reduce(list, {item -> item*2}`, but if given a variable name, uses that, and frees up "item", `for list: x -> x*2`
+	or perhaps, you just have to deal with `item` in the namespace
+	or maybe there's a way so, when defining the function, you can either choose to inherit the namespace (dynamic scoping)
+	or you can choose to define all your own variable names
+
+
+shouldn't arrows automatically imply an object? so we don't have to keep doing stuff like `map({x -> x*x})`, and just do `map(x -> x*x)`
