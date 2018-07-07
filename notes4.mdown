@@ -1779,6 +1779,243 @@ match if even(key): key*2 // by default, the match function provides a `key` var
 
 ```
 
+### Dynamic Class/Function Revisited
+
+* I noticed that the `with` keyword will probably almost always need capture blocks
+
+```js
+students: people.with(...)
+	occupation = "student" // filter for people that have the occupation "student"
+	type = "Student" // add the type tag "Student"
+
+```
+
+* because `with` is a function, so it's almost always called (not cloned)
+* and the arguments are conditions, so they are probably long enough to warrant separate lines
+* I mean, tbh, it doesn't look that bad
+
+* however, I did also notice that "functions" are almost always called
+* it's rare to clone or modify a function
+* because usually, the name already indicates that it's a function, an action
+* `sum`, `with`, `product` etc
+
+* so it kinda goes back to the idea that, if there's outputs, it should be treated as a function
+
+* however, the syntax still won't work well for inline declared functions
+* eg `map(x => x*x)`
+* this will get evaluated as a value, so it will pass the value of `x*x` into `map`
+* what we really want is to pass the function `x => x*x` to map
+* so we'd have to use braces, like `map({x => x*x})`
+* this was actually discussed in the section "Different Syntax for Calling vs Cloning"
+
+### Incomplete vs Complete
+
+* after talking with veggero about incomplete vs complete functions, and thinking about it some more,
+	it seems like the idea of incomplete functions has more merit than I originally thought
+* I originally thought it would be almost impossible to tell if a function was incomplete
+* because in a dataflow language, you don't know if an input is going to be undefined or not
+	* talked about in the section "Currying and Returns"
+* but I realize now that, undefined is different from unbound
+
+* and it actually seems to work for 99% of cases
+* because when would you want to get the output of an incomplete function?
+* it's just going to be undefined
+* and when would you want to clone a complete function?
+* it's already complete
+
+* functional has this concept already, with how it treats currying
+* in functional, when you have multiple arguments:
+	* you keep passing it arguments until all arguments are complete
+	* and then it returns the value
+* this is really just that same concept, but you don't have to pass arguments in the same order
+
+* undefined feels the same as unbound, from the function's perspective
+* so if the function doesn't know if it's complete or incomplete, why should you have to know?
+	* at least in terms of which variables you want from the function
+	* you might not know what values are in those variables
+	* but you know which variables you want
+
+* in my diagram syntax though, it's very clear whether or not you want an output, or the entire module
+* it's always pretty clear what you're asking for
+	* be it a property, an output, or the entire module
+* whether or not a function is complete, seems like a runtime thing, so it feels weird to rely on it
+	* though variables being bound, is more static than I originally thought
+
+* there are also a few issues
+* if you wanted to be able to extract the value of incomplete functions
+
+```js
+foo: cond, foo, bar =>
+	if (cond):
+		foo
+	else:
+		bar
+
+foo(true) // technically incomplete, but still has a defined output
+;
+```
+
+* though note that you could pull out the output using `foo[0]` or `...foo`
+
+* also, lists are technically the same as "complete functions"
+* they are just a set of output values
+* so you might want to clone them
+* though you could always use `{}` for that
+* and it might be better to be more explicit, especially with singleton sets like `{3}`
+
+* when calling a function
+	* if its complete
+		* you would want the output
+	* if it's incomplete
+		* the output is probably undefined, so you don't want it
+		* you might still get a output, if the incomplete values don't matter for that output
+
+* when calling a module:
+	if it has values, and you want those values, you could have called it
+	if it doesn't have values, and you want the new module, you can call it
+	if it doesn't have values, and you want to call it, you know you'll just get empty
+
+### Incomplete vs Complete II
+
+* in the previous section "Dynamic Class/Function Revisited", I mentioned that inline functions look kinda ugly
+* in fact, way back in the section "Syntax and Mechanics Brainstorm III", I talked about using syntax like:
+
+```js
+list.map(a+1) // because a is unbound, it is implicitely the first argument
+list.map(a -> a+1) // this works as well
+;
+```
+
+* so way back then, it seems like I already had this idea of incomplete functions
+	* if an expression has unbound variables, it's treated as a function
+* though it probably wasn't formalized very well in my head
+* but now the idea of incomplete functions makes much more sense
+
+* if we use unbound variables
+* that means that we probably want to bind them later
+* eg, when we call it with arguments
+* so if there's unbound variables in the expression, it should return the function
+* note that unbound is different from undefined, as talked about in the section "Incomplete vs Complete"
+
+* in fact, there's no point to declaring unbound variables if the entire expression is evaluated
+* because 
+
+* in addition, if we wanted to extract values of incomplete functions, like discussed earlier
+* we could just give some inputs default values
+
+```js
+foo: cond =>
+	foo: undefined // foo is now bound, but undefined
+	bar: undefined // likewise
+	if (cond):
+		foo
+	else:
+		bar a. b. c. #what #1 #2 #3 #5 10.
+
+foo(true) // technically incomplete, but still has a defined output
+;
+```
+
+* dynamic bindings could still be a problem, similar to how they are a problem with dynamic scopes
+	* as mentioned in section "Clone Scopes and Dynamic Inputs"
+
+```js
+randomStrings: "cds" "ei" "2idkz" "a" "38sk10" "cat"
+
+foo:
+	for x in randomStrings
+		(x): 10 // this would ruin the unbound input a
+	map(a+1) // the value 11 is passed in, instead of the function a+1
+	square: // square seems like a function, but it's actually a value now
+		a*a
+;
+```
+
+* though we could just explicitely declare inputs, eg `map(a => a+1)` and `square: a => a*a`
+
+### Dynamic Calling based on Completeness
+
+* so it seems like the new model for calling is:
+	1. if it has no outputs, return as object
+	2. if it hsa unbound inputs, return as object (aka function)
+	3. otherwise, evaluate
+* `{}` is still used for explicit cloning and creating objects
+
+* also, note that the implicit brackets are `()` again
+* coming full circle lol
+
+### State Variables and Set Items
+
+* I mentioned in the section "State Variables and Actions" about declaring state variables like `myVar.`
+* now that function calling is based on which variables are bound/unbound, it's important to "bind" state variables
+	in some way, so they don't get counted as unbound variables
+
+* `myVar.` stands for `myVar: {}`, creating an empty object
+* this automatically gives it a memory address, so we could also use this for defining symbols
+* it also ensures that it is bound
+
+* now that `{1 2 3}` now makes an ordered list, and we have to use object keys for sets,
+	this also gives us a shorthand for defining sets
+
+```js
+foo:
+	a. b. c. // can be used as symbols, state variables, and set values
+;
+```
+
+* the `a.` syntax starts looking ugly with inline objects though
+	* eg `foo: a. b., x: 10` (we need the comma to separate it from the property `x: 10`)
+* maybe we can use `#` instead, like `foo: #a #b, x: 10`
+* but it doesn't look as good for sets
+
+```js
+foo:
+	#a #b #c // can be used as symbols, state variables, and set values
+;
+```
+
+### Closures and Dynamic Functions II
+
+* anonymous functions allows for closures
+
+```js
+foo:
+	bar: (x := 0, inc: (x++, x), inc)
+	bar() = 1
+	bar() = 2
+	bar() = 3 // I think this should work...
+
+```
+
+* `x` and `inc` can never be accessed or referenced
+* but their affects are visible
+
+### Overriding Outputs
+
+* if you override the outputs/values of an existing object, it replaces the existing values
+* `foo: {1 2 3}`, `bar: foo{10}`, `bar = {10}`
+* if you want to keep existing values, you have to do so explicitely
+* `bar = foo{...foo.values 10}`
+* in this case we could have just done `bar = {...foo.values 10}`, no cloning necessary
+* but cloning can be useful if we want to override or reference properties as well
+
+### Escaped Symbols
+
+* in state variables and reductions, we used the variable `prev` to reference previous states/values
+	* see section "`For` Keyword"
+
+* there are also times when you want to reference variables from outer scopes with the same name
+* eg, `x: x+1` where it isn't feedback, but instead is "redefined" `x` in the current scope
+* or `fn: (x y => x+y), gn: fn(...values x+y+z)`, where `values` should refer to `fn.values` not `gn.values` (or else feedback)
+
+* perhaps we can use `prev` for that as well?
+* the problem with the word `prev` is it's a shortened word, usually keywords are full words, like `previous`
+* also, reserves a variable name that could be useful elsewhere
+
+* maybe we can use a symbol, like `^`, eg `x: ^x+1`
+* looks kinda ugly though
+* maybe the `..` operator like used to go up a folder, `x: ..x+1`
+
 -------------------------------
 
 nice thing about accepting objects as keys
