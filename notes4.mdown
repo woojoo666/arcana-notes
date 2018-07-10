@@ -1670,6 +1670,18 @@ foo:
 		bar: 'hello'
 ```
 
+* maybe we can even do stuff like
+
+```js
+foo: mylist.reduce(…).apply(x, y => x/y) + 10
+	x: prev.x+1
+	y: prev.x*prev.y
+```
+
+* capture block can be used inside expression
+* obviously, only one allowed per line
+* or maybe we can have multiple, which correspond to multiple indented blocks separated by empty lines
+
 ### Brackets Trinity
 
 * the three brackets of power:
@@ -2191,6 +2203,7 @@ magnitude: v => Math.sqrt(v.x*v.x + v.y*v.y)
 
 ### Immediately Invoked Function Expressions
 
+* we kinda talked about someting similar to this idea in the earlier section "Indented Expression"
 * remember that, expressions with all bound variables and at least one output, will automatically be evaluated
 * this allows us to quickly define a throwaway block with some local variables for long calculations
 
@@ -2372,17 +2385,35 @@ p1: {rightTriangle(10,20,30)} // or you could do rightTriangle{10,20,30}
 examples:
 
 ```js
-nums: (1 2 3)
+nums: (1 2 3) // a list
 rightTriangle:
 	x, y, Math.sqrt(x*x+y*y) // implied parenthesis makes this a list
 distance: x, y, Math.sqrt(x*x+y*y) // no parenthesis, so a function
 a, b: 1, 2 // no parenthesis, so a function. However, since no unbound values, it is immediately evaluated
 foo: a: 10, b: 20 // we technically could immediately evaluate this (which results in no values), but I think this should be a syntax error
+foo: => a: 10, b: 20 // if we really wanted to do that, we could use this instead
+foo: ...(a: 10, b: 20) // or this
 
-bar: ... // ... + implied parenthesis = immediately invoked function expression
+bar: ... // ... + implied parenthesis = expression
 	x: 10
 	y: 20
-	x+y
+	x+y // because all values are bound, it is an "immediately invoked function expression"
+
+zed: ... // ... + implied parenthesis = expression
+	x+y // unbound values, so stored as function
+
+Person:
+	name age occupation // implied parenthesis, so an object
+Bob: Person
+	name: 20
+
+divide: Math.floor(nom/denom), nom % denom // a function that returns quotient and remainder
+divideObj: (divide) // turn function into an object
+quotient, remainder: divide(100, 7) // binding
+(quotient, remainder): divideObj(100, 7) // object deconstruction
+
+divide2: ...divideObj // turns the object back into a function/expression
+
 ```
 
 ### Syntax Exploration
@@ -2434,7 +2465,111 @@ foo.sum(10,20) = 30
 // some might say foo.sum should be undefined, because it represents the value if x and y were to exist
 // but actually, this allows me to do `foo.sum(10,20)` without calling foo
 // allows for libraries and stuff
+
+divide: Math.floor(nom/denom), nom % denom // a function that returns quotient and remainder
+...divide // forces value extraction
+
 ```
+
+### Dynamic Keys Syntax
+
+* because `()` is being used for object deconstruction now
+* dynamic keys now use `[]`
+
+```js
+foo:
+	localkey.
+	[localkey]: 10
+```
+
+* in fact, this makes sense because to access it, you would use `[localkey]` as well
+	* see section "Square Brackets without Target"
+
+* you can also use functions/matchers within this as well, like `[>10]: "hello"`
+	* this will return "hello" when accessing any key >10
+
+### Capture Blocks vs Immediately Invoked Function Expressions
+
+* so instead of capture blocks, we can actually do something like
+* 
+
+```js
+foo: fn1(a).fn2(b).fn3(c, d)
+	a: 10
+	b: 20
+	c: 30
+	d: 40
+```
+
+* because this actually treats the first line as an expression, a function `a b c d => fn1(a).fn2(b).fn3(c, d)`
+* and then the indented block is treated as arguments to that function!!
+
+### Functions Syntax
+
+* so we have to use this syntax for functions now
+
+```js
+sum: ...
+	a, b =>
+	a+b // implied parenthesis + unbound variables makes this a function
+;
+```
+
+* however, maybe we can allow the declarations to be moved to the first line
+
+```js
+sum: a, b =>
+	a+b
+;
+```
+
+* technically this implies `sum: a,b => (a+b)`, which returns an object not a value
+* but maybe we can treat this as a special case
+* we could alos just use object deconstruction when calling the function, `(x): sum(10, 20)`
+
+* another problem is with inline functions
+* `map(x => x, 10)`, is this
+	* two arguments, like `map((x => x), 10)`
+	* a single argument, but a function that takes two objects `map(x => (x, 10))`
+
+* same problem with indented blocks
+
+```js
+sum: ... // how many of these are function returns? how many are just values?
+	a+b
+	10
+	b+20
+;
+```
+
+* actually, this works!!
+
+```js
+sum: a, b => // declares a function with no output
+	a+b // gives the function an output, without binding any variables, so function is still incomplete
+;
+```
+
+* we can carry over the idea from "Capture Blocks vs Immediately Invoked Function Expressions"
+* basically, the first line, `a, b =>` defines a function with no output
+* the indented block gives the function properties and outputs, and as long as it doesn't complete the function, we're good
+
+* we can also do
+
+```js
+sum: a, b => a+b
+	a: 10
+;
+```
+
+* which basically does the same thing, except the output is declared on the first line
+* and properties are declares in the indented block
+
+* these examples work on the assumption that the first line is evaluated by itself, before evaluating the indented block
+* if we instead took "implied parenthesis" literally, and converted the above into `sum: a, b => a+b(a: 10)`
+	then it doesn't really work
+* so there has to be this concept of treating the first line as a single entity
+* and perhaps each line should be treated as a separate entity
 
 -------------------------------
 
