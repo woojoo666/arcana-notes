@@ -513,6 +513,12 @@ foo: divide(
 * you can't do stuff like `map( (item => result: a+b).result )`, because then the `map` function actually clones `result`, not the inner module
 * though perhaps what I meant, is that the `map` function pulls out `result`
 
+* even later later on, I realized that it actually does work
+	* see section "Functions and Objects - A Unified Theory"
+* if you do `map(item => (result: x+10).result)`, it doesn't evaluate the inner expression because it is "incomplete"
+* the `.` operator is part of the function
+* I was just thinking about it wrong, wasn't accounting for incompleteness
+
 ### Clone Scoping - Overriding vs Shadowing
 
 there are two ways of handling scope

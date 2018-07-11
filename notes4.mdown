@@ -2659,59 +2659,68 @@ whereas, if the evaluation fails, it just returns the expression
 
 ### Functions are Values
 
-functions and expressions are just "values" with the entire evaluation structure behind it
-it is dynamic, pulls the entire evaluation structure with it
-no such thing as incomplete, and complete
-parameter declarations are useless
-inputs are implied
+* functions and expressions are just "values" with the entire evaluation structure behind it
+* it is dynamic, pulls the entire evaluation structure with it
+* no such thing as incomplete, and complete
+* parameter declarations are useless
+* inputs are implied
 
-the "boundaries" of a function don't actually exist
-this is why we could do
+* the "boundaries" of a function don't actually exist
+* this is why in the earlier section "Syntax Exploration", we could do
 
+```js
 foo: x,y  =>
 	sum: x+y
 
 foo(10,20).sum = 30
 foo.sum(10,20) = 30
+```
 
-in the earlier section "Syntax Exploration"
+* so what is being cloned?
+* where are these "inputs" exactly? how do you override them?
+* when you clone an incomplete expression, you can fill in values in the scope of the function
+* but what if you have something like this
 
-so what is being cloned?
-where are these "inputs" exactly? how do you override them?
-when you clone an incomplete expression, you can fill in values in the scope of the function
-but what if you have something like this
+```js
+foo: x, y =>
+	a: x+10
+	b: a*y
+	bar: z =>
+		c: a/(b+z)
+		c*c // result
 
-	foo: x, y =>
-		a: x+10
-		b: a*y
-		bar: z =>
-			c: a/(b+z)
-			c*c // result
+```
 
-foo.bar is a function
-are you allowed to do
-foo.bar(x: 10, y: 20, z: 3)?
-imagine if all variable names were unique, then this would have no problems, right?
+* foo.bar is a function
+* are you allowed to do
+* foo.bar(x: 10, y: 20, z: 3)?
+* imagine if all variable names were unique, then this would have no problems, right?
 
-but if there's repeat function names, then maybe it should propagate "backwards", looking for unbound symbols to override?
+* but if there's repeat function names, then maybe it should propagate "backwards", looking for unbound symbols to override?
 
-functions represent the "tip" of this evaluation tree
-they don't represent a "scope" with an output, they represent the output itself
+* functions represent the "tip" of this evaluation tree
+* they don't represent a "scope" with an output, they represent the output itself
 
-go to diagram syntax
-show how objects can be thought of as a bunch of references to dependencies
-I used to think functions were like special modules, that clone until they are complete, and then they return a value
-now I see that, a function is simply a variable bound to the output of a module, instead of the module itself
+* go to diagram syntax
+* show how objects can be thought of as a bunch of references to dependencies
+* I used to think functions were like special modules, that clone until they are complete, and then they return a value
+* now I see that, a function is simply a variable bound to the output of a module, instead of the module itself
 
-when you clone an object, it can only clone and override the direct references
-so when you clone a function, it does the same
+* when you clone an object, it can only clone and override the direct references
+* so when you clone a function, it does the same
 
-the key difference is **a function is where the object being cloned is not the same as the object being returned**
-you can think of a regular object as one where the object being cloned is the same as the object being returned
+* the key difference is **a function is where the object being cloned is not the same as the object being returned**
+* you can think of a regular object as one where the object being cloned is the same as the object being returned
+
+### Functions and Objects - A Unified Theory
 
 no such thing as incomplete and complete
+	* actually there is, see next section "Incomplete vs Complete Revisited"
 objects are a subclass of functions (but they are ultimately the same thing)
 static, not dynamic
+	* objects are where scope and output are the same, functions are where they are different
+	* actually, they can be viewed as the same, discussed in the section "Propagating Incompleteness"
+	* if you consider the object wrapper `(  )` as part of the expression as well, then they do end up being the same
 
 looks like the diagram syntax ended up coming in handy after all!
 (helped me think about the problem better)
@@ -2734,7 +2743,7 @@ or is the `c` property outside of the functions?
 probably the latter
 
 
-
+### Incomplete vs Complete Revisited
 
 you can kinda think of functions like trial-and-error
 you keep cloning the function source, changing variable here and there
@@ -2746,7 +2755,207 @@ just like `1+3 = 4`, but `1+3` has a difference structure behind it than `4`
 so if functions work the same way, then calling it will keep overriding, until its complete and the output can be evaluated
 	at which point the evaluated result takes the place of the original clone source evaluation
 
-so how do evaluation models fit into this whole graph model of objects?
+* so how do evaluation models fit into this whole graph model of objects?
+* maybe each node has both an evaluated "value" and all the properties and operations that went into it?
+* this sounds like mixed nodes
+
+* say there was a function getRGB that returns a color in rgb format, with properties `r` `g` `b`
+* when you call the function getRGB, it should first return the color, and then when you call the result of that, it clones the color
+* so clearly they are pointing to different nodes
+* there is a concept of incomplete and complete
+
+* declaration matters
+* `foo: getRGB('green')`
+	* `getRGB` is incomplete, but `getRGB('green')` is complete, so that's the difference between `foo` and `getRGB`
+
+### Functions and Expressions
+
+* if we had `Math: (sum: x+y)`, and we did `Math.sum`, it returns a function
+* because `Math` and `sum` are both bound variables
+* the scope of each function is just the expression 
+
+* functions and objects are the same thing, functions aren't a separate system
+* lists are the only "added" system, just a shorthand for numeric indices, and an extra spread operator that works with binding
+
+* what is the function scope? what is cloned during the function call?
+* does function scope change when you extract functions?
+
+* originally I thought that, if you extract a function, it should still use the original function scope (the scope you extract it from)
+* the diagram syntax made it look that way
+* but for a bunch of nested scopes, being able to choose which scope is cloned is convenient
+* if you only want to use a deeply nested function, you shouldn't have to clone the entire thing
+
+* it's based on the expression the symbol was declared with
+* the expression associated with `Math` is `(sum: x+y)`
+* the expression associated with `sum` is `x+y`
+* these determine what scope is cloned
+
+### Function Extraction
+
+* note that accessor pattern works, even though I thought it didn't for a while
+* I was just putting the operator in the wrong place tbh
+* `map(x => (result: x*x).result)` doesn't extract `result` until after the function is complete
+* the entire expression is `(result: x*x).result`, not just `(result: x*x)`
+
+* the spread operator is really just accessor pattern
+* the spread operator is part of the function!
+* so ...(expression1, expression2, expression3) doesn't actually create 3 functions
+* it's still a function that returns three objects
+* so if you did `foo: ...(expression1, expression2, expression3)`, you can clone `foo` to complete all expressions, and get all three values back
+* though does it make sense to get multiple values, not wrapped in a list? `foo` and `foo(...)` should represent one value, not multiple
+* so perhaps the `...` operator should extract the expressions beforehand
+
+* but then are we allowed to extract `Math.sum`?
+
+* so which operators are evaluated, which aren't?
+* maybe it tries to evaluate everything it can?
+
+### Propagating Incompleteness
+
+* what happens if we have multiple expressions referencing/sharing the same unbound symbol?
+	* eg `foo: (sum: a+b, product: a*b)`, where `a` and `b` are shared across `sum` and `product`
+* technically, that symbol is declared in each expression
+* but because it's shared, maybe it should be part of the outer scope
+* but you can always add it to the outer scope if you clone the outer scope, so perhaps the behavior is the same either way
+
+```js
+MathXY:
+	x: a, y: b
+	sum: a+b
+	product: x*y
+```
+
+* in `sum`, `a` and `b` are unbound, but in `product`, `x` and `y` are bound
+* or is it supposed to detect that `x` and `y` are unbound as well? does it propagate?
+
+* what if I do `foo: x => a: x*x, b: 10` so foo is a function, but then I do `foo.a`? what about `foo.b`?
+
+* I don't think "incompleteness" should propagate
+* so in the above `MathXY` function, `product` returns a value, `undefined`
+* completely based on what variables are undeclared in the expression
+* incomplete expressions have a temporary scope
+* that's where all the overrides go, and extra variables
+
+* incomplete objects are incomplete expressions, because the object wrapper `(  )` is an expression as well
+* only difference is that the temporary scope is the object itself? so not actually temporary?
+
+* but what about `MathXY.sum`? it's variables can be thought of as bound to the unbound variables `a` `b` used in the `MathXY` scope
+* technically they are the same variable
+* but perhaps in the `Math` scope, it's considered unbound, but in the `sum` scope, it's considered bound?
+* or maybe, if bindings are inherited through scopes (as in, if an outer scope declares a variable, inner scopes will inherit the variable and auto bind to it),
+	then "unbound" should be inherited as well?
+* propagation of "unbound" to variables that use that an unbound variable, and so on
+* propagation of incompleteness
+
+* another example:
+
+```js
+fn: // a, b are unbound
+	x: 10/a
+	y: 20+b
+	result: x*y
+```
+
+* if "incompleteness" propagated, then `fn.result` would be a function with `x` and `y` as inputs
+* but that doesn't really make intuitive sense
+
+```js
+fn: // a, b are unbound
+	x: 10/a
+	y: 20+b
+	result: x*y+c
+```
+
+* but then it doesn't really make sense fo `fn.result` to have input `c` either, right?
+* but maybe, if you call `temp: fn(a: 3, b: 5)`, then you can do `temp.result(c: 7)`
+* it's like initializing the global variables of a library, and then pulling individual functions out
+* a function's unbound variables are based solely on it's own expression, and which of those variables are unbound
+* doesn't care about what happens in outer scopes, even if one of it's "bound" variables turns out to be unbound, like the case of `fn.result.x`
+
+* this also indicates to us that, even though `x` and `y` are functions, `result` sees them as values
+* so functions should evaluate to the value `undefined` when viewed? and only when you call them, can you access the function scope?
+* does this mean that all nodes have values and properties? perhaps values are associated with their evaluation system? so Numbers have a `numeric_value` property, strings have a `string_value` property, etc
+	* and type coercion converts between them
+* this is actually how mixed nodes can work. "viewing" and "printing" an object is something that can be overridden. If it's a number, the `numeric_value` is printed out. If its a string, the `string_value`. If it's a color, it prints out the `r g b` properties. I think by default it should just print out the properties
+
+### Implicit Declarations
+
+* going back to the `MathXY` example:
+
+```js
+MathXY:
+	x: a, y: b
+	sum: a+b
+	product: x*y
+```
+
+* it actually makes sense that `sum.a` and `sum.b` are considered bound
+* because they are first used in the outer scope, and because scope binding is basically just outer scopes passing variables into inner scopes
+	* talked about in the (much earlier) section "Scope Passing and Nested Modules"
+* the first usage of an unbound variable is like an implicit "declaration"
+
+* this also means that, shared variables are not considered bound, because they aren't implicitly declared in the outer scope
+	* eg `foo: (sum: a+b, product: a*b)`, the symbols `a` and `b` are considered unbound in both `sum` and `product`
+
+* the IDE highlights the first usage of unbound symbols, so these implicit declarations are obvious
+
+### Function Scopes
+
+```js
+fn1 fn2: ...
+	x: 10/a
+	y: 20+b
+	x+y
+	x*y
+```
+
+* so this creates a temporary scope, that looks like `(...(x: 10/a, y: 20+b, x+y, x*y))`
+* but shouldn't you be able to access `fn1.x` and `fn2.y`? you wouldn't be able to if the entire thing is wrapped
+
+* note that, in the above function, even though `fn1` is bound to `x+y` and `fn2` is bound to `x*y`, the function scope is the entire indented block plus the `...`,
+	and both `fn1` and `fn2` inherit that functions scope
+* this is because function scope is based on the entire expression, not just the function output value
+
+* perhaps `...(   )` and `(   )` are special cases for function scope
+* makes sense for `...(   )` because it should be equal to the behavior of
+	1. object deconstruction: `(fn): (a: 10, a+b)`
+	2. inline functions: `fn: => a: 10, a+b`
+* what about `fn: someParentFn(  argscope  )`
+* in this case, the function scope should not be the same as `argscope`
+* so it does seem like `...(  argscope  )` is a special case
+
+* what about accessor pattern?
+
+commutivity/associativity:
+
+	foo(a b c)[x y z] = foo(a)[x](b c)[y][z] = foo[x y z](a b c) = foo[x y](a)[z](b c)
+
+* though this doesn't always work because extracted functions have their own function scope, and don't use the parent function scope
+* eg for something like `foo: (a b c => x: (y: (z: 10)))`, then `foo[x y z]` would just be 10, and the arguments `(a b c)` would be discarded
+
+* however, this commutivity holds true if `foo` was something like `foo: (a b c => x: (y: (z: a+b+c)))`
+
+### Evaluation Systems, Mixed Modules, Incomplete vs Complete
+
+* towards the end of section "Propagating Incompleteness", we talked about evaluation systems
+* how functions could store both their expression and their evaluation result
+* the expression would be the structure used to calculate the result
+* the evaluation result would be stored in `numeric_value` or `string_value` or some other property, depending on the evaluation system used
+
+* this makes sense because, the expression would never contain a `numeric_value` or `string_value` on it's own, so no possibility of conflicts
+* even if the expression was an object, because `numeric_value` and `string_value` are hidden
+* maybe mixed modules work after all?
+
+* what about getRGB example?
+* what does this mean for Incomplete vs Complete?
+
+
+### ________ Summary
+
+implicit declarations for unbound symbols
+	"Scope Passing and Nested Modules"
+function scopes
+	`...(   )`  and `(   )` special case
 
 -------------------------------
 
