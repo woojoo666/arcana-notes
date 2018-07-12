@@ -231,16 +231,12 @@ root:
 ```js
 unit:
     km: m*1000
-    hm: m*100
-    dam: m*10
-    m: km/1000 | m/100 | m/10 | dm*10 | cm*100 | mm*1000
-    dm: m/10
+    m: km/1000 | cm*100 | mm*1000
     cm: m/100
     mm: m/1000
 
-unit(m: 5 -> km)
-unit(dam: 550 -> cm)
-unit(mm: 150000 -> m) // and so on...
+unit(m: 5).km // gives 0.005
+unit(mm: 150000).m // gives 150
 ;
 ```
 
@@ -251,19 +247,13 @@ unit(mm: 150000 -> m) // and so on...
 * represents undefined behavior
 * can have properties that store more info
 
-* it's possible to do without `null` or `undefined`
-* type systems
-* however, it forces you to account for every case
-* and dynamic languages are supposed to be fast
-
-* using `undefined` as a default, and building from there
+* use `undefined` as a default, and build from there
 * it allows you to create "incomplete" programs
 * which is fast
-* often, accounting for every case is unrealistic
-	* especially in an un-typed system, where other programs can give you whatever data they want, corrupt data or invalid types or wrong number of inputs, etc
+* so you don't have to _define_ every case, which can be impractical for large programs
+	* especially in an un-typed system, where you have to handle all kinds of input, like corrupt data or invalid types or wrong number of inputs, etc
 * it's much more practical to have cases where you just throw `undefined` to indicate that those cases aren't accounted for
-* declaring the program behavior is literally `undefined`
-* instead of trying to define everything
+	* declaring the program behavior is literally `undefined`
 
 ### Random Cool Syntax
 
@@ -407,3 +397,4 @@ magnitude: v => Math.sqrt(v.x*v.x + v.y*v.y)
 
 ### State Machines
 
+* TODO: import this from notes
