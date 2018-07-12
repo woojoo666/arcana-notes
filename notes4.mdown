@@ -2589,7 +2589,7 @@ sum: a, b => a+b
 
 what if I had something like
 
-fn(x+y, 10, x-y, 20) // x and y are unbound
+	fn(x+y, 10, x-y, 20) // x and y are unbound
 
 multiple ways to interpret this
 	four separate arguments
@@ -2597,21 +2597,23 @@ multiple ways to interpret this
 	first argument is a function x y => x+y, second argument is x y => 10, x-y, 20
 	etc...
 
-maybe we can explicitely delimit it like so, fn(x+y, 10, x-y)(20) // first argument is function with three outputs
+maybe we can explicitely delimit it like so
 
-or maybe a special operator, fn(x+y, 10, x-y | 20)
+	fn(x+y, 10, x-y)(20) // first call has one argument: a function with three outputs
+
+or maybe a special operator, `fn(x+y, 10, x-y | 20)`
 
 but function arguments are an object, just like regular objects
 so if we're having problems with this, then regular objects probably have the same problem
 
-args:
-	x+y, 10, x-y, 20
+	args:
+		x+y, 10, x-y, 20
 
 this can be interpreted as this
 
-args:
-	0: x+y, 10, x-y // a function with three outputs, the first of which will be bound to "0"
-	1: 20
+	args:
+		0: x+y, 10, x-y // a function with three outputs, the first of which will be bound to "0"
+		1: 20
 
 so ambiguity here as well
 
@@ -2949,13 +2951,230 @@ commutivity/associativity:
 * what about getRGB example?
 * what does this mean for Incomplete vs Complete?
 
+* no, as I already said, there is a difference between the evaluation structure, and the value we are pulling out
+* the output of the function is not the entire expression used to create it
 
-### ________ Summary
+### Dynamic Functions
 
-implicit declarations for unbound symbols
+(in this section I completely rethink incompleteness propagation)
+
+* `a b c: ...(x y z)` binding is actually deferred until function is complete
+* because if you had a function `fn()` that returns a list, and you did `a b c: ...fn(x y z)`, it can't extract the functions yet
+* or can it? should it?
+* I guess it is just shorthand for `temp: (x y z)`, `a: temp[0], b: temp[1], c: temp[2]`
+* but in this case, `temp[0]` is bound, so `a` will just be undefined
+
+* also ,consider this function
+
+```js
+VectorMath: vec =>
+	dot: other_vec => vec.x*other_vec.x + vec.y*other_vec.y 
+	magnitude: dot(vec)
+;
+```
+
+```js
+negMath:
+	negativeY: -y
+	difference: x+negativeY
+	// I couldn't think of any other function where you might want to use negativeY, but I can see it being a possiblity
+```
+
+* in this case, incompleteness does propagate
+* but that isn't how we should think about it
+* don't think of functions as incomplete expressions
+* we think of our program as a graph, and functions are just output nodes of that graph
+* when we "pull out" an output, it will pull out any inputs related to it
+
+* how does it work with shadowing?
+
+```js
+foo:
+	y: x*x
+	bar:
+		x: 10
+		fn: y+1
+```
+
+* we might think that `fn(x: 5)` should override `bar.x`
+* however, the input related to `fn` is actually `foo.x`
+* this seems pretty weird
+* however, note that any "variable shadowing" won't affect the inputs to nested functions, because only bound variables can do variable shadowing
+	* (eg, in this case `bar.x` is bound)
+* and when pulling out functions, it only searches for unbound variables, conveniently ignoring any of these shadow variables
+* `bar.x` would only come into play if we did `fn: y()+1` and we had dynamic scope inheritance
+
+* this whole output extraction is super dynamic
+* however, this also means that inputs can become unclear
+* Math(2,3,4).sum is the same as Math(2,3).sum and Math(2).sum(3) and Math.sum(2,3)
+* but notice how the arguments for `sum` change
+* the first argument for `Math(2).sum` is `y`, but first argument for `Math.sum` is `x`
+* argument order gets really weird
+
+```js
+foo:
+	x y
+	bar:
+		a x b
+```
+
+* `foo(1).bar`binds `x`, which takes out the _middle_ argument of `bar`
+* what would help alot is for the IDE to automatically show what inputs are unbound when calling a function
+
+* how does feedback play into all of this?
+
+### Partial Completion
+
+* before I thought of objects and functions as the same thing
+* but objects are structural, they have properties
+* an output doesn't have properties
+* so it doesn't make sense to make outputs objects
+* properties point to the output scope
+
+* properties are to facilitate binding?
+
+* actually, if we look at the diagram syntax (see notes on Dynamic Functions in "Objects vs Functions.one")
+* we can see that "outputs" are the same thing as objects
+* objects are just the output when we use the `(   )` object-creation operator
+
+* we should be able to access completed properties, even if some other properties are incomplete
+* imagine the `getRGB` function, and imagine that the `r` `g` and `b` properties are computed separately
+* perhaps we pass in enough arguments to compute `r` and `g`
+* we should be able to access those properties
+* but we should _also_ be able to add more arguments to complete the `b` property
+
+* what about something like `x: (a+b)/(c+d)`
+* `x` is the result of the `divide()` function
+* the `divide` function sets the `numeric_value` property
+* you can call `x` to complete the arguments, and when all the arguments are given, then the `numeric_value` property is defined
+* but you can still use `x` when it's incomplete, it will just pass `numeric_value: undefined` to other math operations
+
+* but then what about properties? if overriding arguments propagates backwards, then doesn't this get really messy for overriding properties?
+
+* this comes back to partial completion
+* every output/object is a node, with properties
+* each of these properties can be complete
+* accessing/overriding properties only takes the properties that belong to the node
+* giving inputs traverses backwards to any inputs that lead to the output
+
+* what happens when an input has the same name as a property?
+
+```js
+foo: x =>
+	a: x+1
+	bar:
+		x: a*a // shadows the input x
+
+```
+* what happens when you call `foo.bar(x: 10)`?
+* I think the input should take precedence
+* because once you complete the input, it disappears and you can access the `x` property
+
+### Dynamic Functions II
+
+* I realized for the `negMath` example, you can be a lot more explicit
+
+```js
+negMath:
+	negate: a => -a
+	subtract: x y => x + negate(y)
+;
+```
+
+* so in `subtract`, we don't even need input propagation
+* because the `y` input is explicitly used in the expression
+* perhaps this is better than letting inputs propagate
+* you have to explicitly pass inputs into dependencies
+* this makes inputs very clear
+
+* yeah but this get's really ugly when you think about a bunch of evaluations
+
+```js
+foo: ... // inputs: x, y
+	a: x+1
+	b: 10+a*a
+	c: b+(b/y)
+
+	-c*(c+5)
+```
+
+* the "input" for `c` propagates backwards until it finds `x` and `y`
+* we could technically write it as
+
+```js
+foo: ... // inputs: x, y
+	a: x => x+1
+	b: x => 10+a(x)*a(x)
+	c: x y => b(x)+(b(x)/y)
+
+	x y => -c(x,y)*(c(x,y)+5)
+;
+```
+
+* but GOD DAMNNN that is ugly
+* so I do think input propagation is necessary
+
+### Binding and List Values
+
+* now that we aren't creating a function scope
+* we don't really have to think about "unbound expressions"
+* and we don't have to worry about "which operators are evaluated, and which aren't?"
+	* from section "Function Extraction"
+* this also helps answer how the `...(   )` syntax should work
+
+* `...` doesn't do anything special besides map between unbound symbols and list values
+* binding arguments to inputs does the same thing
+* we can think about it as simply
+
+```js
+a, b, c: ...
+	x+y
+	10
+	Math.sqrt(y)
+
+// is the same as
+
+temp:
+	0: x+y
+	1: 10
+	2: Math.sqrt(y)
+a: temp[0]
+b: temp[1]
+c: temp[2]
+```
+
+* you can think of `...` as an un-evaluated function, or you can think of it as evaluated from the start, doesn't matter
+* notice that input propagation is necessary to make it work as it should
+* there are no special evaluation rules for "hanging values"
+* evaluation works the same for all properties, including list values
+
+### Functions vs Objects Summary
+
+* functions and objects are the same thing
+* implicit declarations for unbound symbols
 	"Scope Passing and Nested Modules"
-function scopes
-	`...(   )`  and `(   )` special case
+* every object can also be considered a function output
+* every object has two parts:
+	* properties
+	* inputs
+* properties are self-explanatory
+* inputs are unbound symbols that are relevant to the computation of the object
+	* inputs are dynamically found by traversing backwards from the object
+* when "calling" an object, you can both give inputs, and override properties
+	* input takes precedence
+* binding and `...` is just shorthand for binding list values
+	* list values are still just properties
+
+in summary:
+
+1. objects = functions
+	* every object is a function output
+2. incomplete = complete
+	* every object can be complete in some ways, and incomplete in others
+3. calling = cloning
+	* you can give inputs and override properties at the same time
+4. inputs != properties
+	* inputs propagate, properties don't
 
 -------------------------------
 
