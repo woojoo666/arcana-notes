@@ -2416,6 +2416,49 @@ divide2: ...divideObj // turns the object back into a function/expression
 
 ```
 
+### retrospect - FINISH THIS
+
+-------------------- FINISH THIS --------------------
+
+-------------------- FINISH THIS --------------------
+
+-------------------- FINISH THIS --------------------
+
+* thinking back to what I got wrong
+
+* incomplete vs complete
+
+* static vs dynamic typed
+	* key example: lists and unbound lists
+	
+
+its not about using the same data
+its about how functions are thought about
+as temporary objects, that spit out a value when given all inputs
+
+
+it is possible to want to clone a function
+
+
+diagram dataflow doens't have the concept of calling vs cloning
+doesn't have the concept of incomplete vs complete
+
+at every step, you know whether or not you want to pull a value/object
+
+functions are a tool for defining expressions that, you know you want the value of, but only after all arguments are complete
+so you have to keep track of what arguments are needed, are unbound
+which isn't too hard I guess
+
+but it can be tricky if you had something like `x: foo(...args)`
+where `args` is a provided list
+you know you want the value from foo
+but how do you ensure that `args` has enough to complete `foo`?
+
+in the diagram language, you can just pull out the result
+and if `args` doesn't complete `foo`, the result will be undefined
+
+but with functions, depending on `args`, the result can be the result of `foo` or a temporary `foo`
+
 ### Syntax Exploration
 
 ```js
@@ -2718,6 +2761,7 @@ foo: x, y =>
 
 no such thing as incomplete and complete
 	* actually there is, see next section "Incomplete vs Complete Revisited"
+	* actually there isn't, see next next section "Partial Completion"
 objects are a subclass of functions (but they are ultimately the same thing)
 static, not dynamic
 	* objects are where scope and output are the same, functions are where they are different
@@ -2954,7 +2998,7 @@ commutivity/associativity:
 * no, as I already said, there is a difference between the evaluation structure, and the value we are pulling out
 * the output of the function is not the entire expression used to create it
 
-### Dynamic Functions
+### Dynamic Functions and Inputs
 
 (in this section I completely rethink incompleteness propagation)
 
@@ -3070,7 +3114,7 @@ foo: x =>
 * I think the input should take precedence
 * because once you complete the input, it disappears and you can access the `x` property
 
-### Dynamic Functions II
+### Dynamic Functions and Inputs II
 
 * I realized for the `negMath` example, you can be a lot more explicit
 
@@ -3114,6 +3158,19 @@ foo: ... // inputs: x, y
 * but GOD DAMNNN that is ugly
 * so I do think input propagation is necessary
 
+* however, it is important to note that this method can be used to explicitly declare arguments, and force an argument order
+* also stops input-search propagation
+
+```js
+foo: ... // inputs: x, y
+	a: x => x+1
+	b: x => 10+a*a
+	c: x y => b+(b/y)
+
+	m n => -c(m n)*(c(m n)+5) // input is m and n. Halts input-search. Any function that references foo will only see inputs m and n, nothing about x y a b or c
+;
+```
+
 ### Binding and List Values
 
 * now that we aren't creating a function scope
@@ -3147,6 +3204,26 @@ c: temp[2]
 * notice that input propagation is necessary to make it work as it should
 * there are no special evaluation rules for "hanging values"
 * evaluation works the same for all properties, including list values
+
+### Input Propagation and Accessor Pattern
+
+* note that accessor pattern, and other similar behavior, only works because of input propagation
+* going back to the canonical `map` example that has given me so many problems
+
+```js
+list: mylist =>
+	map: fn =>
+		for item in mylist:
+			resultList.push(fn(item).result)
+
+map(x => result: (x+10)/(x-10))
+;
+```
+
+* notice that in function call `fn(item)`, the input is passed to the `+` operator in the `x+10` and `x-10` expression
+* also notice that the function output, aka the object called, is the `/` operator in the expression
+* these are not the same objects
+* any time the input is passed into an object that is not the same as the output object, there is input propagation going on
 
 ### Functions vs Objects Summary
 
