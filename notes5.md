@@ -1,5 +1,5 @@
 Arcana Functions Brainstorm
----------------------------
+===========================
 
 started these notes on yellowstone trip
 
@@ -31,7 +31,9 @@ explicit declaration should override input propagation?
 because inputs and outputs are declares in same scope, possible to add feedback?
     make an input based on an output?
 
-### Part 1
+
+PART 1
+--------------------------------------------
 
 Can't override lists
 Use 0: 10, 1: 20 instead
@@ -43,7 +45,7 @@ Check Implicit Outputs section
 No need to "override" outputs
 Output is -> someObject(args)
 Wouldn't be able to access incomplete properties in someObject
-veggero used notation like fn(-> someObject(args).myprop)
+Nylo used notation like fn(-> someObject(args).myprop)
 But doesn't that look like passing a function?
 
 For my version, if you want to override fn's "function scope" (aka the original scope it was defined in), you could do
@@ -707,7 +709,8 @@ Maybe data should work this way too?
 You can still have "keys" to private data that you hand out to specific people
 
 
-### Part 2
+PART 2
+--------------------------------------------
 
 Construct the object
 
@@ -786,7 +789,10 @@ arcana is a discrete graph of connections
 an approximation of the brain, where everything is interconnected with weights
 in arcana, the weights can only be zero or one
 
-### Part 3
+
+PART 3
+-----------------------------------------
+
 
 if relationships can be parametized, doesn't that make relationships behave like objects?
 so maybe we can model relationships using objects?
@@ -924,7 +930,10 @@ open question: what is the relationship between hardcoded, and generated? eg "Jo
 kinda like caching
 does this relate to the ambiguity concept
 
-### Part 4 - Cono and Knowledge Nets
+
+PART 4 - Cono and Knowledge Nets
+-------------------------------------------
+
 
 wrote these after I wrote the google doc Cono about creating/reinforcing connections in Common Knowledge
 
@@ -964,3 +973,1861 @@ that is what these parametized references are, hardcoded search jumps
 so its important to note that, names are not a part of knowledge networks
 they are used to label these hardcoded jumps
 and it's only natural for these labels to be parametized
+
+
+PART 5
+---------------------------------------
+
+
+primary goals (syntax I definitely want):
+
+search.results and search.results(paginated: true)
+Point(x: 10, y: 20).translate(x: 3, y: 4) = Point(x: 13, y: 24)
+list.map(x+1) // x is unbound, so implicit function
+(a (b c)): a+b+c OR (a (b c)) => a+b+c // matchers
+
+secondary goals:
+
+
+
+implications (what should happen if...?):
+
+list.doubleMap(x+1, x*2) // x is unbound. is it two functions? or a single function returning a list?
+
+doubleMap: fn
+
+
+
+myfn: // Nylo arrow syntax
+    a, b
+    => a + b
+
+this is equivalent to
+
+"myfn":
+    (a, b): a + b
+
+this("myfn")(10, 20) = 30
+
+but if we allow implicit inputs, that means we can take out the (a, b) input declaration
+but then it becomes
+
+myfn:
+    a + b
+
+but this is ambiguous, because it looks like it could also be
+
+myfn(a, b):
+    a + b
+
+I think it actually be equivalent to the above^^
+the implicit inputs are attached to the nearest property key
+
+in fact, for the earlier example:
+
+myfn:
+    (a, b): a + b
+
+if we wanted to use implicit inputs, maybe it would be
+
+myfn:
+    : a + b
+
+WEEIRDDDD
+the arrow looks better here
+
+myfn:
+    => a + b
+
+also, I think you might need ellipses for some of the earlier code snippets
+
+
+myfn(a, b): ...
+    a + b
+
+
+
+
+
+how do we handle lots of default values
+
+myfn(parameter1: 10, parameter2: "hello", parameter3: paramter1 + parameter2.length): parameter3*parameter3
+
+this is super ugly
+
+the ... notation is different because
+the properties in between disappear
+but is that how they should be handled
+if we do something like
+bla: a: 10, b: 20, a+b
+are the properties in between ignored
+or do we do it like Nylo's arrow syntax
+where everything is kept, and everything after the `:` is treated as part of the output object
+
+if we think about it in terms of structure, not syntax
+we have:
+1. source
+2. reference
+3. target
+
+the multiple ways we have to represent
+just going by intuition and seeing if we have an inconsistencies
+
+name: output
+name(parameters): output
+"name"(parameters): output
+(matcher): output
+name
+    parameters
+        output
+
+name
+    parameters
+        parameters
+            parameters
+                output
+
+matcher
+    matcher
+        matcher
+            output
+    matcher
+        output
+
+notice the difference between the name+parameters syntax, and the matcher syntax
+in the name+parameters syntax, we put different parameters on each line
+we'll probably need a special marker for the output line (which is where Nylo uses the `->`)
+in the matcher syntax, different matchers are on each line
+so we need to be careful, to distinguish between whether we are treating each line as a parameter for the previous matcher, or an entirely new matcher
+
+if we follow the rule that indentations = parenthesis, then we can represent name+parameters like so:
+
+"name"
+    parameter1
+    parameter2
+: output
+
+though this is pretty ugly
+maybe the arrow is short for this syntax
+
+"name"
+    parameter1
+    parameter2
+    => output
+
+also, how does our old matcher syntax factor into this?
+stuff like:
+
+isEven(x): x+1
+
+these use booleans
+
+perhaps keys are actually references to matchers that match on equality (discussed earlier)
+that way we can do stuff like
+
+cat | dog: "animal"
+
+or maybe we should just enforce strings everywhere
+
+"cat" | "dog": "animal"
+
+I think the main complications are coming from how we deal with unbound symbols
+with something like this
+
+foo(a, b): a+b
+
+`foo`, `a`, and `b` are all unbound symbols, but `foo` is treated as a string
+
+
+
+
+maybe all symbols actually point to global symbols
+and global symbols have string values
+this kinda works into local variables
+so something like
+
+foo(a, b): a+b
+
+`foo`, `a`, and `b` are all unbound symbols
+
+when you call `foo(10,20)`, it passes the filter `foo` and then overrides/shadows the values for `a` and `b`
+if you declare a local variable "foo" with a value, then it will use that value instead as the key
+
+it works the same with the `.` accessor
+if you did something like `foo.bar`, it's equivalent to `foo(bar)`, so if you declared a local variable giving a value for `bar`, then it will use that value as the key
+so you have to be very careful about local variables
+
+but this means that every time you want to explicitly declare a "public" property, you have to explicitly use strings, and use the parenthesis accessor
+
+"foo":
+    "bar": 5
+
+x: ("foo")("bar")
+
+this is super ugly
+
+I guess in javascript, explicitly using strings is also pretty ugly
+
+this["foo"]["bar"]
+
+so I think we have to decide
+are local variables going to be commmonly used enough, to be the default?
+or should public variables be the default?
+
+I think local variables get a bit messy, because often things aren't used in the same place they are defined
+often we have objects that we pass around everywhere, and want to be able to access the properties from anywhere, without worrying about the surrounding scope
+
+also, you wouldn't be able to do stuff like
+
+foo.foo
+
+because when you define it
+
+foo: // this key uses the global "foo"
+    foo: // this key references the previous "foo", not the global "foo"
+
+but when you use it
+
+foo.foo // these will both reference the same "foo" key
+
+
+
+
+
+parametized references means the local key parameters aren't in the same scope as the output
+so the output can't directly use the key parameters
+seems counterintuitive
+naturally we would want to be able to reference the parameters in the output
+instead of having to do something like `key.myparameter` every time
+maybe we can tweak scope to include key parameters
+but we can't do that all the time, otherwise we always have to worry if a key is passed in with extra properties that collide with the variables used in the output
+so maybe it should only look at key parameters declared in the scope of the output
+this is kinda going against the whole "doesn't matter how you define it, only data matters" idea we were going for
+
+
+
+
+
+name
+    parameters
+        parameters
+            parameters
+                output
+
+the Square.translate translate.x example doesn't work past one level
+
+Square:
+    x, y
+    translate: x, y
+        => Square
+            x, y // <----
+            innerSquare:
+                x, y
+                // how do I reference the variables indicated by the arrow?
+
+
+
+if `foo` is equivalent to `this("foo")`, then notice that, for scoping to work like normal, then it has to be able to search through the scope hierarchy, so `this` must contain all the variables of parents scopes as well
+this relates to our earlier ideas about scope passing
+
+
+
+
+
+name
+    parameters
+        name
+            parameters
+                name
+                    parameters
+                        output
+
+if we can reference names higher up the hierarchy
+then we should be able to reference matchers too
+but that gets super messy
+that means, any matcher in the hierarchy will basically override everything underneath
+
+(x, y):
+    mag: x*x + y*y
+    foo:
+        bar:
+            (3, 4).mag = 25 // should this be possible?
+            (10) // does this reference the top matcher?
+
+actually, even more ambiguity
+because (3,4) looks like it's creating an object
+to maybe, to "call", you have to specify a source, like `this(3, 4)`
+if you don't specify a source, it creates an object by default
+
+
+I don't know why I didn't notice it before, but cloning clashes a lot with property access
+
+strObj: "hello"(x: 10, y: 20)
+foo: bar(strObj) // are we accessing the property "hello", or cloning using the string's properties?
+
+though we could make cloning a special method, like in Java
+
+foo: bar.clone(strObj)
+foo: bar.extend(strObj) // alternative
+
+it's a bit ugly to have to use a special keyword every time
+
+maybe we can use the "+" operator
+
+foo: bar+strObj
+modifiedFoo: foo+(x: 10)
+
+still a little ugly, but it kinda makes sense because you are "adding" properties
+might present ambiguity when it comes to string/number objects though
+
+ten: 10(msg: "hello")
+twenty: 20(msg2: "world")
+output: ten+twenty // are we adding the numbers? or merging the properties?
+
+bar{strObj
+
+
+
+
+scope is weird
+using "parametized references" makes it seem like the parameters are passed in, and thus belong to the scope of the caller
+but most of the time, we want the parameters to be in the scope of the callee, the source
+keys are in the source scope
+values are given by the caller
+this was handled well with Nylo's model
+
+
+alternative way of thinking about it
+everything has a name, can't use objects as keys
+parametized reference, but functions are just "result" parametized
+so functions are just property access
+
+myfn(10, 20) is just short for myfn.result(10, 20)
+so everything is an object
+
+
+
+another way of thinking about it
+property access is just a special function call
+
+myfn.result(10, 20) is just short for myfn(key: "result", 10, 20)
+
+this way, it doesn't interfere with cloning, as long as you don't clone with the reserved property name "key" 
+
+
+
+are there some fundamental differences between how we think of
+1. references/properties
+2. functions
+3. cloning/extending/modifying
+
+some difference off the top of my head:
+* for references, you are asking the object for something, for functions, you are giving it something and getting the result
+* for references, the "template" for the parameters is in the callee scope
+* for functions, the "template" for the parameters is in the caller scope
+
+
+
+functions have 3 parts, the parent scope (source scope), the body (intermediate scope), and the output
+
+Square:
+    x, y
+    translate: x, y =>
+        return Square
+            x: Square.x + translate.x
+            y: Square.y + translate.y
+
+
+
+if the standard way of defining references is
+
+foo:
+    reference1:
+        msg: "hello world"
+
+then perhaps a parametized reference should look like
+
+foo:
+    reference1(x):
+        msg: "hello " + x
+
+to match the call to it
+
+foo["reference1"(x: "bob")] or foo.reference1(x: "bob")
+
+but then there isn't a scope for the function
+also, what should reference1.x refer to?
+
+This ^^ syntax allows for function parameters to be different from output properties
+So you can do things like Point(x: 10).translate(x: 3) = Point(x: 13)
+Not as powerful as an intermediate scope tho
+Intermediate scope allows for private/local variables
+But don't we already have a way for private/local variables?
+Using symbol properties?
+Is it really the same?
+You can always just name your intermediate variables appropriately so they don't clash with the intentional output properties
+
+
+if we don't allow extraction of the function, eg
+foo.fn != foo.fn()
+
+then it's not a first order object anymore
+if theres no function passing
+
+javascript has no currying, but it has function passing
+
+if we follow Nylo's model, foo.fn(...) to get the output, but we can also do foo.fn.x to follow a reference
+so the (...) is like another reference
+
+
+We are used to thinking of fn(...) being a function call, where you need the parenthesis to "execute" the function
+But maybe we can change that
+The parenthesis is merely for modifying
+So in this case we are modifying the reference
+Though how would we modify the output of the reference?
+if foo.bar returns the output of the reference, then doesn't foo.bar(...) modify the output, and not the reference itself?
+
+Imagine a start house, and a destination house, and a taxi that takes you there
+That is like a reference
+Now imagine a row of destination houses, and you give the taxi a number indicating which destination house you want
+That's the parameter
+
+Difference is that, with intermediate scopes, you can construct structures while creating references, instead of only being able to reference things that are already constructed
+
+Nylo's syntax is a simple way of separating function scope from output scope
+notice how lone symbols evaluate differently if they are before or after the =>
+
+foo:
+    x, y // explicitly declared unbound symbols
+    z: x+y // intermediate variable, or a default value, depending on how you look at it
+    =>
+        x: foo.x+10 // output
+        y, z // list values
+
+alternatively, maybe we can make the definition match the call
+
+foo(x, y, z: x+y):
+    x: args.x + 10
+    y, z
+
+foo(10, 20)
+
+however, intermediate variables can get too long to fit on one line, and this will get ugly
+
+
+
+we actually already had support for parametized references, because earlier we talked about how keys can have subproperties too
+<INSERT SECTION REFERENCE HERE>
+in ^^^this section, we talked about how you can inspect a key to find out more about it
+eg, a number, with a "type: time" property
+
+in this case, it might make sense to be able to do things like
+car.color => returns default color
+car.color(format: cmyk)
+because you are just adding properties to the "color" reference
+
+sometimes, it shouldn't matter whether you have properties attached or not
+if you had
+Bob:
+    name: "Bob"
+
+it shouldn't matter if you have some small metadata tags attached to the key
+eg Bob["name"] vs Bob["name"(origin: SpotifyApp)]
+
+however, if you want to change behavior based on a parameter, you can
+
+Bob:
+    name: "Bob"
+ 
+Bob:
+    name(type: "String", length: n):
+        "Bob" + n
+
+this is starting to look like ocaml matchers
+
+actually, in the above example, `type: "String"` acts like a filter, but suppose `n` already has a value in the current scope, then won't `length: n` act like a filter too?
+
+Bob:
+    n: 10
+    name(type: "String", length: n):
+        "Bob" + n
+
+we should actually just be using "length" directly
+
+Bob:
+    n: 10
+    name(type: "String", length):
+        "Bob" + length
+
+you can also leave out the property name and define a object key, like so:
+
+Matrix:
+    (x, y): this[x][y] // converts Matrix[10, 20] into Matrix[10][20]
+
+however, note that there can only be one of these "nameless" references, because if we have multiple
+
+Matrix:
+    (x, y): x+y
+    (x, y, z): x*y*z
+
+then which one should it use? eg if we did Matrix[10], it could be calling either of them
+
+so now, how do we pass functions around?
+if passing functions is like passing references, then we should also be capable of passing parametized references
+as in, not just passing around Math.sqrt, but also passing around Math.sqrt(tag: "hi")
+this is starting to feel like currying
+
+we could pass around the source and key separately
+
+source: Math
+key: "sqrt"(tag: "hi")
+
+x: source[key(tag2: "world")]
+
+actually, in the earlier example
+
+Bob:
+    name(type: "String", length):
+        "Bob" + length
+
+`type: "String"` is not a filter, it's a default value
+a filter would be useful here though
+maybe we can do
+
+Bob:
+    name(type = "String", length):
+        "Bob" + length
+
+note that this can help with nameless references
+
+Matrix:
+    (x, y): this[x][y]
+    (x, y, z is defined): x*y*z // only called when z is given
+
+we can always put these filters in the body of the output though...
+
+Matrix:
+    (x, y, z):
+        if z is defined:
+            x*y*z // only called when z is given
+        else:
+            this[x][y]
+
+because sometimes we want to imply inputs without declaring them
+
+Bob:
+     greeting: // implicit input: otherPerson
+        if otherPerson is defined:
+            "hi " + otherPerson.name
+        else:
+            "hello."
+
+
+yeah I think trying to combine filter and properties might be abusing property definition
+trying to make it do too much
+
+when we want to reference the reference scope, we can do
+
+Square:
+    x, y
+    translate: x, y =>
+        return Square
+            x: Square.x + translate.x
+            y: Square.y + translate.y
+
+but how do we do this with nameless references?
+
+Matrix:
+    (x, y):
+        x: ???.x + 10
+
+note that something like car["color"(format: cmyk)] technically returns an object like any other
+so its equivalent to
+car[type: string, string_value: "color", format: cmyk]
+so would it trigger the nameless reference blocks? should it? maybe nameless references automatically exclude objects of type "string"?
+
+what is the point of a name anyways?
+definitions vs usage
+
+definitions have 3 parts: source scope, parameter scope, output scope
+definition structure reflects this
+usage has to be able to chain:
+    bla(1).foo(10, y("hi")+2).bar
+
+names are for creating bindings
+parametized names for structuring binding creation
+but filters/matchers sort of work into this too
+the body/value of the property is the structure, the actual content
+the name is just a way to refer to it
+doesn't necessarily relate to the content
+this is why we can use aliases, eg
+    foo: 10
+    bar: foo
+in this sense, maybe filters/matchers make sense
+just another way to refer to the content
+instead of saying
+foo: 10, bar: foo
+say
+(foo | bar): 10
+
+
+perhaps we can pass around references, use them like first order objects
+basically, we want to be able to do something like
+Math:
+    sqrt: x => internal_sqrt_fn(x)
+foo: Math.sqrt
+foo(16) = 4
+
+the last call is equivalent to foo(x: 16)
+which is almost like foo[x: 16]
+so perhaps passing around referencing is just shorthand for creating an object with a dynamic key
+
+foo:
+    [key]: internal_sqrt_fn(key.x)
+
+perhaps currying can use a similar mechanism
+
+however, we don't necessarily have to treat foo(x: 16) the same as foo[x: 16]
+we could enforce that the `.` accessor is needed for it to be treated as a reference
+otherwise it's just cloning
+if so, then we need to find some other way to pass around references
+
+when we do Square.translate(x: 10), are we
+returning Square.translate, and then cloning the result
+parametizing translate before returning the result?
+perhaps we need two types of parenthesis after all
+that way, we can use the cloning parenthesis to indicate that we have finished the reference
+other symbols, like `,` and `+`, also indicate that the reference is done
+note that it doesn't make sense to parametize a reference multiple times consecutively, like Square.translate(x:10)(y:20)
+so perhaps the first set of parenthesis also completes the reference
+
+
+
+lets define some concrete examples for
+* cloning complete objects
+* using incomplete objects
+
+
+
+a single statement can represent a many-to-one tree structure
+if you want to create cycles, or create one-to-many structures, you need to use names and multiple statements
+
+
+the concept of functions and parametized references comes from our desire to isolate the output from the construction parameters
+for car.color vs car.color(format: cmyk), we could just make `format` a property of `color`, and this would work fine using current syntax
+but for something like `Math.sum(a: 10, b: 20)`, we don't want `a` and `b` to appear in the output
+at the same time, this also works using current syntax, because we would never just do `Math.sum` without parameters
+can we find a reasonable example where we would want to isolate output from construction, but also have default values for the construction?
+perhaps
+Square.transform(scale: ..., rotate: ..., translate: ...)
+each of these properties has defaults, so that you can omit them
+default is (scale: 1, rotate: 0, translate: (x: 0, y: 0))
+so you can do stuff like
+Square.transform(scale: 2)
+Square.transform(rotate: 10)
+but technically, if you do Square.transform(), it just uses all defaults
+how do we treat Square.translate vs Square.transform()?
+how does this compare to car.color vs car.color()?
+doesn't seem right because for Square.transform, nobody would leave _all_ inputs as default
+can we think of an example where all construction values have defaults, and it is reasonable to leave them all as default during usage?
+
+maybe HTMLElement.children
+we can do
+HTMLElement.children(type: "div")
+in fact, many functions that return lists of objects, have construction values with defaults
+like Search.results vs Search.results(paginated: true)
+so is it a property or a function? can it be both?
+
+note that, normally, the Search example is just done with Search.results vs Search.paginatedResults
+that way, you don't have this property vs function confusion
+but results(paginated: true) is just another way of saying resultsPaginated
+they are both just references
+the difference is that the behavior of Search.results(paginated: true) is defined within the behavior for Search.results
+
+or maybe if you accidentally execute e a CLI script as an executable
+can be thought of as a direct call without parameters?
+
+
+maybe we can have a special property for cloning
+like foo.clone(bar: 10))
+or foo*(bar: 10)
+this way, we can still use parenthesis
+but calling and cloning don't interferere with eachother
+
+do dynamic properties/keys interfere with cloning?
+if we made Matrix[x: ... ,y ...], then what happens when when we do Matrix(x: ..., y: ...)?
+
+doesn't make sense for references to have references/properties themselves
+so when you pass around a reference, you shouldn't be able to access properties of it
+you can only give it parameters and complete it
+
+note that you can't pass in list values to a clone (doesn't do anything), but you can to a call
+
+setting some ground rules:
+you can't "call" objects
+you can't clone references?
+references don't have properties
+objects don't have parameters?
+
+does this give any insight to how the syntax should work?
+
+"functions" are like incomplete references
+all you can do is complete them
+
+doesn't really make sense to access properties of a function
+because how does that make sense in terms of incomplete references?
+foo.bar(x: 10) is like foo[bar(x: 10)], but then what about
+bar2: foo.bar
+bar2.x
+if bar2 is an incomplete reference, then after you extract the property, what happens to the reference?
+foo[bar.x] isn't the same, how would you get "x" out of the brackets?
+
+we need some way to indicate the "completion" of a reference
+eg, if it was $, then we could do stuff like
+foo.bar(10)$(hello: "world") // extracts the bar(10) property of foo, and then clones it with the property `hello: "world"`
+foo.bar(10).x$ // equivalent to foo[bar(10).x]
+bar2: foo.bar(10) // notice that the reference is left incomplete
+y: bar2(20)$ // now it's complete
+the last couple examples show an issue with this though
+we have to add the $ every time theres a dot accessor, so the third line should actually be
+`foo.bar(10).x$$`
+    we have to complete the `x` reference first, before completing the `bar(10).x` reference
+
+can objects have parameters?
+isn't foo.bar(10) equivalent to foo["bar"(10)]
+but what does 10 get mapped to? The string "bar" doesn't have any unbound parameters
+
+Retroactive modification?
+foo.bar returns the result of bar unparametized
+Then foo.bar(10) adds parameters
+It's kind of like how the statement "return my shirt" 
+
+"Return my shirt washed" vs "return my shirt and then wash it"
+First one modifies the request
+Second one modifies the return
+So perhaps, what we need is something to complete the reference, only if there if you are using the returned output in the same statement
+
+Any actual examples where we would do complex statements as a key, and not in the function body?
+Something like
+foo[(bar(baz).hi+10).val]
+And why couldn't we use bracket notation for this?
+Simple function notation, "key(params)" works in 99% of cases I think, and we can use bracket notation for the rest
+
+if functions don't have property access, then we can make property access immediately "complete" the reference
+eg:
+    Search.results(paginated: true).first // parametizes, then gets first result
+    Search.results.first // completes the references without parameters, then gets the first result
+
+fuzzy queries
+so normally, references are strictly defined, and you call it directly, and it returns one thing
+we can think of a more dynamic method, where even if the result isn't explicitly defined, the "closest matches" are returned
+it will dynamically try to guess the most logical thing to return
+first instinct is to return a list of possible results, like a Google query
+but a list is a rather arbitrary structure
+we could instead return a weighted list, weights based on "relevance" or "confidence"
+but the most generalized behavior is to return a structure
+the structure can be anything, a list or weighted list or single result
+in fact, all three parts to the query are structures
+1) the context
+2) the query
+3) the result
+this is how the brain works
+we have an initial set of activated nodes
+external stimulus activates a different set of nodes
+the result is a new set of activated nodes
+this seems like an important concept for Cono
+but can we integrate this into Arcana?
+
+
+PART 6
+-----------------------------------------------
+
+
+right now we've been treating functions as parametized references
+however, we can't just treat foo(...) the same as foo[...]
+because foo["test"] is not the same as foo("test")
+so previously, when I talked about doing using dynamic keys/properties to define function behavior, that doesn't really work
+
+maybe we can use "foo()" "foo( )" or "foo(...)" to indicate that we want to return a function, not follow the reference
+
+so what is a function? what does foo(args...) represent?
+short for foo.ref(args...)
+has a hidden source + query
+completes the query, gives it to the source, and returns the result
+note the existence of this "hidden" source
+
+module:
+    foo: a, b, c => a+b+c
+    bar: Math.sqrt()
+
+foo and bar do *not have the same source* (?)
+foo is a normal query, source is `module`
+bar is an incomplete reference, source is `Math`
+well, note that foo uses syntax that we haven't fully decided on, and it looks like a function here, so maybe it does act like an incomplete reference...
+so then, what is foo's source?
+
+
+when defining references:
+    foo:
+       "bar": a, b, c => a+b+c
+"bar" is like a filter
+so if we want to handle arbitrary objects, maybe we should allow filters for that as well
+aka matchers (which we kinda already have)
+
+foo:
+    isEven: a, b, c => a+b+c
+
+foo[2(a: 10, b: 20, c: 30)] = 60
+foo[3(a: 10, b: 20, c: 30)] = undefined
+how do parameters play into this?
+right now the reference in foo is structured with the filters first, and then the parameters
+but what if we want to mix the filters and parameters? add a filter based on the parameters?
+something like
+
+bar:
+    a > 20, b < 10, c = a/b => a+b+c
+
+bar[a: 30, b: 5, c: a/b] = 41
+bar[a: 30, b: 5, c: 0] = undefined
+
+however, it's important to note that, in the foo example earlier, a,b,c are parameters of the first key
+whereas in bar, a,b,c are all keys
+
+
+remember that we established earlier that functions can't have properties
+So maybe it's okay if functions look like brackets
+The filter might overlap with dynamic properties and references but that's just something you have to handle
+after all you aren't supposed to be using properties and reference names with functions anyways
+but then how are you supposed to define intermediate properties? in the filter?
+
+
+Continuations, why they are useful
+Structure, easily add stuff to the leaves of computation
+Builder pattern?
+
+can you return functions using the current model?
+_should_ you be able to return functions?
+
+normally, in the old diagram based language, we only had objects
+you went from object to object by following references
+Alternating between object and reference
+But now we are allowing variables to represent "partial references"
+Which means we can pass these around as well
+Does this allow us to go from object->reference->reference->reference? Breaking alternation?
+
+Perhaps partial references are actually objects themselves
+Except instead of lots of properties, they have one giant dynamic property
+this might be why we need the special operator `(...)` to turn a reference into a partial reference
+we are converting a reference into an object
+
+in the implementation, I might use the OneBracket as base language and just use accessor pattern to implement functions and partial references
+but that begs the question, are parametized references actually necessary?
+
+Seems like we are overcomplicating things
+Functional languages worked fine with just normal symbolic names
+Is there any reason we actually need "parametized references"? Or is it just a useful construct?
+Is there really a reason why functions can't have properties?
+Why we cant make functions objects as well?
+Even in the diagram syntax, we have objects with "unnamed" outputs that acted like functions, but they had properties too
+
+Important to note how we got to the idea of functions as parametized references
+It came after I realized functions should only have one output
+And functions have one source too
+References also have a source and an output, so it just seemed to match
+
+However, functions don't necessarily have to have just one output
+In the diagram syntax, objects could have multiple unnamed outputs
+In retrospect, the "functions should only have one output" conclusion really came from the restrictions that typed syntax added
+In typed syntax, it was hard to account for functions with multiple outputs
+
+so it's important to note how the restrictions of typed syntax affected the structure of the language
+there are all sorts of ways to represent computation
+set theory, turing machines, lambda calculus, etc
+right now, we are trying to find the balance between
+    1. math and computation
+    2. human intuition
+    3. typed language
+
+if we are treating functions and references the same (aka () and [] brackets are the same)...
+then is there any interference?
+now foo.hello = foo["hello"] = foo("hello")
+is this ever a problem?
+
+if we use can use filters for references, then what if two filters collide?
+eg isEven and isPrime collide if input is "2"
+this is like if you try to define two properties with the same name
+it returns undefined?
+this is more evidence that we can't just throw an error if a module contains properties with the same name
+because if two filters collide, it's possible that case will never happen
+eg if the module with isEven and isPrime never has to deal with the input "2"
+
+
+earlier talking about mixing parameters and filters
+perhaps we can use syntax like this
+
+foo:
+    isEven(a,b,c): a+b+c
+
+i've actually been considering this syntax for a while now, but haven't explored it yet
+this really emphasizes how a,b,c are parameters of the key, and not keys themselves
+also, looks similar to function syntax, so it's familiar
+works like a matcher, where unbound variables in the reference name are treated as parameters
+so you can use this for multiple keys with parameters
+
+baz:
+    hello(a, b) world(c, d): a+b+c+d
+
+baz("hello"(1,2) "world"(3,4)) = 10
+
+or even filter complex structures
+
+tinytreesum:
+    ((a b) (c d)): a+b+c+d
+
+tinytreesum((1 2) (3 4)) = 10
+tinytreesum(1 2) = undefined
+
+maybe we could even do recursive structures
+
+binarytreesum:
+    (a = binarytreesum, b = binarytreesum): a+b // hmm not sure if this works
+
+ehh not sure if this is possible
+
+note that the parenthesis syntax (eg `foo(a, b): a+b`) works nice for matchers
+but it gets ugly if you have a lot of parameters, or parameters with long names or default value
+and you have to break the parameters onto multiple lines
+javascript, python, java, all have this problem
+Nylo's arrow syntax shines in this regard
+looks nice even if there are a ton of parameters
+
+
+
+notice how we seem to be treating single tokens/hanging values
+
+"foo"(a, b): a+b
+
+if its undefined, like a and b, treat it as an input
+if its defined, like "foo", treat it as a filter (testing for equality)
+so in the above example, if we call "foo"(10, 20), it passes the filter, and 10,20 are passed in as inputs
+
+so perhaps, we enforce this, and force property names to be strings, to make it clear that they are filters
+so instead of 
+
+BobPerson:
+    name: "Bob"
+    age: 32
+
+which makes it look like BobPerson, name, and age are all inputs
+we instead explicitly declare them as name filters
+
+"BobPerson":
+    "name": "Bob"
+    "age": 32
+
+this is starting to look like JSON
+
+however, remember that we are extending the idea of variables/references into filters in general
+so what about referencing variables in scope
+eg, in old syntax:
+
+a: 20
+foo:
+    b: a+10
+
+notice that the `a+10` reference the variable `a` using a symbol, not a string
+so if we turn property names into strings, what does this become?
+
+"a": 20
+"foo":
+    "b": ("a")+10
+
+hmm. this could work...but ugly as heck
+also, ("a") could also be interpreted as a singleton set, so that could be an issue
+    you could use this("a") instead, but now its even uglier
+so I guess maybe this is what symbols are for
+`a` is short for `this("a")`
+actually, short for `scope("a")` because it could be referencing a variable in a parent scope
+
+in foo(10, 20), the property key is a list of (10, 20)
+in javascript, this would be foo[ [10, 20] ]
+however, for foo.bar the property key shouldn't be thought of as a singleton list, foo[ ["bar"] ]
+it should be foo["bar"], aka the key is the string itself
+so maybe foo.bar is different from foo("bar")
+but then again, sometimes we also want to use a variable directly as a key
+foo[mykey]
+and since we aren't using square brackets anymore, the only realistic way to represent this is foo(mykey)
+so perhaps, when there is only one item, it's treated as the entire key
+but once you have multiple items, it's treated as a list/set
+if you actually want a singleton list, you have to specify it explicitly
+foo( ("bar") )
+
+
+Part 7
+--------------------------------------------------
+
+
+Now that references have their own parameter scope
+It's all starting to seem a bit too complicated
+Thinking back to the diagram syntax
+I really only used labels, aka strings as property keys
+Everytime I wanted to create a module inside a module, I just created one and gave it a name
+Didn't worry about "parameters" or "parameter scope"
+Sometimes I would use objects/modules as labels
+Never really made it clear how that worked
+
+If we have dynamic types
+And no primitives
+Everybody goes back to the "object" type
+Then it doesn't make sense to restrict reference names to strings
+Because the base language shouldnt have types
+Types like strings and numbers are just implemented on top
+
+Are labels/tags necessary?
+Can we just use sets, unlabeled?
+What functionality do labels give? Perhaps conditionals?
+We need to develop a strict mathematical model
+Kind of like the progression of FSM->PDA->TM
+In our model, what is an output?
+
+
+-------------- INSERT SKETCHBOOK NOTES 9/2 to 9/3 HERE ----------------
+
+### Structure and Behavior 1
+
+feedback vs recursion
+recursion requires labels
+also allows for copying
+beyond explicit definition
+
+
+function, labels can only be strings
+can't be dynamic, or objects
+what would our language look like without dynamic labels
+only strings
+can we still achieve everything?
+yeah, using accessor pattern to emulate functions
+
+
+intermediate scope
+
+multiple layers
+bla
+   =>
+        x: bla
+        =>
+            y: bla
+            => x+y
+
+if we have this idea that there are "default" outputs
+how far out should it return
+same issue with references, like Search.result
+
+
+how does cloning work now?
+if we have like, Shape.Square
+Shape.Square(size: 10) won't actually clone a Square with size 10
+it will modify the reference
+Shape("Square"(size: 10))
+though I guess you could make it "transfer" over to the output
+but mentally, we are thinking that its a cloning
+not a parametized creation
+if theres a difference between cloning and parametized reference, we should have a way to get the reference, and clone it
+currently there is no way to do so, without parametizing the reference, like
+Shape.Square()(size: 10)
+this is where it would be useful to have cloning as a property, eg Shape.Square.clone(size:10)
+maybe we can use an operator like #
+Shape.Square#(size: 10)
+Actually this doesn't completely work because what if the result of Square() is a function
+For example:
+Math.getFn("add")(2,3)
+Let's say the default of getFn returns add. So we try to use the default:
+Math.getFn(2,3)
+But now it looks like we are calling getFn with (2,3)
+We can't use # here because we aren't cloning the result of getFn
+Maybe we can use "." to finalize it
+Math.getFn.(2,3)
+Still kinda ugly, not too bad though
+
+
+
+input/output
+private variables
+specify that certain variables shouldn't show up in output
+that way you can simulate like private variables
+however, translate() wouldn't work
+because you want the output to be a normal Square object
+that you can clone like any other Square object
+
+
+What happens if we restrict to:
+Finite number of static references
+No parameters
+No dynamic access either, so you can't do stuff like MyArray[10]
+However, you can do MyArray.get(index: 10).result
+I believe this can achieve everything a functional language can
+
+Dynamic parametized references: alternates between object reference object reference
+Static properties: object object object object (every parenthesized expression is a clone, resulting in another object)
+
+
+When we are accessing variables, like so
+Bla: foo
+It is actually short for
+Bla: this.foo
+So if we want to call it
+Bla: foo(10)
+It looks like we are actually using parametized references
+Bla: this.foo(10)
+so when we define foo
+foo: mylibrary.getFn(5)
+We should specify that it's parametized
+foo(): mylibrary.getFn(5)
+hmmm
+
+------------------------ INSERT SKETCHBOOK NOTES 9/5 HERE -----------------
+
+Work in reverse
+
+Multiplication and repeats
+Program vs data
+
+Logic lang and nondeter
+
+Filters strict vs defaults
+
+Named output
+
+Function vs property access
+transform example
+
+
+Diagram (in sketchbook, "transition diagrams")
+Cloning
+Program and data
+
+
+Its actually possible to do multiplication using structure (in sketchbook "multiplication circuit")
+
+How we bind inputs, evaluate outputs, eg count the number of nodes in a tree
+These are program behavior, not just structure anymore
+
+Evaluation vs structure
+Property access is where evaluation comes in? or maybe cloning... 
+When you link a function, where does the evaluation stop? Stops after evaluating the function call, which clones the structure
+
+Object model has 2 ops, clone and property access
+Functional combines the two into one op, calling, which clones a function and "accesses" the output
+
+
+Maybe if functional uses a single output for each function, we dont need labels
+We can wire directly
+And have a special operator for cloning
+How can we represent functional using graph notation? 
+
+Objects and functions are both atoms
+We are trying to create a model with both atoms
+We should stick to one
+
+String references are like defaults
+We want to be able to easily modify them, add complexity
+
+
+Back to thinking in terms of brain
+Currentstate(sensory input) => nextstate
+
+If we want to be able to parametize everything, what if we wanted to parametize foo(bar)
+but we dont want foo(bar, param), because that isn't the same as parametizing the entire foo(bar)
+We can wrap it
+(parameter: param, object: foo(bar))
+Need some shorthand for this
+
+We want to be able to modify everything
+What is "modify"? 
+Add/change properties
+But what about in the context of functional
+And properties are just shorthand for function behaviorWell 
+If we think about it in terms of brain and neural nets
+Add/change pathways
+Its like learning
+We "teach" it new behaviors and responses
+However, note how this complicates "overriding" properties
+Because if we generalize to parametized references and matchers, its hard to tell when to override vs add
+When two matchers are the same
+In the brain, its impossible, which is why we only reinforce connections, and other connections degrade over time
+
+Its counterintuitive to define using dynamic properties, but modify properties using static
+
+foo:
+    bar(param): …
+        param+10
+
+modifiedfoo: foo(zed: "hello")
+
+notice that during cloning, we've always been modifying static properties, and haven't really dealt with dynamic ones
+How do we specify a dynamic property to modify? 
+What do we do if two dynamic ones collide? Does it modify both of them? 
+Maybe we can modify dynamic params if we use the same "signature" (aka same name and parameters)
+but will this work for all filter matchers? 
+Maybe we should stick to static property names after all
+
+
+
+conditionals still seem special
+functional needs it
+static object needs it
+
+dynamic property access kinda replicates it, using demux pattern
+but we still need equality operator and booleans
+
+deconstruction:
+functional does it through function passing
+objects use property access (object passing doesn't do anything because it will just return a clone of the original object, so the stuff passed in is still stuck inside)
+
+program is finite
+data is infinite
+(turing machine is good example)
+
+turing machines require so little
+just a finite set of state transitions
+everything else (the tape, behavior of the state machine), is hard coded in the interpreter
+
+on the other hand, functional seems to require so much
+special conditional function
+special equality operator
+boolean operators?
+
+actually I think boolean operators can be implemented by chaining conditional functions and duplicating code
+OR: if (cond1) doX else (if (cond2) doX else doY)
+AND: if (cond1) (if (cond2) doX else doY) else doY
+
+the only way to obtain info about a function is to call it
+
+we might be able to do conditionals and equality using deconstruction as well...
+basically, use callbacks to do conditionals
+"call" the boolean, to deconstruct it and branch computation based on it's value
+this means that every value needs to return a function, which can be used to check for equality
+another way to think about it is, say we have some function foo:
+foo() {
+    ... bunch of stuff
+}
+
+somewhere inside foo, we get a boolean
+we don't know the value of that boolean
+so to actually use it, we have to call the boolean
+thus, we design the boolean such that, depending on if it is "true" or "false", it will do different things
+
+True(a, b): a
+False(a, b): b
+
+foo(bool): bool("it was true", "it was false")
+
+so notice what happens:
+* say we get a bool that either has the value True or False
+• when we call the bool, it will behave differently depending on it's value
+• so we leverage that, and give it two different behaviors, one for if it is true and one for if it is false
+
+we can extend this to create boolean operators
+we can combine this with the functional method for list datastructures to create binary numbers
+finally, we can create a equals operator, that compares two binary numbers, and returns a boolean
+so each of these comparators don't actually return a value
+they return a function, which we call to figure out what the actual value was
+
+```js
+function True(trueVal, falseVal) {
+  return trueVal;
+}
+
+function False(trueVal, falseVal) {
+  return falseVal;
+}
+
+function Bin(head, tail) { // binary number constructor
+  return function(listFn, nilVal) {
+    return listFn(head, tail);
+  }
+}
+
+function Nil(listFn, nilVal) {
+  return nilVal;
+}
+
+var x = Bin(True, Bin(True, Bin(False, Nil)));
+
+function boolToNum(bool) {
+  return bool(1, 0);
+}
+
+// acc is accumulator
+function binToNumHelp(binary, acc) {
+  return binary((head, tail) => binToNumHelp(tail, (acc*2)+boolToNum(head)), acc);
+}
+
+function binToNum(binary) { return binToNumHelp(binary, 0); } // converts binary to integer
+
+console.log(binToNum(x));
+console.log(boolToNum(True))
+
+function NOT(bool) {
+  return bool(False, True);
+  // return (trueVal, falseVal) => bool(falseVal, trueVal);
+}
+
+console.log(NOT(True)(1, 0));
+
+function AND(bool1, bool2) {
+  return bool1(bool2(True, False), False);
+  //  return function(trueVal, falseVal) {
+  //    return bool1(bool2(trueVal, falseVal), falseVal)
+  //  }
+}
+
+function OR(bool1, bool2) {
+  return bool1(True, bool2(True, False));
+}
+
+function EQL(bool1, bool2) {
+  return bool1(bool2(True, False), bool2(False, True))
+}
+
+function equals(bin1, bin2) {
+  return bin1(function (head1, tail1) {
+    return bin2(function (head2, tail2) {
+      return AND(EQL(head1, head2), equals(tail1, tail2))
+    }, False);
+  }, bin2(() => False, True));
+}
+
+var y = Bin(True, Bin(False, Bin(False, Nil)));
+
+console.log(equals(x, y));
+console.log(equals(x, x));
+```
+
+notice the two methods shown for AND
+the first method is shorter
+but the second method can be thought of as a lazy-evaluation method.
+In the first, the expression is evaluated, and values returned by the expression are all functions, True and False
+In the second, the entire expression is a function, and the values returned are all values, trueVal and falseVal
+the methods achieve the same thing, but change the time of evaluation
+So if bool1 and bool2 are computation expensive, then the second method might seem better.
+however, once we need to "use" the boolean from the second method, we need to evaluate the expression
+and we will almost always be "using" the boolean returned
+so we will always be evaluating it anyways. So the lazy evaluation isn't very useful.
+However, we can have a third method, a partial-evaluation
+ 
+function AND(bool1, bool2) {
+    return bool1((trueVal, falseVal) => bool2(trueVal, falseVal), False);
+}
+  
+notice that in this method, if bool1 is false, then we don't evaluate bool2
+short circuit evaluation
+This means that 50% of the time, we don't evaluate bool2
+This is better than both method 1 and 2.
+
+
+
+now that we know how to do conditionals in functional, how does this translate to objects?
+how would we transform a case statement like the one below, so that it doesn't use dynamic property access, and only static access and cloning?
+
+coffeePrice:
+    "small": 3
+    "medium": 4
+    "large": 5
+
+print(coffeePrice[customerInput])
+
+note that we already created a mapping between static object syntax and functional, so it should be possible
+in order to follow the method we used for booleans, we need to treat customerInput as a function not a value, and pass in a bunch of different behaviors to it, so that it will "choose" the correct behavior based on it's own value
+we also need to modify strings to be able to do this
+
+"small": x =>
+    equals: x.small
+"medium": x =>
+    equals: x.medium
+"large": x =>
+    equals: x.large
+
+print( customerInput(x: coffeePrice).equals )
+
+the reason this feels so weird and counterintuitive is because instead of getting a value, and testing or using it, we get a function, and give behaviors to it and let it choose what to do
+we are passing control to the value itself
+it's like, instead of retrieving a soda from the vending machine, and giving it to Bob if we don't like it, we instead tell the vending machine to decide whether or not to give it to Bob
+instead of acting on the boolean, you let the boolean act for you
+
+
+
+objects vs functions
+
+objects retrieve values, and treat them like values
+functions return functions
+you can still emulate object-like syntax though
+
+
+objects, modify properties
+functions, modify inputs
+objects, inputs can become outputs and vice versa
+inputs and outputs are mixed together
+function: inputs and output is fixed and separate
+objects, you can modify everything
+function: you can only modify inputs, there is stuff you can't modify
+well local variables also create behavior in objects that you can't modify
+making objects even more like functions, and making functions even more redundant
+
+Search.use(paginated: true).results
+actually could work
+the intermediate scope "use(...)" belongs to Search
+allows us to modify a property indirectly
+scope is also isolated, so we can do
+Square(x: 0, y: 2).use(x: 10, y:5).translate
+though it does look a little backwards....
+and it'll look ugly if we want to use indentation
+though we could use capture blocks to make it a lil cleaner
+Square(x: 0, y: 2).use(...).translate
+    x: 10
+    y: 5
+
+
+for map, you could do something similar
+mylist.map(item*2)
+the way we can think about it is, item is an unbound input, that is actually part of mylist
+so it's actually doing
+mylist.for(item: ...).map
+hmm
+
+instead of Search.result(paginated:true)
+why don't we just do
+Search(paginated: true).result
+this way, we don't need parametized references
+though we need to make it clear that the parameters apply to "result" and not "Search", because for stuff like Square.translate, Square(x: 10).translate is different from Square.translate(x: 10)
+
+
+Another possible syntax:
+
+Square:
+    x: ... , y: ...
+    translate:
+        x: ..., y: ...
+        result:
+    translation: translate(...).result
+Square(x: 2, y: 3).use(x: 10, y: 20).translation
+
+notice that "use()" looks ahead at the property being accessed (in this example, "translation") and then fills in the (...)
+
+
+Either, we make objects and functions the same
+or we need to make them achieve completely different purposes
+
+
+PART 8
+-----------------------------------------------------
+
+
+note that despite the complications in syntax, it is usually quite obvious what the internal representation should be
+for example, for translate, the internal representation should be
+Square:
+    x: ... , y: ...
+    translateParams:
+        x: ..., y: ...
+        result:
+          x: ..., y: ...
+three scopes, one for the source, one for the params, one for the result
+this is obviously how it should be represented internally
+how it appears externally, is what we are having issues with
+should it be
+Square:
+    translate(x, y): (x: ..., y: ...)
+or should it be
+Square:
+    translate: x y => (x: ..., y: ...)
+or something else?
+
+maybe we should allow both
+if the internal structure is the same, whether we treat it as an object or a function doesn't matter
+just two sides of the same coin
+two ways to see the same thing
+we can declare something as an object, and then retrieve it as a function
+or declare it as a function, and retrieve it as an object
+
+this kinda goes back to the FACETS idea
+
+we can declare a function using something similar to Nylo's arrow notation
+foo: a, b => a+b
+but if we retrieve it as an object, it will return it like
+foo:
+    a, b
+    _result_: a+b
+
+different syntax for retrieving as object vs function:
+Square.translation // retrieves a object
+Square->translate // retrieves a function
+this way, it's obvious what you are retrieving
+or maybe we can use syntax highlighting, that colors it differently depending on if it was declared as a function or an object
+because the internal structure is the same, the IDE should allow you to easily convert a function declaration to it's equivalent object declaration, and vice versa
+
+for example, if you start with
+Search:
+    results: ...
+and you want to add parameters
+the IDE will give you an option to "expand" the reference
+Search:
+    results: resultsWith(...).result
+    resultsWith:
+        paginated: false
+        _result_: ...
+
+you can turn any expression/object into a function using unbound symbols
+you can turn any function into an object (not sure how yet)
+
+### Comparing Our Different Mechanisms and Syntaxes
+
+We should compare our different syntax options, using our core examples
+
+Options:
+* pure objects (no functions, no parametized references)
+* objects + functions (add the concept of functions, like in Nylo)
+* parametized references (functions and references are the same, property access is a function)
+* duality (all variables can be treated as both an object and a function)
+
+Core Examples:
+* map
+* currying / builder pattern
+* Square.translate
+* Search.results and Search.results(paginated: true)
+
+Comparison ( UNFINISHED ):
+
+```js
+// pure objects
+
+Square:
+    x, y
+    translate:
+        x, y
+        => x, y ...
+Square(x: 0, y: 0).translate(x: 2, y: 3)
+
+Search:
+    results:
+        paginated: false
+        => ...
+
+Search.results.
+Search.results(paginated: true).
+
+Map:
+
+// objects + functions
+
+Square:
+    x, y
+    translate:
+        x, y
+        => x, y ...
+Square(x: 0, y: 0).translate(x: 2, y: 3)
+
+Search:
+    results: resultsWith()
+    resultsWith:
+        paginated: false
+        => ...
+
+Search.results
+Search.resultsWith(paginated: true)
+
+// parametized references
+
+Square:
+    x, y
+    translate:
+        x, y
+        => x, y ...
+Square(x: 0, y: 0).translate(x: 2, y: 3)
+
+Search:
+    results:
+        paginated: false
+        => ...
+
+Search.results
+Search.results(paginated: true)
+
+// duality
+
+;
+```
+
+Hmm I just realized
+One of the core examples we always used to justify parametized references
+Was the Search.results example
+But you can always just use normal function syntax and use a proxy pattern: Search.results and Search.resultsWith()
+Search:
+    results: resultsWith(...)
+    resultsWith:
+        paginated: false
+        => ...
+In fact, this works fine with scalability
+If you originally only have Search.results
+And you want to parametize it later
+You can just modify Search, adding Search.resultsWith and redirecting Search.results
+This doesn't affect old code that uses Search.results, but in new code every time you want to use parameters just use resultsWith()
+So effectively, this is just as easy as our parametized references method
+Except with all the complications that parametized references comes with
+
+
+
+For implicit inputs
+How do we know what scope it applies to?
+foo: list.map(n+1)
+In this one we were restricting it to the parenthesis, so it's equivalent to
+foo: list.map(n => n+1)
+However, for declaring functions, we restricted it to the property scope
+foo: n+1
+is equivalent to
+foo: n => n + 1
+For capture expressions, we were restricting it to the current line
+foo: a.get(b) 
+    a: Array(size: 10).fill(index+1) // array of nums from 1-10
+    b: Math.floor(Math.random()*10)
+is equivalent to
+foo: ((a, b) => a.get(b))
+    a: ...
+    b: ...
+So we've been super inconsistent
+So what scope should we use?
+Maybe we shouldn't allow implicit inputs after all?
+
+
+Note that for inline functions, like
+list.reduce((a,b) => a+b)
+we should wrap inputs in parenthesis if there are more than one
+Otherwise it would look like:
+list.reduce(a     ,     b => a+b)
+which clearly looks like a list and not a single function
+
+
+For objects, how do we declare inputs?
+This is useful if we want to specify an order when mapping unnamed arguments
+foo: // inputs: a, b, c
+    x: (b*b)+c*a
+f: foo(1, 2, 3)
+which is equivalent to
+foo:
+    a: undefined, b: undefined, c: undefined
+    x: (b*b)+c*a
+f: foo(a: 1, b: 2, c: 3)
+Note that this is different from a function that returns an object
+bar: a, b, c =>
+    x: (b*b)+c*a
+b: bar(1, 2, 3)
+because "b" has lost the declaration order?
+after all, bar is equivalent to
+bar:
+    a, b, c
+    _result_: ( x: (b*b)+c*a )
+though maybe we can preserve declaration order? carry it over?
+but what if we are shadowing parameters in the output
+bar:
+    a, b, c
+    _result_: ( a: (b*b)+c* bar.a )
+then bar(a: 10) is different from bar()(a:10)
+whereas foo(a: 10) is the same as foo()(a: 10)
+also, the whole point of function parameters is that they shouldn't show up in the output
+so they shouldn't be preserved
+
+another way we can think about it is
+the internal representation should be
+bar:
+    _param_order_: a, b, c
+    x: (b*b)+c* bar.a
+what about functions? do they also have this "_param_order_" property?
+
+
+
+we can use => to specify the scope of the function (and implicit inputs)
+by default, the implicit inputs are scoped to the property scope
+but if we use =>, it declares it as a function, scoped to the current expression, and captures all implicit inputs
+if you have multiple =>, then the inner one captures it's own implicit inputs, and does not pass them to the outer =>
+so if you have
+foo: => mylist.map(=> n+1)
+this is equivalent to
+foo: mylist => mylist.map(n => n+1)
+note that the input "n" does not propagate to the outer function
+if we instead had
+foo: => mylist.map(n+1)
+this would be equivalent to
+foo: (mylist, n) => mylist.map(n+1)
+
+we can use this to fix capture expressions
+foo: (=> a.bar(b))
+    a: SomeObject
+    b: 10
+note that, we can still use ... for capture blocks
+foo: SomeObject[...]
+   10
+the "..." capture block works like "=>", is scoped by the current current expression
+
+how does multiple inputs work?
+works differently for inline expressions vs blocks?
+for inline expressions, we are used to the javascript method:
+parseFunctions((a b c) => a+b+c, (d e f) => d*e*f)
+however, if we took a function defined using indentation blocks:
+foo:
+    a b c
+    => a+b+c
+and converted it to inline, it would look like
+foo: (a b c => a+b+c)
+so it seems like we are using two different methods:
+1. js method: "=>" operator takes one object on the left and one object on the right
+2. block method: "=>" operator acts like a property name, short for "_return:"
+the block method isn't too bad for inline. if we wanted multiple functions:
+parseFunctions((a b c => a+b+c) (d e f => d*e*f))
+note that we can get rid of the comma separator between the two functions
+and it's clear what the scope of the function is
+however, if we wanted to use implicit inputs, the parenthesis look a bit cluttered
+parseFunctions((=> a+b+c) (=> d*e*f))
+not too bad though
+js method with implied inputs:
+parseFunctions(=> a+b+c, => d*e*f)
+I actually like the block method, makes it clear where the functions start and end
+however, what if we only have one function?
+list.map(n => n+1)
+this could be interpreted as
+list.map(n, _return: n+1)
+but clearly we want
+list.map((n, _return: n+1)) or list.map((n => n+1))
+double braces look ugly though
+so maybe one function is a special case?
+
+
+what happens when cloning, and we add implicit inputs to the declaration order?
+
+
+
+going back to the facets idea, being able to treat things as both a function and an object
+first off, the syntax
+foo#myfn(x: 10) for calling and foo.myobj(x: 10) for cloning
+doesn't it make more sense to have the "call" operator be after the property access? like so:
+foo.myfn#(x:10) or something?
+after all, we are accessing myfn like any other property, but then treating it like a function when we call it
+actually, we already kinda had syntax like this a while ago
+foo.myfn(x: 10) for calling and foo.myobj{x: 10} for cloning
+why did we change it?
+one reason was that we wanted one set of braces
+
+but another reason is that, remember that veggero pointed out that you will never "call" an object
+it doesn't make sense to "call" an object when it doesn't have the _return property
+in fact, if there is a _return property, we probably want to use it, so it's rare to clone a function too (though this definitely does happen, like in currying)
+
+So you will never treat an object as a function, but you can treat a function as an object?
+This is not perfect duality
+Asymmetric
+Why is that?
+
+If we think of functions as an object type
+Do other object types have this behavior?
+Numbers have a special _numval property
+Also, the + operator only works on numbers
+Also asymmetric
+So maybe we can think of calling as an operator
+for numbers it looks like mynum+10
+for functions we can do
+myfn#(10)
+which combines myfn and (10)
+
+
+for something like HTTPRequest
+it's kinda ambiguous if its an object or a function
+is it supposed to be
+HTTPRequest(url: "google.com")
+or
+HTTPRequest(url: "google.com").execute()
+if we used the call operator
+HTTPRequest#(url: "google.com")
+it's clearly a function
+without it, it could be an object, or it could be a function that we are treating like an object
+but it works without the call operator as well
+if we have
+HTTPRequest(url: "google.com").execute()
+it's clearly an object
+but without the ".execute()", it could be a function or an object
+
+functions are a little different from numbers
+in that functions are a natural part of language/linguistics?
+
+numbers can have multiple operators, like + or * or /
+functions only need one operator, the call operator
+numbers (and strings and other objects/datatypes) are meant to be used, to be acted upon
+functions are meant to use other objects, to do the action
+
+actions?
+"Bob, pick up the bucket" modifies Bob and bucket
+modifies the environment state
+maybe we should have another type of object specifically for modifying environment state
+should we separate functions that modify state from functions that return output?
+are there functions that do both?
+yes, functions that modify state and then return true/false to indicate success/failure
+
+
+natural human language has ways to indicate whether something is an object or a verb or a preposition
+maybe we need that too
+aka, maybe we should have a call operator
+
+on the other hand, with dynamic typing, you're supposed to name your variables appropriately
+to indicate what it is
+if its a number, specify so
+if its a function, likewise
+
+"send the mail"
+even though we know "send" is a verb, there are still rules on where in the sentence it has to go
+
+hmm, but it's not the word's location in the sentence that determines it's type (aka part of speech)
+in this case, the verb is at the beginning
+but we could also put a noun at the beginning
+"Bob sends the mail"
+
+to the contrary, its the part of speech that determines where in the sentence it has to go
+the way we did syntax trees, was we *first* determined each word's part of speech
+and then we built the structure
+
+the sentence structure is (i think) mainly for indicating what modifies what, like which adjective modifies which noun, etc
+analogous to parenthesis in our language
+
+I guess one major difference is that, in natural speech, you can't treat a verb as an object or vice versa
+whereas in my language, you can treat a function as an object (and clone it, access properties)
+
+but also, consider how long it took to learn a language like english
+but the difficult part is understanding the syntax construction
+but if the syntax tree were given to a foreign speaker...
+i think they would be able to figure out the meaning, if they understood the vocab
+
+also, note that i think human language needs to achieve more than what programming languages need to achieve
+human language needs to be able to describe things like events in the past
+"yesterday, bob went to the zoo"
+programming languages only need to describe commands
+no need for verb tenses
+though I guess for describing data, you might have to do something like
+"event(subject: bob, action: goes(to: zoo), time: yesterday )"
+
+different langauges have different parts of speech though
+so maybe having syntax based on parts of speech should be built on top of the base language
+
+the base language more represents ideas and neural connections
+super simple, fundamental
+other stuff can be built on top
+
+its a little less flexible than functional though
+because in our language, `foo(...)` must return a clone of `foo`
+whereas `foo(...)` in functional, can return pretty much anything, including a clone of `foo`
+
+I think our language is pretty much complete though
+It has a core mechanism, objects/dictionaries, that is Turing complete
+It add a few mechanisms on top of it, like local variables and state variables
+But it's main purpose is to be simple and elegant
+
+It's most similar to functional
+However, the main differences are:
+Dictionaries
+Local variables
+State variables/eventlist blocks
+Feedback
