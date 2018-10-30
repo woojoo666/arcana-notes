@@ -377,7 +377,7 @@ what if overriding properties only changed last scope? but then do we still have
 * `combined: ...firstList, ...secondList`
 
 * comma operator takes last precedence
-* so `if...else if...else` and other operators combine first
+* so `if __ else   if __ else` and other operators combine first
 
 ### Clone Scopes and Property Access
 

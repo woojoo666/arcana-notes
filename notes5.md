@@ -167,6 +167,8 @@ fn:
     ...y(c,d)
 
 Fix Map function diagram. Doesn't use outputs, uses the object itself
+    as in, in the map implementation `for item in list: list.add(mapFn(item))`, the `mapFn(item)` does not return the output of a function
+    rather it clones the mapFn object with `item` as input
 
 Even evaluated functions store input?
 To make Turing machine, base lang only needs: properties, cloning
@@ -180,12 +182,15 @@ states:
 Whether or not something is unbound, is up to the user. The function shouldn't know this
 Though when yOu clone a function, it does preserve bindings
 An object includes everything that is cloned
+anything that needs to be cloned to preserve the object's behavior, can be considered as part of the object
 That includes inputs, and even inner unnamed expressions
 So object properties can be bound yet unnamed
 
 Just because you can override outputs doesn't mean you should - Vish
 Doesn't really make sense to override an output
 Just access it using property access
+
+### Mixed Modules - Checking Equality
 
 Normal objects, the input and evaluation steps are all properties of the output object
 
@@ -205,6 +210,7 @@ Sum(1,3) = sum(2,2) even though different objects?
 It seems like my objects are combining inputs/evaluation and outputs. Which can be confusing
 Some properties are both inputs and outputs? You want to access and override them?
 
+### Mixed Modules - Property Collision, Namespace Clutter
 
 I've been kinda worried that intermediate properties and outputs might collide
 You have to keep track of what properties are in the output object, and make sure your temp evaluation variables don't clash
@@ -218,8 +224,6 @@ This also factors into memoization. If we have multiple functions using "sum(2,3
 
 Does this mean we have to factor inputs into equality checking?
 
-Drawing: I noticed how quickly I've been improving, at drawing smoke, trees, colors, etc. Being forced to doodle quickly and frequently is forcing me to just experiment and just go for it, instead of overanalyzing. Trial and error helps me learn surprisingly quickly. I try to have a goal that I'm trying to achieve for each trial, and I can see if it worked or not, and learn from each trial. Also, drawing in public forces me to just start drawing, and also to start simpler, so I get less stuck and unsure and frustrated. Starting simple also helps me focus on training one thing at a time, which speeds up learning and prevents me from getting overwhelmed and frustrated and disappointed. Drawing from reference (esp simple things like trees and mountains) helps a lot, and Yellowstone has a lot of cool stuff that constantly keeps inspiring me to doodle.
-
 If a "function" outputs an object, but includes all the inputs, what happens when you clone the object? You don't want those inputs in the clone, right? Maybe it should only retain inputs for one level? Maybe expressions should be treated differently from objects? Cloning fn_result vs cloning the entire function. When/where are the inputs relevant? Are they relevant after cloning?
 
 In this new model, either you can have the inputs permanently part of the object, or not at all. Functional's function model (and input propagation model) allows for inputs that disappear after being completed.
@@ -227,13 +231,19 @@ In this new model, either you can have the inputs permanently part of the object
 You can create a function model, just make an object that hides variables once complete (local variables). How does this work with equality? How to declare such variables?
 
 Iterating across all properties of a mixed modules, usually you just want output values?
-Mixed modules get ugly once you start considering multiple chains of operations, where inputs are getting preserved across all of them, littering the namespace. If you had "fillNthRow: matrix, row, value => temp: value*value,  matrix()"
+Mixed modules get ugly once you start considering multiple chains of operations, where inputs are getting preserved across all of them, cluttering the namespace. If you had "fillNthRow: matrix, row, value => temp: value*value,  matrix()"
+// TODO: CLARIFY THIS
 
 Usually when you clone something you only want to clone the output. Cloning the input isn't necessary, as previously thought.
 
 How to do Person.updateBMI
+    updateBMI needs height and weight as inputs, but it needs to output a person, so the input height and weight will be mixed in with the Person's properties
+    however, that isn't a problem because luckily, the height and weight should be properties of the output Person anyways
+    so this is an example of where mixed modules _does_ work
 
 Mixed modules are unintuitive, they are not how we naturally think about data structures. The core concept of functions is the distinction between evaluation and output
+
+### Sticky vs Loose Bindings
 
 I keep thinking that incomplete vs complete, unbound vs bound, all don't matter because all that matters is a functions structure. sum(2,3) is the same as sum(4,6), just with different values. But then I remember that everything in an object can be considered a binding, eg what functions are being used. If Matrix.product used the sum function, we could rebind it to some other function. Then it has the same structure, but different bindings. Is it the same function though? No, because the structure, as well as the bindings, all matter. Otherwise, all operators would be the same because they have the same structure (two inputs, one output).
 
@@ -609,6 +619,8 @@ the way vish views functions:
 ----- end Discussion with Vish -----
 
 
+### Default Values vs Currying
+
 Currying and default values contradict each other?
 Currying: once you give an input a value, the function returns the output
 Default values: inputs can have a value or not, doesn't matter
@@ -617,6 +629,7 @@ Maybe we can view default values not as inputs, but properties
 So you can override them as much as you want
 A function with properties is like a semi-complete function, where some of the inputs have been given already
 
+### Prototypes vs Templates
 
 Objects are for using
 But when you create a function, you are doing so so you can use it to create other objects
@@ -656,6 +669,8 @@ Eg output is a separate object
 Map example:
 Prototype-map, the outputs have to contain the inputs
 Functions-map, the inputs have to have exactly one input
+
+### Random Syntax - Operators and Parenthesis, Mixed Modules, Namespace Clutter
 
 Note: if an operator given a spread list, it only takes the first one
 (1,2,3)+4 = 5
@@ -707,6 +722,19 @@ With wired charging, you can choose how much power goes to each person
 With wireless, you can only broadcast a bunch of power, and it's up to the appliance to pull however much it needs
 Maybe data should work this way too?
 You can still have "keys" to private data that you hand out to specific people
+
+
+### Choosing Default Values Over Currying
+
+currying implies that the behavior of the function depends on how many inputs you give
+default values implies that the behavior of the function doesn't depend on how many 
+
+so now that we have to choose one, default values makes more sense
+default values seems to fit more with the prototypal nature of the language
+    * instead of creating a template with blank values, we create a prototype with default values
+    * then we can clone the prototype and then override those default values
+in addition, if we want to emulate currying, we can always use builder pattern
+    * it's also more explicit exactly when the output is finally extracted
 
 
 PART 2
@@ -1139,7 +1167,7 @@ foo(a, b): a+b
 `foo`, `a`, and `b` are all unbound symbols, but `foo` is treated as a string
 
 
-
+### Global Symbols II
 
 maybe all symbols actually point to global symbols
 and global symbols have string values
@@ -1417,7 +1445,7 @@ however, intermediate variables can get too long to fit on one line, and this wi
 
 
 we actually already had support for parametized references, because earlier we talked about how keys can have subproperties too
-<INSERT SECTION REFERENCE HERE>
+// FIND SECTION REFERENCE
 in ^^^this section, we talked about how you can inspect a key to find out more about it
 eg, a number, with a "type: time" property
 
@@ -2574,75 +2602,129 @@ This doesn't affect old code that uses Search.results, but in new code every tim
 So effectively, this is just as easy as our parametized references method
 Except with all the complications that parametized references comes with
 
+### Implicit Inputs/Functions and Bounding Scope
 
+* For implicit inputs/functions
+* How do we know what scope it applies to?
 
-For implicit inputs
-How do we know what scope it applies to?
-foo: list.map(n+1)
+for example:
+
+        foo: list.map(n+1)
+
 In this one we were restricting it to the parenthesis, so it's equivalent to
-foo: list.map(n => n+1)
+
+        foo: list.map(n => n+1)
+
 However, for declaring functions, we restricted it to the property scope
-foo: n+1
+
+        foo: n+1
+
 is equivalent to
-foo: n => n + 1
+
+        foo: n => n + 1
+
 For capture expressions, we were restricting it to the current line
-foo: a.get(b) 
-    a: Array(size: 10).fill(index+1) // array of nums from 1-10
-    b: Math.floor(Math.random()*10)
+
+    foo: a.get(b) 
+        a: Array(size: 10).fill(index+1) // array of nums from 1-10
+        b: Math.floor(Math.random()*10)
+
 is equivalent to
-foo: ((a, b) => a.get(b))
-    a: ...
-    b: ...
+
+    foo: ((a, b) => a.get(b))
+        a: ...
+        b: ...
+
 So we've been super inconsistent
 So what scope should we use?
 Maybe we shouldn't allow implicit inputs after all?
 
 
 Note that for inline functions, like
-list.reduce((a,b) => a+b)
+`list.reduce((a,b) => a+b)` (javascript notation)
 we should wrap inputs in parenthesis if there are more than one
 Otherwise it would look like:
 list.reduce(a     ,     b => a+b)
 which clearly looks like a list and not a single function
 
+### Declaring Input Order For Objects
 
 For objects, how do we declare inputs?
 This is useful if we want to specify an order when mapping unnamed arguments
-foo: // inputs: a, b, c
-    x: (b*b)+c*a
-f: foo(1, 2, 3)
+
+    foo: // inputs: a, b, c
+        x: (b*b)+c*a
+    f: foo(1, 2, 3)
+
 which is equivalent to
-foo:
-    a: undefined, b: undefined, c: undefined
-    x: (b*b)+c*a
-f: foo(a: 1, b: 2, c: 3)
+
+    foo:
+        a: undefined, b: undefined, c: undefined
+        x: (b*b)+c*a
+    f: foo(a: 1, b: 2, c: 3)
+
 Note that this is different from a function that returns an object
-bar: a, b, c =>
-    x: (b*b)+c*a
-b: bar(1, 2, 3)
-because "b" has lost the declaration order?
+
+    bar: a, b, c =>
+        x: (b*b)+c*a
+    b: bar(1, 2, 3)
+
+because `b` has lost the declaration order?
 after all, bar is equivalent to
-bar:
-    a, b, c
-    _result_: ( x: (b*b)+c*a )
+
+    bar:
+        a: undefined, b: undefined, c: undefined
+        _result_: ( x: (b*b)+c*a )
+
 though maybe we can preserve declaration order? carry it over?
 but what if we are shadowing parameters in the output
-bar:
-    a, b, c
-    _result_: ( a: (b*b)+c* bar.a )
-then bar(a: 10) is different from bar()(a:10)
-whereas foo(a: 10) is the same as foo()(a: 10)
+
+    bar:
+        a: undefined, b: undefined, c: undefined
+        _result_: ( a: (b*b)+c* bar.a )
+
+then `bar(a: 10)` is different from `bar()(a:10)`
+whereas `foo(a: 10)` is the same as `foo()(a: 10)`
 also, the whole point of function parameters is that they shouldn't show up in the output
 so they shouldn't be preserved
 
+### Declaring Input Order Using a Property
+
 another way we can think about it is
-the internal representation should be
-bar:
-    _param_order_: a, b, c
-    x: (b*b)+c* bar.a
-what about functions? do they also have this "_param_order_" property?
+the internal representation should be something like
 
+    bar:
+        _param_order_: a, b, c
+        x: (b*b)+c* bar.a
 
+what about functions? do they also have this `_param_order_` property?
+
+actually, note you can use any property declared at the beginning to declare input order
+
+    bar:
+        myinputorder: a, b, c
+        x: (b*b)+c* bar.a
+
+after all, input order is determined by the order in which symbols appear in the scope
+so if you declare a list of symbols at the beginning, the input order will follow the order of that list
+
+note that for the same reason, you can leverage list elements to serve the same purpose
+
+    bar:
+        a, b, c
+        x: (b*b)+c* bar.a
+
+however, if you are planning to use `bar` as a list, then you can't do this
+
+maybe we can use the same technique that we use for function output
+use a symbol to represent a property `_param_order_`, used specifically for declaring input order
+
+    bar:
+        $ a, b, c
+        x: (b*b)+c* bar.a
+        => x*x
+
+### Arrow Operator and Capturing Implicit Inputs
 
 we can use => to specify the scope of the function (and implicit inputs)
 by default, the implicit inputs are scoped to the property scope
@@ -2658,14 +2740,14 @@ foo: => mylist.map(n+1)
 this would be equivalent to
 foo: (mylist, n) => mylist.map(n+1)
 
-we can use this to fix capture expressions
-foo: (=> a.bar(b))
+we can use this to fix immediately-invoked functions aka IIFEs (note that we have to use the call operator too)
+foo: (=> a.bar(b))#
     a: SomeObject
     b: 10
 note that, we can still use ... for capture blocks
 foo: SomeObject[...]
    10
-the "..." capture block works like "=>", is scoped by the current current expression
+the "..." capture block works like "=>", is scoped by the current expression
 
 how does multiple inputs work?
 works differently for inline expressions vs blocks?

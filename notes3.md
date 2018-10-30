@@ -2279,6 +2279,20 @@ foo: a, b // imagine if the `a` key is pressed. Now `a` is bound. Should foo bec
 
 so how should I distinguish between unbound keys and hanging values?
 
+**REVISIT (9/26/2018)**
+
+* actually, I think my old examples work fine, if you account for implicit inputs
+
+bar:
+	a, b
+	result: a+b
+
+* here, `a` an `b` are set values, but because they are unbound, they are implicit inputs as well
+* I am leveraging set values to declare inputs
+* I think that was my intention in the first place, and in this section, I was just confusing myself
+* in fact, that's exactly how I was treating it in an earlier section, "Default Values II"
+* I believe that was what I was doing even all the way back in May in one of my first conversations with veggero [here](https://www.reddit.com/r/ProgrammingLanguages/comments/8g8mru/monthly_what_are_you_working_on_how_is_it_coming/dyceran/)
+
 ### Duality of Unbound Symbols and Anonymous Properties
 
 * aka the connection between function calls and return statements
