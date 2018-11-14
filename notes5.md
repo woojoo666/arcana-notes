@@ -1178,20 +1178,32 @@ foo(a, b): a+b
 
 `foo`, `a`, and `b` are all unbound symbols
 
-when you call `foo(10,20)`, it passes the filter `foo` and then overrides/shadows the values for `a` and `b`
+when you call `foo(10,20)`, it matches the matcher `foo` and then overrides/shadows the values for `a` and `b`
 if you declare a local variable "foo" with a value, then it will use that value instead as the key
 
 it works the same with the `.` accessor
 if you did something like `foo.bar`, it's equivalent to `foo(bar)`, so if you declared a local variable giving a value for `bar`, then it will use that value as the key
 so you have to be very careful about local variables
 
-but this means that every time you want to explicitly declare a "public" property, you have to explicitly use strings, and use the parenthesis accessor
+for example, if you had
+
+    foo
+        bar: 10
+    zed
+        bar: 20
+        x: foo.bar + bar
+
+the `x: foo.bar + bar` will actualy turn into `x: foo[bar] + bar` => `x: foo[20] + 20` => `x: undefined + 20`, which is really counter-intuitive
+
+in addition, this means that every time you want to explicitly declare a "public" property, you have to explicitly use strings, and use the parenthesis accessor
 
 "foo":
     "bar": 5
 
 x: ("foo")("bar")
 
+because if you had simply declared `foo: (bar: 5)`, then if there happened to be `foo` and `bar` declared already as local variables, then it would use the value of those variables as the property keys
+so in order to ensure that `foo.bar` is globally accessible, we have to explicitly use a global key `"bar"`, and explicitly reference it using `foo["bar"]`, so it never gets mixed up with a local `bar`
 this is super ugly
 
 I guess in javascript, explicitly using strings is also pretty ugly
@@ -2694,10 +2706,10 @@ another way we can think about it is
 the internal representation should be something like
 
     bar:
-        _param_order_: a, b, c
+        _input_order_: a, b, c
         x: (b*b)+c* bar.a
 
-what about functions? do they also have this `_param_order_` property?
+what about functions? do they also have this `_input_order_` property?
 
 actually, note you can use any property declared at the beginning to declare input order
 
@@ -2717,7 +2729,7 @@ note that for the same reason, you can leverage list elements to serve the same 
 however, if you are planning to use `bar` as a list, then you can't do this
 
 maybe we can use the same technique that we use for function output
-use a symbol to represent a property `_param_order_`, used specifically for declaring input order
+use a symbol to represent a property `_input_order_`, used specifically for declaring input order
 
     bar:
         $ a, b, c
