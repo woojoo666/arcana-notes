@@ -239,7 +239,9 @@ note that this differentiates it from declaring a list of functions
 			=> a*b
 
 
-for input order, using `$` for inline functions is kinda ugly
+for input order, we mentioned earlier that we can use `$` to declare input order
+	in the section "Declaring Input Order Using a Property"
+however, it gets kinda ugly
 		
 		listofFns($ a b => a+b, $ a b => a*b)
 
@@ -643,7 +645,7 @@ note that for functions, where we don't really use list items, we can leverage t
 `fn: x y z => x+y+z`
 
 notice that we aren't using the `>=` symbol, so these are regular list items
-however, the `_parem_order` property will be automatically generated to follow the same order as these list items, so it's basically the same thing
+however, the `_input_order` property will be automatically generated to follow the same order as these list items, so it's basically the same thing
 maybe this is the idea I had [back in May](https://www.reddit.com/r/ProgrammingLanguages/comments/8g8mru/monthly_what_are_you_working_on_how_is_it_coming/dyceran/) when I was using syntax like
 
 sum:
@@ -858,6 +860,10 @@ Audio Notes from 9/27 to 9/28 (Transcribed)
 
 // TODO: clean this up, convert to bullet-point style notes
 
+note: in these audio notes, I talk alot about "dynamic property modification"
+What I am referring to, is creating a property of an object, outside of the object's declaration
+I later call this "indirect binding"
+
 ### Recording 10
 
 Oh yeah so and I'm also going to put down some thoughts about Arcana and tagging. I was thinking, I can use the dot notation (the standard JavaScript property access notation) for public properties, which are properties that have strings as keys/names. And I can use the hashtag notation for tags. And what I'm wondering is, maybe I should make the property notation something you have to define locally. Whereas the tags, the hashtags, you can add them to any object anywhere. You can add them dynamically.
@@ -1026,3 +1032,1092 @@ So I was trying to think of examples. So one example would be like, if you wante
 But I guess one case I was thinking about where it could be useful, to modify instead of output, is if you’re in this complex structure of all these different behaviors, and there’s one module inside this giant spaghetti of structures, and this module calculates this important number that’s used by a bunch of different modules inside this giant structure. So basically what it would look like is, maybe this module is called “foo”, and “foo” calculates this number “bar”, and inside this module “foo” you basically say “Bob’s color is bar”, “Alice’s car is bar”, “Joe’s food is bar”, and you basically take a bunch of these objects throughout the structure, and bind them to bar.
 
 But there's another way you can do this, using the current model. In the topmost scope, you set bar equal to foo’s output, and then inside the scope of Bob and Joe and Alice, you can just use “bar”, because “bar” is now inside the outermost scope. So it feels like it could be resolved with just like, a scope inversion, but...I dunno.
+
+
+--------------------------------- End of Audio Notes (Transcribed) ------------------------------
+
+
+### Examples of Indirect Binding?
+
+In the audio we talked a lot about dynamic property modification aka indirect bindings
+where we would want to use one structure to construct/modify the bindings of another module
+but any examples where we would actually want this?
+
+maybe something like
+
+first part {
+	a[bla] = b
+	...
+}
+second part {
+	b[bla] = d
+	...
+}
+
+
+### State Variables vs Imperative Variables
+
+hmm state variables are very similar to normal imperative
+
+state variables:
+
+	scope:
+		foo.
+		x: // can modify stateVar anywhere in "scope"
+			foo := 10
+		modifyVar(foo) // can also call function and modify state var inside
+
+javascript:
+	
+	function scope () {
+		var foo
+		function () { // can modify stateVar anywhere in this scope
+			foo = 10
+		}
+		modifyVar(foo) // can also call function and modify state var inside
+	}
+
+
+
+earlier, we talked about how tags are like state variables
+	// TODO: this^^^ is referring to our audio notes (transcribed), after I re-organize those notes, update this with a proper section reference
+and also why tagging (and dynamic modification) should be restricted to local scope, like state variables
+we also started exploring the differences between state variables and javascript variables
+after all, with javascript variables, you also declare them in a scope, and use them in the scope
+maybe the difference is that in javascript variables, you can still modify that variable anywhere, if you pass it around
+
+actually, it seems like you can do something similar for state variables as well
+
+	foo:
+		bar:
+			stateVar.
+		zed:
+			x: foo.bar.stateVar
+			x := 10
+
+but recall that hierarchal scope is just an approximation
+
+for local variables, it seems like you can "extend" them out the scope by passing the private key to a different scope
+
+but what does this mean for encapsulation?
+
+
+also, maybe tags and state variables and hashsets are all the same thing, all based on the versioning/implicit index concept, and you just need to declare the type at the beginning to determine how it behaves
+if its state variable, then it treats each entry as an ordered version
+if its tags, then it treats each entry as a different set item
+
+### Imperative Variable Modification - by reference vs by value
+
+anytime you have a variable, modifying the variable can mean two things
+	1. modifying the reference/pointer
+	2. modifying the value
+note that the second option will modify the value seen by all variables referencing that value, whereas the first option will only modify the variable in question
+
+C++ makes it so that for any pointer, you can modify both the pointer value, or the value at the pointer
+but it gets complicated because you have to constantly keep in mind whether or not you want to modify the pointer or value
+
+java/javascript makes it simple
+by default, everything is a reference
+if you want to modify a "value", you wrap it in an object, or use the object's internal methods
+
+### Datastores
+
+we can liken state variables to the Solid/Inrupt datastores model
+in fact, **we're going to call state variables "datastores" now, for conciseness**
+you "set" a new value to the datastore (like adding a new state to a state variable), and all the dependencies are updated
+in addition, scope doesn't matter
+	remember, scope is just an approximation, a system for modeling tree-like structures
+	but you should be able to modify a datastore from anywhere, not just restricted to tree-like structures
+note the difference between modifying a regular variable, and modifying a state variable (aka pushing a new state)
+
+	x: 10, y. := 10 // a regular variable and a state variable
+	moduleA:
+		myX: x
+		myY: y
+	moduleB:
+		myX: x
+		myY: y
+		for cick in mouseClicks:
+			myX := 20 // modifies the reference, won't affect moduleA
+			myY := 20 // modifies the value, will affect moduleA
+
+I guess you can think of the `y. := 10` declaration as `y: (0: 10)`
+so instead of creating a direct reference, you wrap the value in an object
+so that anytime you modify the value, all references to the wrapper object see the change
+
+it's a little weird for `x` though
+should we allow references to change like that?
+to "change a reference", we are actually modifying the outer object
+so in this case, we are actually modifying `moduleB`
+it's equivalent to something like `moduleB := moduleB(myX: 20)`
+
+it doesn't really feel right though
+means that `:=` will modify different things depending on if its a datastore or not
+	1. if it's a datastore, reaches inside the variable and adds a revision
+	2. if it's not a datastore, modifies the containing module, adding a state
+
+I think we should restrict data modifications to datastores
+so if you want to be able to modify a variable, you have to declare it as a datastore
+otherwise, it's a static reference
+
+regular variables are defined by relationships, eg `x: a+b`
+datastores are defined by a sequence of modifications, like datastores
+
+i guess the reason why it seems like we can merge regular variables and datastores
+is because regular variables can be viewed as just datastores with just one state
+as long as you don't modify it, it acts like a regular variable
+
+
+notice that the way datastores work, is when you modify them, everything using that datastore sees the change
+it's the opposite of Java/javascript, where when you reassign a variable, it just moves the reference
+so it seems like datastores are like a "value modification" system
+opposite of Java/JS, which uses a "reference reassignment" system
+
+so if you wanted to do reference reassignment, you have to modify the value of the containing object
+in Java, to do modification you reach inside an object, whereas in Arcana to do reassignment you reach outside an object
+
+so let's try some typical javascript/java examples and see what happens:
+
+	keytracker.
+	lastPressed.
+	onKeyPress: key >> // this is how I'm declaring inputs for now
+		keytracker[key]++
+		lastPressed := key
+
+that seems to work as expected...like how Java/Javscript would work as well
+what about adding/modifying properties?
+
+	foo.bar := 10
+
+hmm this would probably work the same as well...
+how are these JS/Java examples working if Arcana uses modification instead of reassignment?
+
+I think the difference comes about in an example like this:
+
+	lastPressed.
+	lastPressed2: lastPressed
+	player1Input: key >>
+		lastPressed := key
+	player2Input: key >>
+		lastPressed2 := key
+
+there are a few things we can observe from this
+first, let's assume that, in the beginning only player1 presses a few keys, after which player2 presses a key
+in the beginning, when player1 is pressing keys, `lastPressed` will change
+	and `lastPressed2` will mirror that change
+		this is value modification behavior, and behaves differently from the Javascript equivalent, where `lastPressed2` would not change
+however, once player2 presses a key, `lastPressed2` will stop mirroring `lastPressed`, and will now be assigned to `key`
+	this is more like reference reassignment, and behaves the same as the Javascript equivalent
+
+to be clear, this is what I'm referring to as the javascript equivalent
+
+	lastPressed = null
+	lastPressed2 = lastPressed
+	player1Input = key =>
+		lastPressed = key
+	player2Input = key =>
+		lastPressed2 = key
+
+these observations reminded me of an important rule: data binding should act the same as continuous re-evaluation
+if we add a revision to `lastPressed`, that doesn't change the binding of `lastPressed2`
+remember that revisions are persistent too, so if we add a revision, and re-evaluate the whole thing, `lastPressed2` will reflect the revised value of `lastPressed`
+however, when we add a revision to `lastPressed2`, it doesn't point to `lastPressed` anymore
+
+this shows that, state variables don't really work via "modification" or "reassignment"
+it depends on what your variable is bound to
+`lastPressed2` is bound to `lastPressed`, so changing `lastPressed` will change `lastPressed2`
+but changing `lastPressed2` won't change `lastPressed`
+
+compare this to javascript, where reassigning either `lastPressed` or `lastPressed2` won't affect the other variable
+
+### Defining How State Variable Work
+
+* every variable is a state variable, a datastore, a node in a graph
+* variables are declared using `:`, and given an initial value
+* when you use the modify operator, `:=`, you add a revision to the variable
+* any variable that references that variable, will see the updated binding
+
+* remember that `:` and `:=` define bindings, continuous evaluations
+* the LHS (left-hand side) contains a variable, the RHS (right-hand side) contains an expression
+* the binding will continuously evaluate the expression, getting the current value of each variable in that expression
+* the result of the evaluation is given to the LHS variable
+
+* notice the distinction between updating a value and updating a binding
+* bindings are continuously evaluated, updating the value of the LHS variable
+* the modify operator, `:=`, is for modifying a binding with a new binding
+
+### Comparison with Imperative Re-Assignment
+
+in imperative languages, assignment works a little differently
+instead of creating a binding, with continuous evaluation, an assignment is a single evaluation
+it retrieves the current value of the RHS expression, but does not check for updates
+
+if we look at the Arcana example below:
+
+	lastPressed: undefined
+	lastPressed2: lastPressed
+	player1Input: key >>       // event listener
+		lastPressed := key
+	player2Input: key >>       // event listener
+		lastPressed2 := key
+
+if `player1Input` is triggered, then both `lastPressed` and `lastPRessed2` are updated
+`lastPressed2` is "bound" to `lastPressed`, almost like it has a reference to it (in imperative terms)
+`lastPressed2: lastPressed` binds `lastPressed2` to a reference of `lastPressed`
+changing `lastPressed` will change `lastPressed2`
+but changing `lastPressed2` won't change `lastPressed`
+
+on the other hand, take a look at the Javascript equivalent:
+
+	lastPressed = null
+	lastPressed2 = lastPressed
+	player1Input = key =>       // event listener
+		lastPressed = key
+	player2Input = key =>       // event listener
+		lastPressed2 = key
+
+the `lastPressed2 = lastPressed` is an assignment, and extracts the value of `lastPressed` and gives it to `lastPressed2`
+unlike the Arcana version, in the Javascript version, the reference to `lastPressed` is not preserved
+if `player1Input` is triggered, only `lastPressed` is updated
+and changing either `lastPressed` or `lastPressed2` won't affect the other variable
+
+
+actually, I think the main reason for these differences is because, in javascript, when you do something like `foo = 10, bar = f00`,
+you are making `bar` point to the value of `foo`, not `foo` itself
+this makes it so the example is equivalent to `foo = 10, bar = 10`
+`foo` and `bar` point to the same thing
+
+for state variables, on the other hand, if you had `foo: 10, bar: foo`, `bar` actually points to `foo`
+goes back to the "alias" pointers idea
+it doesn't "evaluate" the value of `foo` and make `bar` point to the same value
+it just makes `bar` point to `foo`
+
+this is why, in javascript, if you change `foo`, it doesn't affect `bar`, whereas with state variables it does
+this is also why, with state variables, the order in which you bind variables matters
+eg `foo: 10, bar: foo` is different from `bar: 10, foo: bar`
+whereas in javascript, `foo = 10, bar = foo` is the same as `bar = 10, foo = bar`
+
+### State Variables - Manual Ordering
+
+we talked about earlier how, in regards to updating a state variable, working with the `index` property feels a bit too low-level
+	// TODO: this^^^ is referring to our audio notes (transcribed), after I re-organize those notes, update this with a proper section reference
+the `index` property is part of the internal mechanics of state variables
+shouldn't be exposed to the user
+
+instead, we can define the "revision order" of a state variable in a different way
+just create a list of your revisions, with the order you want
+	using `push` and `shift` and other list operations
+then do a for-loop on that list, applying each revision to the state variable
+internally, the for-loop will transfer the indices of the list ordering to the state variable
+
+this is sort of like how Java/Javascript avoids the complications of pointers
+	where, instead of making the programmer deal with pointers and other "internals", they define some high-level rules about references, and if you want to work around it, you have to use high-level structures, wrappers
+	eg if you want to allow multiple functions to modify a shared value, you pass around a wrapper, `foo = { bar: null }`
+	and each object goes into the wrapper to modify the value, eg `foo.bar = 10`
+instead of hacking internals, we leverage an existing structure
+instead of modifying the internal index property, the programmer creates a high level list structure that explicitly defines the order
+
+### Local vs Private
+
+note that with our current model, even though we have local properties, we still don't have private properties
+
+	foo:
+		bar.
+		[bar]: 10
+
+even though `[bar]` doesn't show up when you do `foo.allProperties`, you can still do `foo[foo.bar]`
+and `foo.bar` shows up under all properties
+
+but if we think about modules like private modules in Cono, then there is definitely information that you want to keep private
+
+the way local properties worked was that, because objects are given a unique id (kinda like a memory address), we use that unique id as a key
+and the interpreter knows to hide it from the `allProperties` property
+
+but if the unique id is just some random number, how would the interpreter know that it's supposed to hide it?
+as opposed to like, a normal property like `foo(10: "hello")`?
+
+perhaps the way it works is that, properties that have strings/numbers as indices are visible in `allProperties`
+but object keys are treated in a special fashion
+it's not the same as a numerical key
+
+thus, to create a private property, we can just use an anonymous object as a key, something like `[()]: 10`
+this wouldn't be visible from the outside
+however, this isn't accessible from the inside either, making it useless
+
+maybe we should use some notation for private variables, like `$foo: 10`, which basically creates an object with an anonymous object as a key
+within the same scope of `$foo`, we can use `foo` to reference the local/private variable
+note that this requires changing the way references work a bit, because before, `foo` is the same as `["foo"]`, but clearly that won't work for private variables
+
+
+what about modifying state variables? where can you modify them? where can't you?
+if we think about datastores, if Bob owns a datastore, it's weird for anybody to be able to modify it
+instead, you should either access it by API (and Bob has to accept your modifications), like state variables
+or maybe if you have a special key, then your allowed to modify it, like local variables
+
+
+can we use local properties instead of `_return` for functions?
+
+
+how do state variable work with private/local properties?
+
+### Arcana is now Entangle
+
+* Arcana is now called Entangle!
+* "Entangle" both captures the mystical vibe of "Arcana", and also the data binding features of the language
+* last name change I promise
+
+
+### Function Scopes Mechanics Brainstorm
+
+state variables and functions that modify state?
+
+whats the scope inside a function? what takes precedence? is it the source scope? or the target scope?
+for reference:
+
+	// source scope
+	myFn: x y >>
+		z: 10
+		=>
+			foo: x+y+z // target scope
+
+scopes is approximation
+that means
+anything achievable through scopes has to be achievable through other means
+so what does that imply in this case...?
+
+### Modifying State Variables Outside of Declaration Scope
+
+note that our rules for state variables
+actually make it impossible to modify state variables outside it's declaration scope
+even if it's "passed around"
+because when you're passing in the state variable into other modules, you're just defining an alias for the state variable
+and you will just be modifying an alias of the state variable
+
+	foo:
+		stateVar.
+	bar:
+		increment(input: stateVar) // notice that you are creating an alias to stateVar, so the alias will be incremented, not stateVar
+
+### Shared Variables and Scopes
+
+so how do we make "shared" datastores?
+Bob has his scope, Joe has his scope
+Bob and Joe are both part of the dance club
+we want a variable that Bob or Joe can modify
+
+tagging?
+
+we talked about how tags are like hashsets
+in fact, we can model "shared" scopes using hashsets as well
+just create a "Group" with Joe and Bob inside
+and then create the datastore in the group
+and this is just like tagging Joe and Bob with some "#danceClub" tag
+
+however, it's not quite the same as what we were trying to achieve
+see the example code below:
+
+	People: // a set of people
+		Joe: (name: "Joe")
+		Bob: (name: "Bob")
+		Alice: (name: "Alice")
+	DanceClub:
+		songRequests.
+		members: People.Joe, People.Bob
+
+how do we give Joe and Bob the ability to modify songRequests?
+maybe a module that we attach to Joe and Bob, that is within the DanceClub scope?
+
+
+we want the behavior and properties of things to be context dependent
+eg, if we are in the DanceClub context, and we ask for Joe's ID, we are probably asking for his member ID
+whereas, if we are in the context of, say, a nightclub, and we ask for Joe's ID, then we are probably asking for his state-issued ID
+this is beginning to look like tags
+
+groups and permissions are a hierarchal structure, DAG (because doesn't make sense to have cycles)
+whereas the core of our language is based on relationships, so it can have cycles
+
+this implies that permissions/groups are a system we have to build on top of the base language
+kinda like functions, or a type system
+
+however, it will affect tagging and our concept of scopes
+
+### Shared Scopes and Indirect Bindings / Submodules
+
+maybe we can make an indirect binding, create a property/submodule of Joe inside DanceClub's scope
+that way, the submodule has access to DanceClub's scope, and the internals are dictated by DanceClub
+but Joe can still access the external api of the submodule, and clone/use/access it however he wishes
+something like:
+
+	DanceClub:
+		songRequests.
+		People.Joe
+			#requestSong: song >>
+				songRequests += song
+
+the `#requestSong` action is defined inside `DanceClub`, so `DanceClub` has the power to allow certain users to request songs
+hmm, but what if we wanted to request `songRequests` from the scope of `Joe`?
+	notice how currently, it's still private to `DanceClub`
+after all, `Joe` is a member, so he should be able to see it from his own scope
+but we don't want non-members to be able to see it
+
+another example, is if `Joe` is part of a bunch of clubs, each with a different member id assigned to him,
+and we want a private `Joe.allMemberIds`, so that Joe can get a list of all his member ids
+if we did something like
+
+	DanceClub
+		People.Joe (#memberId: 145131)
+	MusicClub
+		People.Joe (#memberId: 194)
+	SoccerClub
+		People.Joe (#memberId: 49110)
+
+the benefit to declaring them in the scope of each club, is that the `memberId` properties don't collide
+the downside is that `Joe` can't see them, so `Joe` would not be able to create the property `Joe.allMemberIds`
+
+also, we mentioned earlier that groups and permissions are DAG structures, so they don't really fit in with the general object model
+however, if we think about it in terms of context, it kind of makes sense
+for example, if we just did `Bob.memberId` from some random context, it doesn't make sense
+it only makes sense if you ask for `Bob.memberId` from the context of a club, like the dance club or the music club (which will each give a different member ID)
+your context determines what information is available to you
+
+another example:
+
+	President.secretLaunchCode = 134829
+	randomCitizen.secretLaunchCode = undefined
+
+however, you could still do something like
+
+	randomCitizen.myPresident.secretLaunchCode
+
+### Secret Keys
+
+maybe just use secret keys to hide properties, eg `President[secretLaunchCode]`
+you can pass the secret key around
+we can extend the `#` local variable notation, eg `Bob.DanceClub#memberId`
+
+in fact, maybe you can even use yourself as the key, eg `DanceClub[Bob]`, and it returns everything in the Dance Club pertaining to `Bob`
+though what if Joe has access to `Bob`, and does `DanceClub[Joe.Bob]`...
+
+we have two options
+make data private, or make properties/references private
+to make data private, we would keep a list of authorized users with every piece of data, and anytime you try to access the data, it cross-checks against that list
+to make references private, we can either
+	keep a list of authorized users with every reference/property, and when you try to access the property, it cross-checks against the list
+	use objects as private keys
+
+I think it's better to make references private
+that way, we can have cases where, Bob might not be able to access "secretValue" through one route, but could access it through a different route
+	like if Bob didn't have `secretKey` so he can't do `Bob[secretKey]`, however, he has access to Joe, who has direct access, so he can do `Bob.friendJoe.secretValue`
+
+maybe the `#` local variable notation is shorthand for a system for checking if the current scope has access to the secret key
+	eg if Bob does `DanceClub#memberId`, it checks if `Bob` has access to Dance Club
+
+maybe we can actually just use `.` for everything
+don't differentiate between local and public variables
+all based on access permissions
+when somebody tries to access `DanceClub.memberId`, it checks if they have access to that key
+
+though recall the reason why we made the distinction between local and public properties in the first place
+	talked about in the previous section "Global Symbols II"
+it starts getting messy if we treat `foo.bar` as `foo[bar]`
+because `foo.bar` is commonly thought of as a way of accessing the property `foo["bar"]`, but if we happen to declare a local property `bar`, it uses that as the key, which is counter-intuitive
+example:
+
+    foo
+        bar: 10
+    zed
+        bar: 20
+        x: foo.bar + bar
+
+the `x: foo.bar + bar` will actualy turn into `x: foo[bar] + bar` => `x: foo[20] + 20` => `x: undefined + 20`, which is really counter-intuitive
+
+though it seems like this is more a matter of local properties
+but in terms of private vs public, we can still use `.` for both, and check access
+for example, you declare `memberId` as a secret key inside DanceClub
+and pass that secret key to club members, like Joe
+and if Joe asks for `DanceClub.memberId`, then because he has access to `memberId`, then he can access `DanceClub.memberId`
+
+though this is still to vague and general
+how do we "pass around" the secret key?
+is "access" the same as just being able to traverse the graph to get to it?
+	eg, for `foo: (bar: ()), zed: (secretKey: 10)`, do we say `zed` has access to `secretKey` but not `bar`?
+
+### Separating Referencing and Scoping
+
+references and scope are actually distinct things, even in javascript
+
+	foo: 10
+	bar: foo // this creates a reference/property
+	zed:
+		inner: // this creates reference, and also leverages scoping
+			x: foo+1
+
+we can already easily make references without scope
+just declare everything at root level
+once we start nesting object definitions inside other object definitions, we start introducing the idea of scope
+
+now what we want is scoping without creating (public) references
+have `DanceClub.members` visible to `Joe` and `Bob` (aka in their scope), but not accessible publicly
+this is useful even when we don't want a "shared" private variable, and just want a local private variable
+
+what we basically want, is a way to "redefine" an object within another scope
+this is easy to see in diagram syntax:
+
+	 _________
+	|         |
+	| A    ___|_____
+	|_____|_x_|     |
+	      |       B |
+	      |_________|
+
+object `x` can see an interact with both scopes `A` and `B`
+typed syntax is harder
+we might have to do some sorta double definition, something like
+
+	A:
+		#x:
+			// can access scope A and scope B
+			foo: A.length + B.length
+	B:
+		#x:
+			// can access scope A and scope B
+			foo: A.length + B.length
+
+when "redefining" an object, maybe we should keep each definition separate
+because different scopes might use the same variable names
+you can run into stuff like:
+
+	DanceClub:
+		members: ...
+		Joe:
+			clubMates1: members // this should reference DanceCLub.members
+	FilmClub:
+		members: ...
+		Joe: // separate definition
+			clubMates2: members // this should reference FilmClub.membmers
+
+in addition, if we have separate scopes for each definition, should we allow name collisions
+for example:
+
+	DanceClub:
+		Joe:
+			memberId: 13543
+	FilmClub:
+		Joe: // separate definition
+			memberId: 8591
+
+but then, if we use `Joe.memberId` in some outside scope, which definition should it pull from?
+
+
+maybe a single definition, but you have to be explicit when using variables from multiple scopes
+
+	DanceClub:
+		members: ...
+		Joe:
+			clubMates1: DanceClub.members
+			clubMates2: FilmClub.members
+	FilmClub:
+		members: ...
+		Joe: // cloned definition
+			clubMates1: DanceClub.members
+			clubMates2: FilmClub.members
+
+note that the IDE will automatically duplicate the definition when you "expand" the definition of `Joe` in `FilmClub`
+in addition, the IDE will truncate references depending on the scope
+
+	DanceClub:
+		members: ...
+		Joe:
+			clubMates1: members // truncated by IDE
+			clubMates2: FilmClub.members
+	FilmClub:
+		members: ...
+		Joe: // cloned definition
+			clubMates1: DanceClub.members
+			clubMates2: members // truncated by IDE
+
+
+
+note that, now that we are allowing scopes to intersect and such, it's no longer a hierarchal tree model
+scopes can now represent a DAG, and maybe even a cyclic graph (though cycles wouldn't be very useful)
+scopes would not be just an approximation anymore!
+but rather, a way of defining private scopes
+
+
+one problem is that, code can get too long
+maybe we can use satellites
+
+	Joe:
+		favoriteSong: poopityScoop
+		danceClubMembers: #DanceClub.clubMates
+	DanceClub:
+		members: ...
+		songRequests.
+		#Joe
+			clubMates: members
+			songRequests += parent.favoriteSong // "parent" refers to Joe
+	FilmClub:
+		members: ...
+		#Joe
+			clubMates: members
+
+this takes care of quite a few of our problems
+we define a main controller, in this case `Joe`
+and then in the auxilliary contexts, we define new objects, and use `parent` to interact with the main controller
+note that we are leveraging feedback, because we can access the satellites from the main controller, and also the main controller from the satellites
+we also don't have name collision to worry about
+we also don't have to worry about scope precedence, because the satellites only use the surrounding scope, and have to use `parent` to interact with the main controller
+this also doesn't require much extra features in our language????
+
+
+maybe we can use something like imports
+
+	Joe:
+		import DanceClub as danceClub
+		import FilmClub as filmClub
+		clubMates1: danceClub.members
+		clubMates2: filmClub.members
+
+though in DanceClub and FilmClub they'd have to specify that "Joe" is authorized to access their data...
+
+### Input Order and Default Inputs
+
+in earlier sections, we talk about input order and default inputs
+	see section "Implicit Inputs and Default Values"
+sometimes we want to have "inputs with default values"
+	aka a variable with a value, but also declared as an input, so it is included when mapping anonymous arguments
+we can do it like so:
+
+	callFunction(a b c >> c: 10 => a+b+c)
+
+however, it's a little uglier than the javascript method, `callFunction((a, b, c = 10) => a+b+c)`
+
+so maybe we can copy javascript and allow default values in the input order declaration
+
+	a, b, c: a+b >> d: a*b*c => d*d
+
+we also noted that it's still a little ugly, because now we can have properties on both sides of the input order operator
+
+maybe we can make implicit inputs include defined properties
+aka, implicit argument mapping applies to bound variables, and not just unbound variables
+aka, the implicit input order is just the order in which new symbols appear in the scope (both bound and unbound)
+so if you had
+
+	foo:
+		a, b, c: 10, d
+	bar: foo(10, 20, 30, 40)
+
+then the mapping makes `bar` equivalent to `foo(a: 10, b: 20, c: 30, d: 40)`
+notice how `c` got included in the mapping, even though it's a bound variable
+
+if you want `d` to be mapped after `b` (like it would be if we only mapped unbound variables), we can simply do
+
+	foo:
+		a, b, d, c: 10
+	bar: foo(10, 20, 30, 40)
+
+if you want to change the order that variables are declared, without changing the mapping order, then you have to implicitly declare mapping order
+
+	foo: a b c d >>
+		a, b, c: 10, d
+	bar: foo(10, 20, 30, 40)
+
+it might seem like we have the same problem, because there's still those possibly-redundant `c` and `c: 10` declarations that could possibly be grouped into one declaration
+however, the ugliness is really only a problem when declaring inline functions
+but now, we can just mix inputs and inputs-with-default-values when declaring inline functions, to declare input order without redundancy
+eg: `foo( (a, b, c:10, d => a+b+c+d) )`
+helps for simple functions with default values
+	where we can leverage list values without worry
+anytime you need more complexity, explicitly declare input order
+	eg when you want a function-list combo (so you can't leverage list values for input order anymore)
+also when you want to modify/extend an object, and explicitly declare the new input order
+
+note that this method tacks on a bunch of arguments at the end, that weren't being included earlier
+eg `myFn: (a, b, sum: a+b, diff: a-b => sum*diff)`, the inputs are actually `a, b, sum, diff` instead of just `a, b` (like it was before)
+i don't think this is a problem
+we don't have currying, and the input order is still static
+we can just call `myFn(2, 3)` and ignore the last two inputs
+we don't have currying, so we don't have to worry about cases like `x: myFn(2,3)` resulting in an unintended function because not all arguments were passed in
+input order is static, so we don't have to worry about `myFn` changing and inputs appearing/disappearing, changing the input mapping of `myFn(2,3)`
+
+in addition, note that there's actually pretty much no issue with using list items as a way to implicitly declare input order
+because there's not really any reason to use a function as a list, or vice versa
+
+### Input Order and Default Inputs II
+
+(continued from section "Input Order and Default Inputs")
+
+we seem to always run into problems when things have default values
+so now that we've decided that default values are a crucial part of a prototypal language, we should design our language as if everything has a default value
+
+we can think of input order declaration as just an internal property `_input_order` at the beginning of the object, and implicit inputs takes care of the rest
+	we talked about this in the previous section "Declaring Input Order Using a Property"
+so let's look at an example like this:
+
+    bar:
+        _input_order: a, b, c: 10, d
+        x: a+b+c+d
+
+if implicit inputs doesn't factor in bound variables, then it will not factor in properties declared under `_input_order`, in this case `c: 10`
+likewise, if implicit inputs does factor in bound variables, then `c: 10` will be factored in
+thus, it follows that:
+
+1. if input declaration (`>>`) allows default values, then we must factor in the order of bound variables
+2. if input declaration doesn't allow default values, then we must only allow unbound variables
+
+however, don't forget that this is only if we want our input declaration rules to be derived from the `_input_order` property and implicit input rules
+we can define special rules for input declaration if we want
+
+
+allowing default inputs makes it ambiguous
+makes input order declaration achieve two purposes
+	declaring inputs and assiging values to those inputs
+also, it's uglier because if you want to declare properties in input declaration, you have to wrap it in parenthesis
+
+but if we don't allow bound variables in input declaration, then it makes inline functions uglier
+
+
+maybe we can do both
+we don't allow default values in the input declaration, but we factor in bound variables in implicit input order
+this means that we can't think of input declaration as just an internal property `_input_order` with implicit inputs applied
+	we have to make a special rule banning properties from being declared in `_input_order`
+but it will prevent input declaration from achiving two purposes, while at the same time making inline functions cleaner
+	because we can now declare inline functions like `myFn: (a, b, c: 10 => a+b+c)`, leveraging list items and implicit inputs so we don't need to explicitly declare inputs
+
+
+if we include bound variables
+then if we have something like
+
+	foo:
+		c: a+b
+
+then c will appear before a and b!
+which is weird
+
+so maybe we shouldn't allow bound variables
+or instead, maybe we append bound variables to the end
+remember, it's ok that we tack on a bunch of extra arguments on the end
+	talked about in the previous section "Input Order and Default Inputs"
+
+
+### Input Order Syntax and Mechanics Brainstorm
+
+* continued from earlier section "Function Syntax - Return vs Arrow, Input Order"
+
+do we need `>> =>` ever? (aka a function with input order, but no function body)
+	it looks very ugly
+	if we never combine functions and lists, then we can always leverage lists to declare input order in functions...
+
+so whats the point of `>>` and input declaration? can we get rid of it
+
+what happens if you do inline `fn(a b >> a+b)`
+what does that even mean
+a list of one item that you can clone?
+the difference between
+	1. `a b >> x: a+b`
+	2. `a b => (x: a+b)`
+is you can clone the first one multiple times, and modify `a` and `b` multiple times
+
+when cloning, if we provide arguments, should they be removed from the input list, for future clones?
+that way you can do builder pattern
+
+
+### State Variables and Indirect Modification
+
+(continued from "Modifying State Variables Outside of Declaration Scope")
+
+in the previous section "Modifying State Variables Outside of Declaration Scope",
+	we mentioned how it is impossible to modify a state variable outside declaration scope
+this is because if we try to pass around the state variable, we will need to create an alias, and modifying the alias won't affect the original state variable
+but what if we do something like
+
+	foo:
+		stateVar.
+	bar:
+		increment(input: foo) // pass in the *parent* of stateVar
+	increment: input >>
+		input.stateVar += 1 // extract stateVar, and modify it
+
+I call this "indirect modification", because we are modifying the state variable outside of its declaration scope
+this is kinda how javascript/java does pass-by-reference style reassignment:
+
+	function increment(wrapper) {
+		wrapper.val += 1
+	}
+	main() {
+		var x
+		increment({val: x})
+		print(x)
+	}
+
+however, should we allow this sort of indirect modification?
+if we only allow it to be modified directly
+and not through something like
+
+	foo.bar := 10
+
+then state variables become something that you can read, but not write, if you are outside the scope
+because even if you try to do something like this:
+
+	x: foo.bar
+	x := 10
+
+note that that doesn't actually modify `foo.bar`, it modifies `x` (the alias)
+whereas, if we do allow indirect modification
+then every variable you can read, you can also write to
+
+### State Variables - Mechanics and Persistence
+
+recall that, state variables use flag-watcher module
+if you create a pubic state variable
+every time a new module is added to the public system
+the state variable has to look through the module to see if it references it at all
+so it can monitor for flags
+this seems really slow and inefficient
+
+state variables and permanent data
+what if we have a word document (represented internally using a state variable)
+Bob and Alice and making modifications
+then Bob goes offline
+wouldn't all his edits disappear?
+
+let's say, every time Bob and Alice click their mouse, it increments a mouseclick
+
+	counter: Bob.mouseclicks.length + Alice.mouseclicks.length
+
+notice that, when Bob "disconnects", the input data representing `Bob` becomes `undefined`
+so `counter` will change
+
+seems like eventlists can't help us here
+maybe we do need some concept of persistent state/data
+
+or maybe we can somehow integrate the concept of "offline" or "disconnection" into our code
+something like
+
+	if (Bob)
+		counter: Bob.mouseclicks.length + Alice.mouseclicks.length
+	else
+		counter: counter
+
+this is pretty much just feedback, sequential logic, verilog style code though
+uglyyy
+
+maybe we should make events persistent and independent
+once an event is registered, you can't take it back
+it is already part of the timeline of the universe
+if Bob's mouse gets disconnected, his computer still keeps track of the history of mouseclicks
+likewise, if Bob or Alice go offline, the document still keeps a record of the modifications
+
+most of the time we can save storage space by converting these persistent event lists into state-based logic
+for example, for `counter: Bob.mouseclicks`, instead of keeping a persistent event store of Bob's mouseclicks,
+	we can just increment the counter on each mouseclick, and forget about the event
+however, if the programmer adds in a mechanism for modifying this history list, eg
+
+	for keypress
+		mouseclicks :=
+			remove.(first) // remove first mouseclick event
+
+then we have to use a persistent event list, and can't optimize it away
+
+maybe the idea of persistent event lists is, when you create a modification or add an event, you add an event to the "global timeline"
+this global timeline is separate from any object
+so when you "click" a mouse, the "mouseclicks" events are saved into the global timeline, not the mouse object
+that way, if the mouse is disconnected, the mouseclick events aren't effected
+
+however, this shouldn't happen for all state variables
+if you do something like, `for item in list: counter++`, then if the list changes, the counter should reflect the new list
+the `counter` shouldn't be permament
+
+notice that, for stuff like:
+
+	for mouseclicks:
+		counter := counter+1
+
+the new revision is dependent on the old revision
+this is like how sequential logic, and D-flip-flops, use feedback to preserve state
+so perhaps this is how we determine whether or not to save to the "global timeline", and make data persistent and independent
+
+but we still have the `mouseclicks` variable in the example above
+so if `mouseclicks` was bound to `mouse`, then if `mouse` gets disconnected, the `for` loops dissappears and `counter` will be `0`
+thus, the `mouseclicks` variable still has to be independent somehow, perhaps tied to the global timeline
+
+
+### Shared Scopes and Combinatorics
+
+the idea of private variables is an important one
+it's basically the idea that, depending on their perspective and context, an object will have different properties
+so, a car might look different from a user's perspective vs a car mechanic's perspective
+likewise, a club member will see more information about a club, then a non-club member
+
+this is sort of like tagging and local variables
+in a BFS search, the BFS scope can see the `#visited` tag on each object, but nobody else can see it
+
+
+earlier we talked about creating shared (kinda) scopes using indirect submodules
+	in the section "Shared Scopes and Indirect Bindings / Submodules"
+and in the example we used, we created a shared scope between `DanceClub` and `Joe` by creating a submodule of `Joe` inside the scope of `DanceClub`, an indirect submodule
+
+but imagine if we had 3 people, Alice, Bob, and Cathy
+and they all want to share variables between eachother
+we would need 6 scopes total: Alice, Bob, Cathy, Alice+Bob, Alice+Cathy, Bob+Cathy, Alice+Bob+Cathy
+grows exponentially
+feels ugly
+
+though you can't get around the fact that there are 6 different combinations of people
+and for every piece of data, you have to specify somehow which of these 6 groups it is visible too
+but indirect submodules forces you to access the data through each of these subgroups
+instead of `Car.color`, you would have to do `Car.AliceCathy.color` (if `color` was a property only visible to `Alice` and `Cathy`)
+
+if I was a developer and a club member, I'd want to be able to see both the normal club properties, the developer club properties, and the member club properties
+all in the same scope, without going through indirect submodules
+or maybe not...?
+maybe it would be cleaner to access developer properties through `club.developer.properties`, and member properties through `club.member.properties`
+it's a bit more explicit, which might be better from a programmer standpoint
+and it also prevents name collisions between different scopes
+but it might be uglier from a user standpoint
+who shouldn't have to access these properties indirectly
+
+### The Intuition Behind Shared Scopes
+
+what would it ideally look like from a user interface perspective
+for example, if we had a webpage displaying all the club information
+
+	clubInfo:
+		clubName: "Dance Club"
+		clubRoom: "103G"
+
+		if (member):
+			clubMembers: Bob, Joe, Mary, ...
+			emailList: ...
+
+the webpage should change depending on who is looking at it
+and it doesn't really need "submodules" does it? could just be a single list of all the information
+aka the list of properties that the user is meant to see
+but do we have to worry about collisions?
+
+
+if we go back to thinking in terms of a programming perspective
+I think it actually makes sense to segregate shared variables to a separate, shared scope/submodule
+even though you have to access them indirectly, eg `Car.AliceCathy.color`
+note that because these submodules are all attached at the base level, and not like some tree structure,
+	it's actually less of a hierarchal model and more of a graph model
+as in, this would be a hierarchal model
+	
+	Alice
+		AliceBob
+			AliceBobCathy
+		AliceCathy
+	Bob
+		BobCathy
+	Cathy
+
+and the graph model (which is created by our indirect submodules) looks more like
+
+	Alice
+		AliceBob, AliceCathy, AliceBobCathy
+	Bob
+		AliceBob, BobCathy, AliceBobCathy
+	Cathy
+		AliceCathy, BobCathy, AliceBobCathy
+
+you can see how the indirect submodules forms like a graph
+which is good because hierarchal structures are approximations, and thus can get ugly, so they should be avoided
+
+in addition, we can make it feel more dynamic and intuitive
+by making it so the IDE will dynamically display what indirect submodules are available from a given scope
+so if you are inside `Alice`
+it will show the indirect submodules `AliceBob`, `AliceCathy`, and `AliceBobCathy` are available
+even though these submodules are declared outside of `Alice`
+
+### Public vs Private - Graph Representation
+
+so since we don't want to restrict the idea of "private" to hierarchal scoping
+it kinda makese sense to make these special "private" references
+because we can now imagine a graph, where some edges are solid, and some edges are dashed
+and you can imagine entire sections that are only accessible through dashed lines
+that would represent a private scope
+and if somebody creates a solid edge to the section, then that entire section is now accessible, public
+that's like somebody being in a private group and then letting people access his account publicly, posting his account credentials publicly
+
+### How do we Make Secrey Keys?
+
+(continued from "Public vs Private - Graph Representation")
+
+something still feels off though
+these "dashed" lines are basically references where the keys are objects
+so they are "hidden" from public view
+but we still need to "hide" these keys
+the user has to have access to the keys, but the public shouldn't
+so it's not enough to simple make object-key properties "invisible", because the public can still access it indirectly
+by going to the user's scope, getting the key, and then getting the property
+(we talked about this before, in the sections "Local Variables vs Private Variables" and "Secret Keys")
+
+so the key has to somehow be invisible too, only accessible from the user's scope
+and that requires a special mechanism
+
+so it comes back to this common idea of "private" variables
+that they are variables that you can only access if you're "inside" their scope
+imperative langs have this too, with private variables that are local to classes, objects, functions
+but what does that even mean?
+
+remember that in Entangle, everything is data, including programs
+so what does it mean when we say "in scope", or when we are "using and IDE to view a program"
+the IDE is just a window into the data, but you can access the data through many means
+if a variable is "only visible in scope", what prevents us from accessing it indirectly?
+if Bob is a club member but Joe isn't, what stops Joe from doing `Joe.friend["Alice"].friend["Bob"].DanceClub`
+how is that different from accessing it "from within Bob's scope"
+if we use the earlier analogy and imagine a graph with solid and dashed edges, what is the difference between being in Bob's scope, versus navigating to Bob's scope?
+
+### Private IDEs and Browsing Contexts
+
+(continued from "How do we Make Secrey Keys?")
+
+the answer is, we have to treat IDE's and "viewing programs" (eg a browser) as part of this private/public ecosystem
+reframe the development and coding process to be part of this public/private system
+when you open up a program or object, and view it's internals, you (the IDE) have a user profile, with it's associated secret keys and permissions
+I was trying to think about private variables from the context of a context-less IDE (an IDE with no user attached)
+obvious, if a context-less IDE can see a variable, it must be public
+
+so now that we have to be in a special "authorized" IDE context to view private variables
+so some sort of secret key used to access the private IDE context
+but what's to stop people from accessing that private key indirectly, by navigating to the private context?
+another secret key?
+if you keep tracing backwards like this, eventually you have to get to a secret key that you can't navigate to, but the user knows about
+this is essentially the user's master password
+it is the "root" of all the user's private data, and isn't stored anywhere
+the user has to enter it to log into their data, and it unlocks/decrypts everything
+
+### Private IDEs and Browsing Contexts II
+
+so the idea is that, once the user is logged in, they can access their private IDE context
+and that private IDE context will show private variables based on the secret keys that the user has in their account
+sort of like how in the BFS search, within the context of the BFS, the "visited" tag shows up on objects
+
+however, doesn't this mean that the global system somehow still has to be aware of these private properties?
+could a hacker look into the system and extract the private properties, even though they aren't displayed by the IDE?
+
+in addition, what if I wanted to make a public variable based on private variables, eg
+
+	publicVar: #privateVar + 10
+
+the system has to be aware of `privateVar` to calculate `publicVar`, right?
+in fact, in the graph, you might be able to trace backwards to find `privateVar`
+how do we prevent this
+
+even just for the user to access their own private variable
+they have to pass the secret key to the dictionary, and the dictionary spits out the value
+but could bad actor inspect the bytecode of the dictionary and figure out the secret keys and values?
+
+well, instead of storing the secret value in the hashmap, we can store it in an external hashmap
+like how tags can be modeled using external hashmaps, as discussed earlier with the BFS example
+just create a hashmap that associates public objects with their private tags
+`foo[privateKey]: bar` becomes `privateKey[foo]: bar`
+this way, all private keys and values are stored separately, secure in the user's storage
+this is simple "object-key inversion"
+note that we can also model it using something like `privateMap[foo]: (privateKey: bar)`
+there are probably many ways to model it using a separate hashmap to maintain security/privacy
+
+as for evaluating public variables from private variables, we could just run all calculations on the user's local machine
+and broadcast the result to the public domain
+alternatively, we can maybe leverage [garbled circuits](https://en.wikipedia.org/wiki/Garbled_circuit) to encrypt the evaluation,
+so it can be run on other machines without revealing any information
