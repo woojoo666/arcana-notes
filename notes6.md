@@ -1398,6 +1398,8 @@ and you will just be modifying an alias of the state variable
 	bar:
 		increment(input: stateVar) // notice that you are creating an alias to stateVar, so the alias will be incremented, not stateVar
 
+this gives it a sort of read-only behavior outside of it's scope
+
 ### Shared Variables and Scopes
 
 so how do we make "shared" datastores?
@@ -1408,6 +1410,7 @@ we want a variable that Bob or Joe can modify
 tagging?
 
 we talked about how tags are like hashsets
+	// TODO: this^^^ is referring to our audio notes (transcribed), after I re-organize those notes, update this with a proper section reference
 in fact, we can model "shared" scopes using hashsets as well
 just create a "Group" with Joe and Bob inside
 and then create the datastore in the group
@@ -2121,3 +2124,453 @@ as for evaluating public variables from private variables, we could just run all
 and broadcast the result to the public domain
 alternatively, we can maybe leverage [garbled circuits](https://en.wikipedia.org/wiki/Garbled_circuit) to encrypt the evaluation,
 so it can be run on other machines without revealing any information
+
+### Modifying State Variables Indirectly
+
+(continued from "State Variables and Indirect Modification")
+
+note that to modify public state variables, we noted previously that this is ugly:
+
+	foo.path.to.a.variable := 10
+
+but this doesn't work
+
+	alias: foo.path.to.a.variable
+	alias := 10
+
+so we actually have to do this
+
+	alias: foo.path.to.a
+	alias.variable := 10
+
+this is a little better, not as ugly but still works
+this is sorta like how you modify values in Java/Javascript
+	talked about in the section "State Variables and Indirect Modification"
+however, still not sure if we should even allow modifying state variable indirectly like this
+perhaps we should only allow state variable to be modified in their scope
+as in, only allow local/private variables to be state variables
+otherwise, people can just modify global information willy-nilly, stuff like the global plus operator, etc
+
+### Call Operator - A Summary of the Rational
+
+The call operator is a bit of an unconventional quirk of this language
+I think my rational behind it, and how I even came up with it, was an interesting journey
+and a good insight into the work that went into this language in general
+so without further ado, here's a summary
+
+// TODO: give references to previous sections
+
+* First, more than a year ago, I decided that everything should an object
+	* section: "Node datatype"
+* no primitives
+* this is so you can tag anything
+* also kinda like Java
+* makes things simpler as well, more reductionist
+
+* the actual "value" of primitives like numbers and strings is stored inside special internal properties
+* eg the number three would look like `three: (_numeric_value: 3)`
+* operators like the `+` sign and `=` operator use these internal properties
+* everything else just sees the entire primitive object
+* this stuff will become important later
+
+* fast forward a year
+* start thinking about the concept of functions
+* I realize that functions can be represented using objects
+* and "accessor pattern"
+* which basically models every function call as an object clone and extraction of a designated property
+a function call `myFn.call(10)` is the same as `myFn.clone(10).result` (assuming `result` is the property designated for this)
+note that any property can be designated, it's arbitrary
+the important thing is that there _is_ a designated property
+
+* fast forward a few months
+* I spend some time debating whether or not to allow currying
+* and how it seems to clash with default values
+* important to note because, if we include currying, then accessor pattern isn't enough to represent functions using objects & property access
+* however, eventually I decide to get rid of currying and stick with default values
+
+* go through a reduction phase
+* trying to figure out if we need both objects and functions (this was also motivated by my exploration of parametized references, but that can be ignored for now)
+* figure out how functional languages reduce everything to functions
+* subsequently, due to accessor pattern, all functions can be represented using objects, so everything in my language can be reduced to objects
+* decide to stick to objects as the base, and implement functions on top using accessor pattern
+* because objects feel like a more intuitive way to represent data
+* I start using `_result` as the designated property for function calls
+
+* now start wondering what syntax I should use for function calls
+* if I do `fn(10)`, how do I know whether or not I'm calling it as function or cloning it as an object
+* one way is to have it default to "calling" for functions, and if you want to clone a function, you have to explicitly say `myFn.clone(10)`
+* also play around with the idea of duality
+* every object can be treated as a function and vice versa, so everything can be called or cloned, `()` for calling, `{}` for cloning
+* that way, you can clone a function if you want to tweak it, or call a function if you want to get the result
+
+* however, realized that there's no point to "calling" objects, because they don't have the `_result` property, so they'll always return `undefined`
+* actually, veggero pointed this out a few months back, when I first came up with the concept of duality and `()` vs `{}`
+* so there's this mysterious assymmetry
+* functions and objects are "the same thing", but functions can be treated as objects but objects can't be treated as functions
+
+* notice a connection with a similar assymmetry with primitives, like Numbers
+* Numbers have a special designated property as well
+* you can treat a Number as an object, but you can't treat every object as a Number
+* eg, you can clone both Numbers and objects, but you can only use the `+` operator on Numbers
+* because the `+` operator relies on that designated property
+
+* thus, Numbers have a special designated property, and special operators that act on that property
+* likewise, functions have a special designated property, so special operations that use that property, should follow a similar syntax
+* thus, function calls should use an operator
+
+* this has a few benefits
+* first, it's consistent with how other primitives work
+* also, it's doesn't collide with the clonings operation, or require defining a special property like `fn.clone()`
+* it also makes it very explicit when treating an object as a function, instead of having to guess whether or not `foo(10)` is a call or a clone
+
+### Tags and CSS Selectors
+
+tags are like html/css class and selectors
+
+
+sort(list, key=len)
+len(li) vs li.length
+li.lenth is better
+but why cant we use .length in the sort function
+maybe get...length is shortcut for (item=> item.length)
+
+### Plugins and addons using spread operator
+
+`...myPlugin`
+will inherit the surrounding scope
+and add properties into the surrounding scope
+for example:
+
+	foo:
+		c: a+b
+	bar:
+		a: 10
+		b: 20
+		...foo
+	zed:
+		print(bar.c) // will print "30"
+
+note that this means that the spread operator `...` has to spread out properties, not just list items
+we talked about this earlier
+	in the section "Spread Operator and Merging Properties"
+
+does this have any dangerous implications?
+eg if you have a dynamic list `li: (a b >> a+b, a-b, a*b)`
+and you spread it out, `fn(...li)`
+does this cause any problems?
+now `a` and `b` will pull from the outer scope
+I guess `...` is meant to be equivalent to redefining it
+
+what does that mean in terms of `_source` and `_parent`?
+multiple inheritance?
+how do `_source`, `_parent` and `_arguments` usually work
+how does it maintain it's references to it's original source scope
+
+### Read-Only Private Variables, Public Mirrors
+
+* we talked about previously about how scoped state variables result in read-only behavior outside the scope
+	* in section "Modifying State Variables Outside of Declaration Scope"
+	* and section "State Variables and Indirect Modification"
+
+* we can easily achieve read-only behavior just using normal private variables though
+* works for any variable, not just state variables
+* say we have the internal variable `arguments_internal` that the interpreter uses to keep track of a cloned object's arguments
+* we want this arguments variable to be accessible by the user, just like Javascript's `arguments` variable
+* however, we don't want the user to be able to override this property and screw with the interpreter's behavior
+* eg, we don't want them to be able to do this
+
+		badObject:
+			arguments_internal: undefined
+
+* so to achieve this, we first make `arguments_internal` a private variable, so that the user can't override it
+* then, we create a "mirror" (or proxy) variable that's a copy of `arguments_internal`
+
+		internal:
+			#arguments_internal // private variable
+			_arguments: #arguments_internal // public mirror variable
+
+* this way, even if the user overrides the public mirror, `_arguments`, it won't change the behavior of the interpreter
+* the user is just screwing themself over because now they don't have access to the `#arguments_internal` variable
+
+### Private Keys and Tags - Mechanism Brainstorm
+
+we have this idea of secret keys and tags
+when you have access to the key, you get access to the data it unlocks (aka the properties that use that key)
+but how do we define "access" to a key?
+if we have `foo.key`, and `bar.friend.friend = foo`, does `bar` have "access" to `foo.key`?
+	I dub this "indirect access"
+how are these "keys" even stored? like normal properties, or hidden in metadata?
+how do we pass these private keys around, if we want to share access?
+and what keys/tags appear in IDE, only "direct keys", aka keys that are directly under the current user?
+
+i think to keep things simple
+we should only show direct access info
+aka, we only reveal information that is accessible from the keys _directly_ under the current scope/user
+otherwise the interpreter has to search across the entire graph to see what keys are available
+
+so if we only allow tags pointed to directly from the module
+then it's basically like you have to declare keys/tags in the module
+in fact, maybe we can have a special property for it, kinda like how we declare input order
+
+maybe something like:
+
+	foo:
+		#x #y
+
+is short for:
+
+	foo:
+		_keys: x, y
+
+from the perspective of the network graph, each module has it's own set of keys that it's pointing to
+and any data using those keys is visible to the module
+
+### Key Classes
+
+(continued from section "Private Keys and Tags - Mechanism Brainstorm")
+
+remember that each module declares it's set of local keys, and can "see" any local properties that use those keys
+if we extend this to global properties
+it's like, there's a "global" node/module that points to all strings
+so any data that uses a string as a key, is visible to the global scope
+
+this is interesting, because instead of declaring a finite set of keys, the global module defines an infinite "class" of keys
+any key that is declared as a "string" is automatically a global key
+
+I wonder if we can allow for similar behavior for local keys/properties?
+allow for defining an infinite "class" of local keys
+
+or maybe it can be like global keys, where a module can declare a new "type", and any object with that "type" becomes a local key to that module
+
+this seems like a common pattern
+instead of declaring an object and defining all the properties inside it
+you use tags, to create properties/list items indirectly and dynamically
+internally uses the "flag-watcher" model to work
+
+state variables uses this
+tagging uses this
+local/private variables uses this
+
+maybe eventlists can leverage this
+any time you declare a property as a "time", it gets added to the universal timeline
+so it becomes persistent
+which solves the problem we had earlier
+	in the section "State Variables - Mechanics and Persistence"
+
+### Cono, Indirect Bindings, and Tracking Trends
+
+defining bindings indirectly
+we talked earlier about how it was ugly
+	// TODO: this^^^ is referring to our audio notes (transcribed), after I re-organize those notes, update this with a proper section reference
+but in the context of Cono, it sort of makes sense
+because if Joe likes Pop songs, and he also likes Taylor Swift, then Cono should see this correlation and bind "Taylor Swift" to "Pop"
+
+
+### Marking vs Tagging with a Value
+
+if we do this
+
+	foo #visited
+
+vs this:
+
+	foo #color: green
+
+one is just tagging/marking it, and one is tagging it with a value
+so simplest idea would be to make the first correspond to a list, and the second correspond to a dictionary
+but what if sometimes you mark, and sometimes you tag it with a value?
+maybe we can make the first correspond to a set (dictionary giving each key a default value of `true`)
+this also makes sense considering the un-ordered nature of tagging and the un-ordered nature of sets (vs the ordered nature of lists)
+this also makes tag access more uniform and consistent
+if we made the first correspond to a list and the second correspond to a dictionary, then we would have to iterate across them differently
+	for the first we use list traversal, for the second we would either extract the keys and iterate across them, or extract properties as a list of key-value tuples
+treating the first as a set means that to get the tagged objects, you have to extract them as object keys
+	just like you would in the second example
+
+### Tagging Mechanics - Problems with a Giant Tag Hashmap
+
+earlier we talked about how tags are like giant hashsets, and should maybe be modeled using them
+	// TODO: this^^^ is referring to our audio notes (transcribed), after I re-organize those notes, update this with a proper section reference
+one issue with "tagging" and having all tagged objects stored in the tag dictionary
+is that we established earlier that object keys are private
+so how do we iterate across this giant dictionary of tagged objects?
+
+lets say we tag a bunch of objects
+	
+	foo #color: green
+	bar #color: blue
+	for item in items
+		item #color: red
+
+then it should store it in a dictionary with objects as keys and their tag value as the values
+and we would want to be able to access them using something like this:
+
+	for item in #color // get all objects tagged with #color
+		print.(item.name + " " + item#color)
+
+however, if we make all object keys private/secret/hidden
+then how are we even accessing and iterating across all of them?
+if `#color` stores a hashmap of `<tagged Object, tag value>`, then every item in the hashmap has an object key, and is thus inaccessible
+	and we wouldn't be able to iterate across them like we want to in the example above
+
+in fact, there are many examples where we would want to create a hashmap with object keys
+and iterate across it later
+so perhaps we can't just make all object keys private?
+
+
+another issue the idea of a giant tag dictionary
+is if you tag a "private" object, you might want to maintain the privacy of that object
+for example, say there is a public `#color` tag
+and you have a list of private objects, eg, photos that you took
+and you want to use the `#color` tag to tag the main color of each photo
+basically use somebody else's tag as a key for one of your values
+that shouldn't automatically make your object available to the tag owner, right?
+using `#color` shouldn't expose your photos to the public, right?
+or maybe it should?
+
+if we think about it in terms of flag watcher model
+if they can't watch you, how can they get notified of the tag?
+though maybe the system takes care of that
+"send a message" to the tag dictionary notifying it
+maybe even an anonymous message?
+
+### Changelists are Ugly, Use Eventlists Instead
+
+remember our concept of changelists?
+a special module that compiles a list of changes a variable undergoes (during computation/evaluation)
+	// TODO: find section reference
+changelists involve tracking computation and execution state
+recall that in order to implement this, we had to leverage feedback
+and the implementation is quite ugly
+we should never really use changelists
+instead, everything should be "timeless"
+all events are converted into timeline events (aka eventlists), and can be parsed like normal data
+I believe if eventlists are used properly, changelists are unnecessary
+
+### Private Keys and Scoping
+
+remember that we can use keys defined in higher scopes
+
+	foo:
+		#mytag
+		bar: someObject >>
+			someObject#mytag: 10
+
+remember that the `_keys` property declares all private/local keys
+	aka all properties that are accessible through `#`
+so the example above implies that the `_keys` property inherits keys from higher scopes
+local keys inherits from scope, just like normal properties
+so we have to make sure to design the `_keys` property to reflect that
+
+### How To Distinguish Tags from Multiple Users?
+
+how do we distinguish tags from multiple users?
+
+using a hashset kinda model (`Joe` uses an internal hashset to keep his taggings private, even though `#rating` is a public tag)
+
+	Joe
+		#rating
+			KungFuPanda
+				5_stars
+
+or maybe, parametized reference (this would make Joe's tagging public)
+
+	KungFuPanda
+		#rating(user: Joe)
+			5_stars
+
+
+examples of tags
+image #height: 5px
+image #format: jpeg
+image #large: (#height * #width) > 10000
+image #nsfw
+
+### Tag Queries
+
+before we were musing about how to implement tagging
+	// TODO: this^^^ is referring to our audio notes (transcribed), after I re-organize those notes, update this with a proper section reference
+I mentioned how it's like a reverse hashset, indirect properties
+where instead of "adding a property" to the object, it links the object to an external hashset
+however, this complicates things
+	which we touched on in the section "Tagging Mechanics - Problems with a Giant Tag Hashmap"
+first, it introduces an entirely new mechanism, namely indirect bindings
+	which is what we would have to use to push these <Object, tag value> bindings to the external hashset
+and second, it has dangerous privacy implications, namely that private objects can be unintentionally made public just by tagging them
+because it exposes the object to the tag, so if the tag (and the hashset) is public, the object becomes public too
+
+don't think about tags like hashsets
+tags are just regular properties
+pretty much like `image.height: 5px`, `image.nsfw: true`, but with objects/symbols as keys instead of strings
+
+instead of making tagging some special mechanism,
+we make a special mechanism for tag _queries_
+don't think in terms of implementation
+think in terms of declarative programming
+when a user wants to see all the #nsfw images, they want to see all images with the property #nsfw
+so its like saying `for obj in AllObjects, filter obj.nsfw == true`
+so theoretically, the interpreter will have to traverse all of public knowledge to find all images with that property
+that is the simplest interpretation
+using a hashset is just an optimization, implementation
+DON'T MIX UP DESIGN AND IMPLEMENTATION
+
+building on top of that
+that means that, if a user uses a public tag on the private object
+and the user queries for all objects with that tag
+he sees his private object in the results
+but if a public user queries for objects with that tag
+they won't see that private object
+so this means, that these "tag queries", will appear differently based on who is querying it
+this fits better with the private vs public idea, and local properties model
+also kinda like facets
+it also seems like it could be insanely slow and inefficient, but that's always a tradeoff when using declarative programming
+however, I think optimizations can make it practical
+
+
+this means that everything based on those tag queries have to be dynamic and multi-faceted too
+like `#nsfw.length`, which should give the number of objects tagged with `#nsfw`
+if a user tags one of their private objects with `#nsfw`:
+	then that private object will still show up in the user's private  `#nsfw` query
+	and likewise, `#nsfw.length` should also include those private objects
+again, this is really slow, but I'm sure there are ways to optimize it
+like a public hashset for `#nsfw` and a public value for `#nsfw.length`
+and each user has a personal hashset for their personal `#nsfw` objects, and their corresponding personal `#nsfw.length`
+and when the user queries for `#nsfw` and `#nsfw.length`, it just combines the public and personal values, and returns it to the user
+
+### Private Tags and Personal Perceptions
+
+what about something like #likes
+this isn't a single property we can add to the object
+some users may tag it with `#like`, others may not
+each user should be able to see their own tag, not other people's tags
+so the taggings should be private, and somehow linked to each user
+at the same time, we do want to keep a total of the number of tags
+so we can, for example, display the total number of #likes a song has
+
+what we can do, is give each user their own personal version of public data
+that includes their taggings
+so if Joe tags a song with #like, it clones the song (and all it's properties), and adds the property
+this way, we don't have to use parametized references to uniquely identify each tagging, like we were discussing before
+	in the section "How To Distinguish Tags from Multiple Users?"
+eg we don't have to do `KungFuPanda #rating(user: Joe): 5_stars`
+it will instead look something like `Joe.tags += KungFuPanda(#rating: 5_stars)`
+in addition, this ensures that Joe can keep his tag private if he wants to
+
+to get the total number of tags/likes/votes an object has,
+the system will go through each user, and check their "version" of public data, to see if it includes the tag
+to keep things secure, it can probably use some sort of cryptographic voting protocol, so that it can't know each user's individual vote
+
+in more abstract terms,
+each user has their own, personal perception of reality
+they can label and categorize things how they like
+Cono will also keep track of the "aggregate" reality, combining all the user's perceptions in some way to create a single reality
+
+in fact, to stay true to this theoretical abstract idea,
+every time a user creates a tag, they are modifying (their perception of) reality
+and that is the ENTIRE reality
+so lets say the "url" for kungfupanda was `Reality.media.movies.animated.kungfupanda`
+then when Joe "rates" Kung Fu Panda, he is doing `Joe: Reality( media.movies.animated.kungfupanda#rating: 5_stars )`
+notice that it creates a copy of the entire reality, just to tweak that one tiny variable
+very inefficient, but stays true to the abstract concept
+optimizations come later
+
