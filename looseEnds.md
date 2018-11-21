@@ -58,3 +58,13 @@ Nodes vs S-Expressions?
 
 state variables
 have a `self` or `this` variable that references the latest value?
+
+
+
+dynamic properties vs recursion
+
+	fibo: // dynamic properties
+		[n]: [n-1] + [n-2]
+
+	fibo: // recursion
+		=> fibo(n-1) + fibo(n-2)

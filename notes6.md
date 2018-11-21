@@ -2125,6 +2125,7 @@ and broadcast the result to the public domain
 alternatively, we can maybe leverage [garbled circuits](https://en.wikipedia.org/wiki/Garbled_circuit) to encrypt the evaluation,
 so it can be run on other machines without revealing any information
 
+
 ### Modifying State Variables Indirectly
 
 (continued from "State Variables and Indirect Modification")
@@ -2574,3 +2575,530 @@ notice that it creates a copy of the entire reality, just to tweak that one tiny
 very inefficient, but stays true to the abstract concept
 optimizations come later
 
+
+### Queries and Perception
+
+if we thing of tag queries as just a giant search for all objects using that tag (as a key)
+then we can think of our perception/context
+as just everything that is accessible through our private and public keys
+so like, instead of querying the universe for a single tag
+our context has a list of keys/tags, and it queries the universe for all of them
+
+in less abstract terms, that means that, every user has a special set of keys that lets them see their hidden properties/tags of objects
+so like, a programmer might see the debugging logs attached to a certain website
+these are things that the IDE should dynamically present
+so the IDE/browser changes how things looked based on who is looking at them
+based on the list of keys the user has
+
+if we generalize, does that mean each user is basically just a query?
+so like, if the user has the key `age > 12`, it will query the web for all content that fits that tag?
+so if a certain scope has a list of keys, `_local_keys: ...`
+then the local properties available to that scope is `for key in _local_keys: someObject[key]`
+basically, for every object you are inspecting, you give it all your local keys, and it gives you back all corresponding properties
+and that is your "perception" of the object
+apply that to every object in the world, and that is your "perception" of the world
+
+but no, a user is not the same as a query
+every "user" is just a node in the graph
+a set of properties, like any other piece of data in Entangle
+data just sits there, it doesn't navigate around the web, it doesn't "view" other objects
+so it doesn't make sense for it to "see" things differently based on it's local keys
+the IDE is the query
+the IDE takes the object's local keys and performs the query
+every query consists of two objects, the context (aka the user) and the target (aka the webpage the user is looking at)
+the IDE queries the target based on the context's local keys
+
+### Eve Lang - tags and queries
+
+I remember that Eve Lang is a language built on the idea of database "put" and "query"
+I wonder if this is similar
+
+so I looked at Eve lang [www.witheve.com](witheve.com) and it actually uses the same tagging methodology
+even uses `#mytag` syntax for tags, just like my language
+it seems like Eve also uses something like `[#mytag]` to get the value of that tag
+and it also has this core concept of querying
+though that's where it seems like the similarities end (though I only skimmed the docs)
+Eve has this weird separation of query and binding
+also uses dedicated event listeners (like verilog), instead of for loops and eventlists like Entangle uses
+
+
+### Global vs Local Queries
+
+(continued from "Queries and Perception")
+
+do you need always need to specify a target for every query?
+why not just always do a global query
+I think Eve just does global query
+for Cono, a "search" for some tag is just a global query as well
+CSS selectors are local queries, but it's easier because HTML is tree-like, not graph-like
+
+for graph-like structures, it's really easy to end up searching the entire graph unintentionally
+for example, if we did `myList.filter(has #mytag)`
+	if `myList` has the property `myRoot` that points to the global root, then it will end up searching the entire graph anyways
+even if we don't give lists a property that points to the global root, somebody might subclass lists and add functionality and add-ons
+and one of those add-ons might have a pointer to the global root
+we don't want people worrying about using list libraries and add-ons for fear of breaking querying
+so perhaps local queries aren't practical
+
+however, there is one important case where you might want to do local queries
+in Cono, if you want to get, say, the `#music` objects that the user themself tagged
+then you would search the user for `#music`, not the global space
+maybe we can them separate tags? have a user specific `#music`, and then a global `#music` that pulls from everybody's user `#music` tags
+
+
+what happens if we pass around a tag
+`#tagAlias: bob#tag`
+should using a tag alias, still make them show up in the query?
+instinctively I would say yes, otherwise what's the point of the tag alias
+but not sure how the internal mechanics of this works out
+
+maybe we can just have a custom `find` function for lists
+that only searches the elements of the list
+	that way we don't run into problems like properties that point to the global root, talked about earlier in this section
+or maybe it can be like an operator, that is overloaded for lists
+
+from a querying/searching standpoint, it makes sense to have a node to search from
+even global search can be seen as a search from the global root
+
+for BFS, anybody that "clones" the BFS module will be internally using the `#visited` tag
+but if we only allow global queries, then every BFS module will see eachother's `#visited` objects
+so either, we allow for local queries
+or, we make it so cloned tags have a separate "global" search
+
+allowing for local queries, it gives more flexibility, because you can mix and match tags and targets to get exactly the query you want
+but that flexibility also leads to complications, can get confusing when you have to account for messy graph structures when designing your query
+creating a new tag whenever you want a "local" query, it's more explicit, and less tangled up
+but more fragmented, because now you have to create a new tag for every local scope
+
+kind of like the difference between twitter hashtags and reddit communities
+
+### Tag Ownership - 3rd Party Tagging Apps
+
+(continued from "Global vs Local Queries")
+
+in Cono, we often want to get all tags created by a specific user
+	mentioned in the section "Queries and Perception - global and local queries"
+based on this idea of tags "belonging" to the user that created them
+but this idea of "belonging" is actually kinda ambiguous
+what if the user tags objects through a 3rd party app?
+what about tags created by a group of people, like a club? who do those belong to?
+
+maybe cloning a 3rd party app ties it to your "perception"
+what if you're using a 3rd party app to clone a different 3rd party app
+how does it know to transfer the "user" node, and not some other property/node
+
+3rd party app has to add the tag manually to user
+user has to "accept" the 3rd party app's tags
+so when the user "attaches" the 3rd party app, they implicitely start pulling tags from the 3rd party app into the user-space
+instead of making tags in the 3rd party app, the 3rd party app communicates to the user to create certain tags
+and then a user-local query can just look for tags directly attached to user
+
+but then, it seems like we should only allow tag queries for direct connections
+	only searchings things directly attached to the user
+not graph traversal
+however, the whole point of tagging was that
+you can tag from anywhere, and the tag query will find it
+
+a global tag query has to have a graph traversal
+so global tag queries do traversal, but local tag queries don't?
+seems weird
+
+what if, instead of creating tags in the user-space
+the 3rd party app tags the object with both the tag, and the user
+that way, you do a double query, `#user = me, #liked = true`
+
+even if the 3rd party app creates tags in the user space
+you can still do something like "#liked, parent = user.tags" and this will find all objects that are tagged "#liked" and children of the user.tags node
+
+so we don't even need the concept of local queries
+we can implement it using tags
+
+we would have to tag the tag though
+
+maybe we can use "perception" instead
+every third party app you use, is cloned in your perception
+so those tags are part of the user
+
+how is perception implemented anyways
+cloning?
+recall that cloning has a "source"
+	aka which scope created the clone
+	"source" is stored in a property
+so maybe that's all we need?
+use the "source" of the clone for the querying
+but what if we have a 3rd party doing the cloning...
+well note that the 3rd party app has to be cloned too
+so maybe the "root" of all clones is the user perception?
+
+so it seems like there's two main methods for tag queries
+delegation
+	requires explicit binding to the user
+cloning/perception
+	everything under the user perception is bound to the user
+	any 3rd party app has to be cloned under the user
+	no delegation, only cloning
+
+this seems like we're getting too preoccupied with implementation
+maybe we need to distance ourselves from implementation
+the invariant of all this is the query itself
+the query is "get all of ____ tags from the user"
+how do we further define this, without getting too deep into implementation?
+
+###  Tag Ownership - Delegation and Aliases
+
+(continued from "Tag Ownership - 3rd Party Tagging Apps")
+
+maybe not everything in the user's graph should show up in the user's local query
+what if the interpreter/language used some internal mechanism
+that keeps track of how much each tag is used, so that it can do optimizations or something
+probably would use a dictionary
+
+	numTimesUsed:
+		#liked: 10
+		#upvoted: 35
+		#downvoted: 12
+
+and this info would probably be stored in each user
+however, this should not show up when the user does a tag query
+even if it might be in the user's "user space"
+
+
+
+perhaps tag ownership depends on who "initiated" the tag
+a user can manually add tags, or clons a program and delegate tagging to it
+both count as "initiation"
+does this always work?
+initiating a tag is different from having a reference to the clone
+a user can clone a program, and not even store a reference to it if they don't want to
+the program should still be able to tag things on the user's behalf
+
+
+so initiator is different from "root node"
+as in, just because a tag is in the user's graph space
+doesn't mean the user initiated it
+and likewise, there could be tags that the user initiated
+that are not in the user's graph space
+
+
+
+we might want tags for delegates too
+like, I might want to see all the tags I tagged through "Facebook"
+delegates can have their own add-ons, plugins, and sub-delegates
+so delegates are like users too
+
+works like scope
+a tag made through Facebook would be linked to the user and to #Facebook
+
+maybe you can tag a tag, like so
+
+FacebookApp
+	#like: ^#like(#Facebook)
+
+so now all #like tags made by FacebookApp are linked to the facebook app
+and this will propagate to all plugins and add-ons of the FacebookApp as well
+
+but this would not be necessary if there were some way to automatically determine that a tag originated from the Facebook App
+
+
+
+in Cono, maybe a user would want to create a secret alias identity
+from the outside, it looks like a separate user
+but it is really just an alias, used for posting all posts of a certain type, eg politics
+externally, your political posts look separate from your other posts
+	(useful if you don't want your personal reputation influenced by your political posts)
+interally, however, you would want to have the posts linked to both your identity and the alias
+so you can search across both of them at the same time
+shows how the concept of "tag ownership" is rather arbitrary
+
+
+by default we want everything created/cloned inside the user to attach the user tag
+(note that this is different from being in the user-space / user-graph, as mentioned earlier)
+we can do this by having a special "owner" tag
+we can do this by overloading the "clone" operator to propagate this "owner" tag
+it's like a virus sorta
+this implies that we can overload the clone operator in the first place (even though it's an atomic bheavior of the language)
+also implies that each module/scope "owns" the cloning that goes on inside it
+should every cloned object contain a reference to the module that cloned it?
+is there a case where we would not want that, like a case where a module wants to discretely clone things, without disclosing identity, so that the objects created aren't aware of it's existence
+
+
+if you clone a BFS, does it create it's own tag? or still use the existing one?
+when you clone something, you shouldn't have to worry about affecting the original
+(though you do have to worry about the original affecting your clone, as that's how dataflow works: if the original changes, the clone reflects that change)
+in fact, the original shouldn't have to worry about clones affecting it
+so I think by default the tag should be separate
+creates a new tag with the same name, like variable shadowing
+
+### State Variables and Contracts
+
+in the previous section, "Tag Ownership - Delegation and Aliases",
+	we talked about how we should be able to clone without worrying about affecting the original
+there are cases where we want the clones to affect the original though
+for example: state variables
+if you have a modifier function, you want every instance of that modifier function to affect the state variable
+
+it seems dangerous to make every variable a state variable
+that means, you always have to worry about other people modifying your variables willy nilly
+only way to prevent modification is to make your variable private, or to create a private+public pair, a read-only public variable (as discussed earlier)
+however, most of the time, people want to just be able to create a public property without worrying about attackers modifying it
+so while the read-only public property option is viable, it will need to be used so often that it's annoying
+
+if you think about how state variables work
+using the flag-watcher model
+it's essentially a contract
+the state variable declares that it's "watching for flags"
+in fact, the state variable should be able to fine-tune the flags it is watching
+for example, a state variable that only listens for flags that match a certain regex pattern
+this reinforces the idea that state variables are a contract
+
+### Explicit State Variable Declaration
+
+(continued from "State Variables and Contracts")
+
+thus, state variables should be declared explicitly
+so people know that it is subject to change
+and that people are allowed to modify it
+and the conditions that are required to modify it
+
+
+### State Variables and Scoping - Orthogonality
+
+so what should the contract be by default?
+anybody can modify it, as long as they can see it?
+so even something like this:
+
+	foo:
+		alias: a.b.c.parent
+		alias.stateVariable += 10
+
+or maybe we should only allow modification if it's in the same scope as the state variable??
+
+but if we wanted to restrict modification to the same scope, we could use a private variable for the state variable,
+	and expose it to the outside using a public mirror
+
+orthogonality
+we should strive to keep each facet of our language separate and independent
+remember that scope is just a convenient tree-style inheritance pattern
+state variables and versioning are a separate mechanism, that can be used alongside scope, or independently
+
+who is in charge of ensuring that the "flag-watcher" system is upheld
+that means, that no matter where the "flag" is raised, the system has to ensure that it reaches the state variable
+the interpreter/compiler has to uphold the system
+it's just like a type system
+the interpreter/compiler is responsible for upholding the language's rules
+so we have to ensure that the "flag-watcher" system is not too unreasonable to embed inside our interpreter
+can't be too slow or complicated
+
+### State Variables with APIs?
+
+can we create special state variables
+that expose an API
+specific methods for modification
+eg, a list `foo` that can only be added to, not replaced or overwritten
+
+we can do so using this pattern
+
+	foo:
+		#privateVar := ()
+		push: x >>
+			#privateVar += x
+		unshift: x >>
+			#privateVar := privateVar + x
+		value: #privateVar
+	bar:
+		foo.push(10)
+		foo.unshift(20)
+		print(foo.value)
+
+### Cloning and Ownership
+
+* note that `foo.push(10)` creates a clone of `foo.push` inside `bar`
+* one might think that `bar` might be able to inspect or "hack open" the clone and figure out the value of `#privateVar`
+* however, we clearly should not allow that
+* thus, this implies that `bar` does not fully own the clone of `foo.push`
+* in fact, `bar` only owns the arguments passed into the cloning operation
+
+### State Variable Syntax - Declaring vs Modifying
+
+right now we use `:=` for declaring and for modifying state variables
+but this can get ambiguous:
+
+	foo:
+		#privateVar := ()
+		foo:
+			#privateVar := () // are we declaring a new state variable (shadowing the one above), or modifying the above state variable?
+
+
+need special syntax for declaring state variables, in case we want to shadow an existing state variable
+
+### Tag Ownership - Explicit or Implicit?
+
+maybe "ownership" has to be explicit
+for example, if we had some 3rd party tagging app like Facebook
+you have to connect your "user" to the 3rd party app
+sign in or something
+and that will tell the Facebook app to tag everything under your user
+
+so does it really have to be explicit?
+to a certain extent, feels like you would want implicit in certain cases
+	explicit forces every 3rd party app to implement this "sign-in" procedure, in order to explicitly connect the user
+	but I feel like it should be automated
+	like, whenever you add a 3rd party app to the user, it's automatically signed in
+so can we find a proof why it has to always be explicit?
+
+we can clearly see that, we can't base "ownership" off of references
+references are just associatiations, unrestricted graph edges
+but "ownership" feels more like a hierarchal strcutre
+	cycles don't make sense. We can't have `foo` owning `bar` and `bar` owning `foo` at the same time
+so maybe ownership should be tied to scope
+a system build on top of our scoping system
+
+can we make ownership a system on top of scope?
+maybe just do a query
+
+	find objects where (#liked., this in ancestors)
+
+### Nondeterminism (check if this name is taken)
+
+in the previous section "Tag Ownership - Explicit or Implicit?", we talked about leverage the scoping system for ownership
+for example, finding all children (and descendants) with the `#liked` tag using a query like 
+
+	find objects where (#liked., this in ancestors)
+
+actually would be nice if we could use `this = ancestor` instead of `this in ancestors`
+	feels more natural, linguistically
+but that starts getting into non-determinism
+
+can we do non-determinism?
+eg, an object can have multiple properties with the key `ancestor`
+and when checking equality, only one of them has to return true
+not very different from just using a list and checking for existence inside the list
+but syntactically, feels nicer
+probably many other possible uses too
+
+currently, if you try to define multiple properties with the same key, it will give `overdefined` error
+but one of the main reasons we wanted to indicate `overdefined` was if you delegated property definitions to multiple "satellites"
+as in, you have multiple modules build a structure, you need to ensure they don't collide
+but we don't allow this sort of "dynamic property modification" anymore, this kinda indirect binding
+so maybe we don't need `overdefined` and can do non-determinism instead?
+
+
+nondeterminism and tagging similarities?
+like, if multiple users tag the same object with the same tag
+that's kinda like nondeterminism? maybe?
+maybe we should have a special variable for nondeterministic variables? or maybe a special key/property?
+
+### State Variables vs Tags
+
+state variables seem to use a mechanism like indirect binding
+maybe we can generalize state variables to queries as well
+maybe state variables are a specific type of query
+a query looking for every "tagging" that uses the modification operator `:=`
+
+though there are some differences between state variables and tags...
+tags work like normal properties, and tag queries are just a search operations,
+	 so tag queries have to obey scopes, public vs private
+	 a tag made privately in a user space, will not show up in a public query
+but for state variables, when you modify the state variable you automatically broadcast, make public, your modification
+
+
+### Aggregators
+
+(continued from "State Variables vs Tags")
+
+state variables as a query
+just query for "last" in the list of states
+state variables generalized: a bunch of modules define an indirect binding, and then the query accumulates it
+though we can implement queries using state variables
+use the state variable as the accumulator, and then query on the state variable
+implementing query on top of state variable, or state variable on top of query, same thing
+maybe a better term would be "accumulator"
+or maybe "aggregator"
+
+by default, an aggregator acts like a state variable, and returns the "last" thing
+but you can override the "aggregator function"
+you can notify an aggregator with information from anywhere
+like, giving it a new state/version
+or a new tag
+hmmmm...but with state variables, you always want to broadcast it to the aggregator, make it "public"
+but with tagging, you want to respect privacy, and have the aggregator search/traverse for the tags
+
+### Aggregators - Voting
+
+voting
+eg, "Joe" tags "Obama" with a "#upvote" tag
+a tag that you want to make public, aka broadcasted to the aggregator
+
+with tagging, you often clone the object, and then add a tag
+with state variables, you clone the API method, but not the object
+
+
+lets say we have members of a club, that vote on a new president every week
+when a member joins
+how does the member get added to the roster
+so that they can vote, and their votes are registered?
+
+
+if two graphs are disjoint, there is no way for them to connect
+for them to connect, there needs to be a "universal" arbiter that they communicate with
+and by communicate, that means, edges going into and from the arbiter
+and they can both send signals to the arbiter, to tell the arbiter to connect certain parts of each graph
+this is essentially the same thing as the graphs being connected (not disjoint)
+
+note that, it's possible for two graphs to get connected without needing communication
+if an 3rd-party arbiter has edges going towards both graphs, the arbiter can connect them 
+
+### Explicit State Variable Declaration - Club Member Roster Example
+
+let's say we have a club, initially made with 3 people
+the club has a voting system
+let's say the `members` list wasn't made as a state variable (maybe an oversight or something)
+	so it's a static list, eg `members: Joe, Mary, Bob`
+now, the club wants to add more people
+realize they can't
+so maybe we should allow all variables to be treated as state variables after all?
+
+no the better way to handle this is
+remember that the club itself is a program/graph
+and the programmer who created it
+can modify it, change `members` to a state variable, and push the change
+just like a git revision
+and now `members` can accept new members
+
+so the general pattern is thus:
+when you define a graph/program, you decide which variables are meant to take in changes (state variables) and which are fixed (regular variables)
+this process of defining a graph or making a program, can be thought of as a state variable as well (because a program may have multiple revisions)
+if you want to change a fixed variable to a state variable, then the initial creator has to redefine the graph
+and this can be thought of as going "up" the hierarchy and finding the nearest state variable (in this case, the program), and changing that
+
+kinda like, if your club initially submitted a list of "club rules" to the administration
+and later realized that the club rules were too restrictive and didn't even allow you to change your own rules
+so you go to the administrator and ask if you can change the club rules, to something less restrictive
+and of course, the administrator will see that the new rules will allow the club to define/modify their own rules, and the administrator can block it if necessary
+so if the hierarchy was like this:
+
+	school
+		admin (state variable)
+			clubs
+				musicClub
+					members
+
+the music club goes up to the nearest state variable, in this case `admin`
+and then asks the `admin` to change `musicClub.members` to a state variable
+
+### Declaring Aggregators
+
+aggregators are a way to declare that you want to create a binding towards it
+it's a "receiver"
+creates two way bindings
+
+aggregators can be used alongside "tags" and "queries"
+
+
+this shows that we don't need special mechanisms for tags or tag queries
+tags are just local properties
+tag queries are just regular queries
+
+by default, the "find" query should search based on hierarchal scope
+that way, we can do lots of optimizations, like query hashsets
+but you can always do a "deep search" which searches the entire graph, but is quite slow
