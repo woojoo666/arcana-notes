@@ -3828,8 +3828,19 @@ All findings so far...
 13. All local variables are properties
 14. Encapsulation: modules can only modify and control things inside the module, no control over anything external
 15. All properties are public information (aside from symbol properties)
-16. Clone Equivalence: calling/cloning a module is the same as redefining it. Variables are inherited from context/scope
 
+vvvv move this to philosophy section? vvvv
+
+16. every peripheral, anything entering the Entangle domain, has to be a state variable, an event list
+	* timeless - Time is data
+	* unwraps cyclic feedback loops into acyclic directed graphs
+	* turns a circle into a helix
+	* allows us to model everything using combinational logic
+	* all events and actions have a timestamp when entering the Entangle ecosystem, eg mouse events and such
+	* assume execution is instantaneous, and can happen in any order/fashion
+17. Prototypal - No "templates", no functions, no currying
+18. Abstract data structures away from execution order. Model everything in terms of structure
+19. Introduce orderings only when necessary
 
 ### Implementation Rules
 

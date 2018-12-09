@@ -2125,7 +2125,10 @@ and broadcast the result to the public domain
 alternatively, we can maybe leverage [garbled circuits](https://en.wikipedia.org/wiki/Garbled_circuit) to encrypt the evaluation,
 so it can be run on other machines without revealing any information
 
-
+revisit 12/6/2018:
+	this is the wrong way to think about private variables
+	check out the section "Private Variables Revisited"
+	
 ### Modifying State Variables Indirectly
 
 (continued from "State Variables and Indirect Modification")
