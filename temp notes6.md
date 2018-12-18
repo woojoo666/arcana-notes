@@ -1820,3 +1820,202 @@ making copies of tags also solves the 3rd party delegation problem
 to designate who "owns" the tag, just create the tag under the user
 so even though it's a 3rd party app, it's using tags that are declared under the user
 so the user can see them
+
+
+every time a user makes a comment
+tags it with a user's copy of the "comment" tag
+
+	target:
+		comment(user: Joe): "my comment"
+
+if a user comments multiple times, then it automatically appends the timestamps?
+
+	target:
+		comment(user: Joe, timestamp: 432): "my comment"
+		comment(user: Joe, timestamp: 819): "second comment"
+
+
+
+
+note that, if you clone `foo: bar(2,3).zed`,
+	you are not actually cloning the expression `bar(2,3).zed`
+	you are cloning the output object of that expression, whatever `bar.zed` returns
+so even if you had cloning access to `foo`, you actually need cloning access to `bar.zed`
+
+
+on one hand, we want to make cloning simple, so you should be able to clone anything you can see
+on the other hand, that makes it impossible for somebody to make a viewable, but not clonable property
+
+
+use aggregators to mimic the behavior of an "API"?
+so the user doesn't actually clone the service
+they clone the API function that the service provides
+and then the service sees the cloned module, the "flag" raised by the user
+and can choose whether or not to accept the call
+and spits out an answer
+something like
+
+	myService:
+		mAggregator.
+		getCandy:
+			if _request.user == 'Bob':
+				mAggregator[_request.user] := candy
+	Joe:
+		myService.getCandy()
+		print myService[me] // prints `undefined`
+
+this seems really complicated
+and do we really want to encourage multiple ways of calling a function?
+this is like how in javascript, async and sync functions look so different
+	(sync functions look normal, async uses callback syntax)
+but in Entangle I kinda want all functions to look the same, regardless of how it's implemented internally
+
+
+
+interpreter can be modeled as a function too
+so maybe, you can only clone a module if you can see the source code
+because in something like `foo: interpreter(foo_source_code)`,
+	if you clone `foo`, you are not cloning the source code, so it wouldn't work
+
+this is the wrong way to think about it though
+we should assume that everything is in the Entangle system
+view our universe in the lens of the Entangle language
+the interpreter is merely a tool used to make the code work in reality
+but inside the code, everything should be modeled as if it is reality, as if the interpreter doesn't exist
+
+in imperative languages, you can always call a function if you can see it
+if you want to restrict the function call to "authorized" people, you can just modify the behavior
+	of the function to take in a "authorization key" as a parameter
+
+so maybe we can just do the same thing with modules
+
+	myService:
+		getCandy:
+			=> _request.user == 'Bob' ? candy
+	Joe:
+		print myService.getCandy.() // prints `undefined`
+
+
+
+in webdev if you send a request to a server, it sends back a response that only you can see
+same with websockets
+in Entangle terms, this is kinda like, cloning an object, and the server is somehow able to create data that is private to the client, even though the server shouldn't know anything about the client
+maybe the client is providing a shared private key to the server, so the server can provide data back to the client?
+
+
+
+
+something to be careful about:
+you should not be able to gain more information out of a module by cloning it
+that would be a security issue
+that means that a module might not "own" everything that is declared under it
+	like we thought previously ( // TODO: FIND REFERENCED SECTION )
+because if `foo` clones `bar`, it still does not "own" the clone, because it shouldn't be able to see the internals
+instead, a module only owns all the bindings it explicitly defines
+so in something like `bar: (a: 2, b: "hello")`, `bar` owns everything inside
+but in someting like `foo: bar(a: 20, b: "world")`, `foo` does not own `bar`,
+	however `foo` _does_ own the argument object passed in: `(a: 20, b: "world")`
+
+
+this makes the idea of "ownership" a bit more complex
+
+
+
+if we allow the module to control how the cloning works
+it is similar to how imperative functions work
+only the module itself can control the behavior of its clones
+however, while this feels natural for functions
+it doesn't feel natural for "cloning" or objects
+for functions, it is like, the caller is sending a query to the function, and the function sends an answer back
+for clones, it feels like the cloner actually has a copy of the original object,
+	so it's weird for the clone to somehow hide info from the cloner
+	like, could the cloner somehow pry open the clone and extract the private info?
+it feels more natural for the parent of the module to control who can clone the module
+
+
+remember: you should not be able to gain more information out of a module by cloning it
+thus, if we think of cloning as manually copying bindings
+it would not copy over private bindings
+you would end up with an incomplete copy
+
+
+
+
+
+if a module is public
+that means you can see its bindings, its "code", its implementation
+and clone/copy its implementation
+when you "view" a module, you can see how it's public properties are implemented
+but when you view a property directly, you see it's value
+for example:
+
+	foo:
+		a: 10, b: 20
+		bar: a+b
+
+if you have read access to `foo`, you can see that `bar: a+b`
+so if you clone `foo`, and override `a`, it will work properly
+however, if you only have read access to `bar`, you will only see `bar: 30`
+you will not be able to override `a` by cloning bar, eg `bar(a: 10)`
+
+a module is defined by its implementation, not its values
+so if you have access to a module, you have access to its implementation
+note that this only includes bindings defined by the module
+	does not include implementation/bindings of its internal variables
+
+should should resolve all the stuff we were wondering about earlier
+about accessing source code vs values
+and the implications for cloning
+
+
+
+
+I'm not sure if I talked about this earlier but,
+why do we want to allow indirect tagging of a public tag
+	which can either cause a collision (if the aggregator accepts),
+	or cause confusing behavior (if the aggregator rejects)
+what is the point of making it the same tag?
+why not always just create a new tag?
+	as in, every time you want to indirectly tag something, you have to use a new local tag
+because it makes it easier to use behaviors/functionalities that have already been defined based on the original tag
+for example
+
+	Joe:
+		weight: 20
+		bmi: weight/(height*height)
+		subModule:
+			height := 10 // indirect binding
+
+if you just did
+
+	Joe:
+		weight: 20
+		bmi: weight/(height*height)
+		subModule:
+			mHeight // declare a new tag
+			Joe.mHeight := 10 // indirect binding
+
+then you can see that `bmi` won't see the value `mHeight` and update accordingly
+
+the problems only happen when you start defining indirect tags outside the aggregator scope
+
+	Joe:
+		weight: 20
+		bmi: weight/(height*height)
+	foo:
+		Joe.height := 10 // indirect binding
+
+if we allow it, but the aggregator doesn't "accept" the binding, then it can be confusing
+	if `foo` asks for `Joe.bmi`, it will return the original `Joe.bmi`, without the updated height
+
+so perhaps we should only allow indirect binding within the scope of the tag
+and if you want to indirectly bind outside that scope, you implicitly (or explicitly?) create a local copy of that tag
+and if you want to view dependents with your perspective, you have to explicitly declare it
+
+	Joe:
+		weight: 20
+		bmi: weight/(height*height)
+	foo:
+		Joe#height := 10 // indirect binding, implicitly creates a copy, `foo.Joe.height` or something
+		mBMI: Joe(this).bmi // somehow, clone Joe using foo's "perspective" and retrieve the new bmi property
+
