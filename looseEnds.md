@@ -68,3 +68,7 @@ dynamic properties vs recursion
 
 	fibo: // recursion
 		=> fibo(n-1) + fibo(n-2)
+
+
+
+how does cloning aggregators work?

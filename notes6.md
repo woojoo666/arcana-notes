@@ -2311,6 +2311,7 @@ i think to keep things simple
 we should only show direct access info
 aka, we only reveal information that is accessible from the keys _directly_ under the current scope/user
 otherwise the interpreter has to search across the entire graph to see what keys are available
+so no indirect keys, aka keys that you have to traverse to get to
 
 so if we only allow tags pointed to directly from the module
 then it's basically like you have to declare keys/tags in the module

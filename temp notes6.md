@@ -1521,14 +1521,13 @@ via the programmers personal perspective, as mentioned earlier
 
 
 
+### Cloning Restrictions
 
 certain cases where you don't want to allow cloning
 you shouldn't always be able to clone somebody and give different inputs and see what it outputs
+	could be used for all sorts of malicious attacks, like reverse engineering your code
 they chose to accept inputs from certain sources
 not accept inputs from you
-
-
-
 
 ### Private Variables Revisited
 
@@ -1576,7 +1575,7 @@ private variable _names_ are just for binding purposes
 dynamic coding and tagging?
 
 
-
+### Object Keys are not the same as Private Keys
 
 before we talked about how public vars are string keys, private vars are object keys
 because if you tried to make a private string key, somebody could just guess it and access it through `foo["myguess"]`
@@ -1607,15 +1606,19 @@ private string keys are "semi-private" because they can still be constructed, bu
 
 in addition, there are examples where we want public object keys
 eg, if we make a hashmap with format `<object, Number>`,
-	and we want to be able to iterate through all entries
-	we would not be able to, if all entries were private because they had object keys
+and we want to be able to iterate through all entries
+we would not be able to, if all entries were private because they had object keys
+	a problem mentioned in the section "Tagging Mechanics - Problems with a Giant Tag Hashmap"
+but the reason we can, is because every time you call `hashmap.push(<key value pair>)`
+not only does it add the key value pair you pass in
+but it adds the key to the `keys` property, the list of public keys
+so that an iterator can iterate through all objects added to the hashmap
 
 in a way we already do this though, separate private/public from strings/objects
-through our concept of the `_local_keys` property, and 
+through our concept of the `_local_keys` property, and the public `keys` property
+`keys` is for public keys, `_local_keys` is for private keys
 
-
-
-
+### Private Keys and Static Binding
 
 the `keys` and `_local_keys` properties might seem related
 but they aren't
@@ -1667,7 +1670,7 @@ how can Bob refer to his own variables, but Joe can't navigate to Bob's perspect
 ### Timeless
 
 earlier we talked about how to handle cases where Bob disconnects his mouse
-	// TODO: FIND REFERENCED SECTION
+	see section "State Variables - Mechanics and Persistence"
 we talked about maybe having some sort of "global timeline" or something
 
 it might be tempting to have some sort of "snapshot" capability
@@ -1725,17 +1728,20 @@ maybe the interpreter binds them directly, or encodes a special signature to all
 
 
 
-
+### Private Tagging of Public Tags
 
 perspective
-should be visible to whoever can see the tag
+taggings should be visible to whoever can see the tag
+so if there was a public tag `#rating`, and you used it to rate the movie `KungFuPanda`, everybody would see your rating
 so if you want it to be private, you have to make a private copy
 
 	#mytag
 	foo:
 		target.
 	bar:
-		foo.target#mytag := 10
+		foo.target#mytag := 10 // everybody can see this
+		#bar_mytag: #mytag() // private tag copy
+		foo.target#bar_mytag := 10 // private tagging
 
 this matches the hashmap model
 because if you add `<foo.target, 10>` into the hashmap `mytag`,
@@ -1767,14 +1773,12 @@ in addition, we also want to be able to view other people's perspectives, even i
 for example, if a bunch of movie critics have different ratings of a movie, and they all want their `#rating` to be public
 
 
-
-
-
+### Perspectives and Cloning Restrictions
 
 also, you can't just access dependents using your perspective and your tags
 because that would imply cloning it and changing the inputs
 for example, in the bmi example mentioned in the earlier section
-	// TODO: FIND REFERENCED SECTION
+	see section "Cloning Restrictions"
 
 in this example, let's `foo` can't see Joe's source code, but `foo` can see Joe's public values
 (recall that the formula for `bmi` is `weight/(height*height)`, thought assume `foo` doesn't know this)
@@ -1816,7 +1820,7 @@ and be able to view object B's dependent from the perspective of person A
 
 
 making copies of tags also solves the 3rd party delegation problem
-	// TODO: FIND REFERENCED SECTION
+	see section "Tag Ownership - 3rd Party Tagging Apps"
 to designate who "owns" the tag, just create the tag under the user
 so even though it's a 3rd party app, it's using tags that are declared under the user
 so the user can see them
@@ -1846,6 +1850,7 @@ so even if you had cloning access to `foo`, you actually need cloning access to 
 on one hand, we want to make cloning simple, so you should be able to clone anything you can see
 on the other hand, that makes it impossible for somebody to make a viewable, but not clonable property
 
+### API Calls
 
 use aggregators to mimic the behavior of an "API"?
 so the user doesn't actually clone the service
@@ -1903,7 +1908,7 @@ in Entangle terms, this is kinda like, cloning an object, and the server is some
 maybe the client is providing a shared private key to the server, so the server can provide data back to the client?
 
 
-
+### Cloning Restrictions II
 
 something to be careful about:
 you should not be able to gain more information out of a module by cloning it
@@ -1940,7 +1945,7 @@ you would end up with an incomplete copy
 
 
 
-
+### Cloning and Source Code
 
 if a module is public
 that means you can see its bindings, its "code", its implementation
@@ -1966,9 +1971,18 @@ note that this only includes bindings defined by the module
 should should resolve all the stuff we were wondering about earlier
 about accessing source code vs values
 and the implications for cloning
+// TODO: FIND REFERENCED SECTION
+
+this also means that: something is clonable if and only if it is fully public
+so if you want something to be clonable, you have to make it fully public
+	or at least, fully accessible to the thing that wants to clone it
+we should also indicate to the user whether or not something is clonable, or it can be confusing
+the user should know the private variables inside the module, like `foo: bar + <private>` or something
+at the very least, the user should know that the module has inaccessible components
+we shouldn't just let the user try to clone it and end up with an incomplete module (that they don't even know is incomplete)
 
 
-
+### Indirect Tagging Restrictions - Explicit Tags Only
 
 I'm not sure if I talked about this earlier but,
 why do we want to allow indirect tagging of a public tag
@@ -2018,4 +2032,1412 @@ and if you want to view dependents with your perspective, you have to explicitly
 	foo:
 		Joe#height := 10 // indirect binding, implicitly creates a copy, `foo.Joe.height` or something
 		mBMI: Joe(this).bmi // somehow, clone Joe using foo's "perspective" and retrieve the new bmi property
+
+
+* however, String tags are public
+* so String tags can be thought of as "globally declared"
+* so the scope of String tags would be global
+* but we don't want anybody to be able to modify the string tag of any other object...
+
+* maybe we should restrict indirect tags to explicitly declared/created tags
+* Strings are a "class" of keys/tags, so you aren't actually declaring them when you use them
+* this way, when you actually declare a tag, you also declare it's scope
+
+* which is important, because it lets the programmer know where to look when looking for indirect tags
+* otherwise, the programmer has to worry about modifications coming from everywhere, and its hard to debug
+* in imperative languages, the programmer knows that modifications must have come from previous code (lines of code that are above the current line), which restricts the search space the programmer has to search through while debugging
+* so we should also strive to restrict the search space the programmer has to worry about
+* we don't want an infinite search space
+* // TODO: i believe I talked about this sometime earlier, figure out where
+
+* note that, when you copy a module like BreadthFirstSearch, you also copy it's tags, like `#visited`
+* so that's equivalent to declaring a new tag, so indirect tagging is allowed (and restricted to the scope of the new tag)
+
+### Tagging Aliases
+
+* for something like the BFS #visited example:
+
+		somewhere_in_the_BFS: currentNode >>
+			currentNode#visited := true
+
+* aren't we tagging the alias?
+* so remember the stuff we said about state variables and aliases
+	* in the section "Comparison with Imperative Re-Assignment"
+* basically, if you create an alias for a state variable, and try to modify through the alias, it will just redirect the alias
+* so won't this be a problem here?
+
+* actually, recall that adding a tag is like modifying a property
+* so just like how in javascript, if you do `fooAlias = foo, fooAlias.bar = 10`, it will modify `foo`,
+	* adding a tag to an alias will also modify the original object
+
+* compare this to when you actually want to do reassignment
+
+		alias := foo // starts as an alias to foo
+		someModule:
+			alias := bar // reassigned to bar
+
+* we are declaring `alias` as a state variable, so it is not really a direct alias of foo
+* so this is actually short for
+		
+		alias:
+			0: foo
+		someModule:
+			alias.1 := bar
+
+* when we want to do reassignment, we have to declare a state variable, which creates a new object
+	* and we push states to that object
+	* the initial binding, the "alias", is just the first state pushed
+* even if we have a subclass of state variables, and we clone that subclass, we are still creating a new object
+* so any modifications will go to the newly created object
+
+* when we create a direct alias, it just points to the original object, doesn't create or clone any new objects
+* so when we want to tag it, it modifies the original object
+
+### Cono and Perspectives
+
+* in Cono, the way we use perspectives is mostly so you can tag things with your own values
+* and then Cono will aggregate everybody's tags to create global weighted tags
+* and you can also run recommendation engines from "your perspective", using your own tags
+
+* the second point seems the most relevant
+* it's important for the user to use public tags directly or through a clone of the public tag
+* so that the recommendation engine can automatically recognize them
+* but if the user declared his own tags, they would have to manually pass it into the recommendation engine
+* for example, in the code sample below, `Joe` uses the `#like` tag directly
+
+		#like
+		MovieRecommender
+		Joe:
+			someMovie#like := true
+			someOtherMovie#like := true
+			anotherMovie#like := true
+
+			myMovieRecommendations: MovieRecommender(this)
+
+* but if `Joe` has to declare a new tag, they would have to pass it into MovieRecommender
+
+		#like
+		MovieRecommender
+		Joe:
+			#mytag: #like() // create a new tag based on #like
+			someMovie#mytag := true
+			someOtherMovie#mytag := true
+			anotherMovie#mytag := true
+
+			myMovieRecommendations: MovieRecommender(this, #like: #mytag) // override #like with #mytag
+
+* so being able to use a public tag for private tagging is more convenient
+* but also can be more confusing, as we've mentioned earlier
+
+### State Variables and Indirect Modification II
+
+* two problems when we apply these rules to state variables
+* first, recall the issue we talked about in the section "State Variables and Indirect Modification"
+* if we have something like
+
+		foo:
+			stateVar. := 5 // set initial state to 0
+		bar: x >>
+			x.1 := 10 // set next state to 10
+		bar(foo.stateVar)
+
+* this allows us to modify state variables out of scope
+* this is because the property `1` we are modifying is a public property
+* however, if we don't allow indirect tagging of public tags, that makes state variables impossible
+* because state variables leverage this exact mechanism
+
+		stateVar := 3
+		for (i in range 1 to 100)
+			stateVar[i] := stateVar[i-1]*stateVar[i-1] % 10
+
+* maybe instead of leverage public properties, we can make it so declaring a state variable
+	* also declares a bunch of private keys that are copies of the numbers `0,1,2,3...`
+* so these new private keys are localized to the scope of the state variable, so only modules in scope can modify the state var
+* in addition, inside the scope, we can reference these properties using normal numbers, `1`, `2`, etc
+
+* though perhaps we have to do it like this, because they are private tags:
+
+		stateVar.
+		stateVar#0 := 3
+		for (i in range 1 to 100)
+			stateVar[#i] := stateVar[#i-1]*stateVar[#i-1] % 10
+
+
+### Using Underscore for Private Vars?
+
+* remember that we have a public property `keys` for public tags/keys
+* and `_local_keys` for private tags/keys
+	* though it's really just an internal property for binding purposes
+	* see section "Private Keys and Static Binding"
+* this way we can iterate across hashmaps that use object keys,
+	* without the `keys` property, these object keys would be inaccessible
+* as mentioned in section "Object Keys are not the same as Private Keys"
+
+* maybe we should use `#tag` for public tags and `#_tag` for private tags?
+* like how python uses `_` (underscores) to indicate private vars
+* we can do the same with public vars, `foo.bar` vs `foo._bar`
+
+
+### Cloneable Private Tags
+
+* how can the #visited tag be cloned if it's private?
+	* remember in the section "Cloning and Source Code" we mentioned that to clone something,
+		the entire module must be accessible
+* that means it must be public...
+* but then wouldn't that open the tag up to anybody outside the scope?
+
+* so we're in a dilemma
+* on one hand, we want to make #visited public so it can be cloned
+* on the other hand we don't want to make it public otherwise anybody can tag it
+* so it seems like we have a case where we want a tag to be visible and cloneable, but not usable directly for tagging
+
+
+* so its kinda like we want #visited to be readable
+* but we don't want to make it writable
+* we display the value, but we don't give away the secret key used to write to it (or push changes to it)
+
+* maybe we can achieve this be separating "source code" from "runtime"
+* we want the source code to be public (so it can be cloned)
+* but the actual runtime creates a secret private key associated to the runtime module
+* and while that key is propagated to nested modules through inheritance, it is not visible to the outside
+
+* or maybe, this is just separating references from scoping
+* as we talked about in a earlier section, "Separating Referencing and Scoping"
+* you can declare a public property, like #visited, that has no reference to it
+* so while you can see it exists and clone it (via cloning the parent module)
+* and while it gets passed to nested scopes
+* you can't use it (or read it) outside the module
+
+* syntactically, this means that you can create local properties like `#visited`, but you can't reference them like `foo#visited`
+
+		BFS:
+			#visited // public local tag
+			...
+		readResult: BFS#visited // illegal
+		cloneResult: BFS(x: 10, #visited: 10) // legal
+
+
+
+### Undirected vs Directed Graphs
+
+* right now Cono just associates entities to entities
+* like unlabeled, undirected edges between nodes in a graph
+* this is sort of like how I initially thought of "tagging", back in 2013
+* and it seems to work pretty well
+* if we have the song "Bad Blood", you might tag it with "Taylor Swift", "Pop", and "1989"
+* and maybe even "favorite songs", your personal playlist
+
+* in Entangle we use labeled, directed, properties
+* and I sort of want to use the same model for Cono
+* but is it necessary?
+* at first glance, it seems useful
+* we can do something like
+
+		Bad Blood:
+			artist: Taylor Swift
+			album: 1989
+			genre: Pop
+			favorite songs.
+
+* but is it really necessary?
+* we don't really need the property names/labels
+* for it to be obvious that "Taylor Swift" is the artist of the song, or "1989" is the album
+* Taylor Swift is a musician, so if she is associated with a song, she's probably the artist of the song
+* undirected unlabeled associations might be enough
+
+* we sort of talked about (much earlier) how crowd-sourced tags can infer hierarchies and stuff
+* eg, if everything tagged with `calculus` is also tagged with `math`
+* but not everything tagged with `math` is tagged with `calculus`
+* we can infer that `calculus` is a subcategory of `math`
+* and when we start to build all these hierachies and weighted relationships
+* we can start to give suggestions and recommendations
+* for example, if an article is getting popular in the `calculus` community
+* it "bubbles up" into the `math` community
+
+* so maybe we don't need property names
+* maybe we can do everything using unlabeled associations between objects?
+
+* what about things like directed relationships between similar objects
+* eg "parent", in the example "Alice: (parent: Bob)"
+* "Bob" and "Alice" are both people, so you can't infer the hierachy or relationship
+* and the relationship is directed (Bob is Alice's parent, but not the other way around)
+* in this sense, relationships are different from just plain associations
+* however, maybe it can be inferred...
+* judging by Bob's age, Alice's age, the fact that Bob raised Alice
+* maybe if we look at all the information associated with Alice and Bob,
+	* we can infer that Bob is the parent, and Alice is the child...
+
+### Modeling Sets using Tags
+
+* in addition, the way we handle tags is sort of weird
+* right now `foo: (#visited.)` is equal to `foo: (#visited: true)`
+* instead of binding object to object
+* we bind object to `true`, with the property key being the other object
+* whereas, it might be more intuitive to think of it as `foo ----> #visited`, an unlabeled edge between objects
+* like, `Bad_Blood: (Pop_Song.)` should really stand for `Bad_Blood: (category: Pop_Song)`
+* but in Entangle, it stands for `Bad_Blood: (Pop_Song: true)`
+* which is sort of weird
+
+* it would be cool if we could start with unlabeled edges, like `Bad_Blood <------> Pop_Song`
+* and then later, we can add a label, `Bad_Blood <---(category)--> Pop_Song`
+* but right now, with the way we represent it, `Bad_Blood: (Pop_Song: true)`,
+* changing it to `Bad_Blood: (category: Pop_Song)` is a big structural change
+
+* it seems like `Bad_Blood: (Pop_Song: true)` should be thought of as `Bad_Blood: (is_Pop_Song: true)`
+* likewise something like `foo: (#visited.)` stands for something like `foo: (is_visited: true)`
+* it doesn't act like a category or set
+* it acts like a query, asking about the existence of certain qualities
+
+### Labeled vs Unlabeled Graphs
+
+*  for a programming language, labeling properties makes sense
+* these labels are how we connect functions to data
+* eg if we have a function `divide()` that takes in a `numerator` and `denominator`
+* then when we use the function, we have to label the input data appropriately
+* these labels are important for standardizing data to be used across a variety of functions
+* if a piece of data is labeled `height`, then it can be used in all sorts of functions that take an input `height`
+
+* so why is there such a big difference between the intuitive model for programming, and the intuitive model for practical usage?
+* as in, how come in programming, it makes sense to use labeled directed properties
+* but in tagging and categorizing the web (using Cono), it seems sufficient to just use unlabeled undirected associations
+* the web is just a network of data, shouldn't it use the same model as our programming language?
+
+* it also seems like the type of data handled in Cono and Entangle are different
+* in Entangle, it's normal to define lots of numeric properties, like `Bob: (height: 3, weight: 6, age: 24)`
+	* it wouldn't make sense to just use labels for this, because `Bob: (3, 6, 24)` tells us nothing
+* in Cono, we deal with higher level concepts, `Bad Blood: (Taylor Swift, 1989, Pop)`
+* where we don't really need labels
+
+
+* maybe the way Cono really works is through inferred labels
+* when we tag `Bad Blood` with `Taylor Swift`, Cono infers that you are actually tagging it with `Bad Blood: (artist: Taylor Swift)`
+* because `Taylor Swift` is a musician, it is able to infer this
+* you might have to specify some things directly, eg `Bad Blood: (featuring: Kendrick Lamar)`
+* because it will by default infer `Bad Blood: (artist: Kendrick Lamar)`
+
+* this explains why we can't use the same methodology for Entangle
+* because this type of inferrence requires tons of crowd-sourced data
+* which is not practical for a programming language
+* instead, when programming, you ahve to explicitly specify such labels and relationships
+
+* note that there are still cases where labels are useful in Cono
+* for example, anytime we are crowd-source building a bank of information
+* like nutrition information of different foods
+* tags like `Lays_Chips: (calories: 999, fat: 99)` could be useful pieces of data
+
+### Scope as Input - Syntax Exploration
+
+(continued from sections "Syntax and Mechanics Brainstorm II" and "Clone Scopes and Property Access")
+
+* right now `foo(...)` is a capture block
+* but it would be nice if it meant "capture the current scope"
+* so you could be like
+
+		bar:
+			x: a+b
+		a: 10
+		b: 20
+		foo: bar(...) // inherits "a" and "b" from scope
+
+* currently we achieve this using the syntax `...bar()`, like so:
+
+		a: 10
+		b: 20
+		foo: ...bar()
+
+* this was discussed in the section "Plugins and addons using spread operator"
+* but this also spreads out the output, and results in
+
+		a: 10
+		b: 20
+		foo:
+			x: a+b
+
+* would be nice if `...bar()`  spread out the outputs, without inheriting inputs from the current scope
+* and if you did want to do both, you could do `...bar(...)`
+
+* maybe to inherit inputs from the current scope, we could use `bar(this)` or maybe`bar(...this)`
+* (this was actually first explored in sections "Syntax and Mechanics Brainstorm II" and "Clone Scopes and Property Access")
+
+### Cloneable Private Tags II
+
+* back to the issue about cloning and #visited
+* how we want the #visited in BFS to be visible so it can be cloned
+* but we don't want outsiders to be able to use the tag, only clone it
+* read-only, no writing
+
+* one issue with the way we handle public vars is
+* if we have a private module but we want to make a nested module public
+	* (kinda like a public api for a private service)
+* we would do something like
+
+		privateService:
+			#privateVar1
+			#privateVar2
+			publicVar: someModule(a: #privateVar1, b: #privateVar2)
+
+* notice that, by passing in private variables as parameters, they are exposed to the public
+* because people can now just do `publicVar.a` to see the value of `#privateVar1`
+* though note that this just exposes the value, not the source code
+* so we don't necessarily need to show the public that `a: #privateVar1`
+* they can see the value of `publicVar.a`, but they don't know it corresponds to `#privateVar1`
+
+* this issue also arises from creating new modules, not just passing parameters
+
+		privateService:
+			#privateVar1
+			#privateVar2
+			publicVar:
+				a: #privateVar1
+				b: #privateVar2)
+				x: a+b
+
+* maybe a workaround for this issue is to do
+
+		privateService:
+			#privateVar1
+			#privateVar2
+			a: #privateVar1
+			b: #privateVar2
+			publicVar:
+				x: a+b
+
+* we basically use inheritance, instead of declaring them inside the public API
+
+* though, isn't that the same thing?
+* remember that inheritance is just implicit passing in variables
+
+* if we go back to the #visited example
+* we could try to do the same thing
+
+		#visited
+			breadthFirstSearch
+				...
+				nestedModule:
+					someNode#visited := true
+
+* then when you clone breadthFirstSearch, you have to provide a value for `#visited` or else it will end up undefined
+* which seems to work
+* however, how can breadthFirstSearch be clonable, aka fully public
+* without making #visited public?
+* somehow the variable has to pass from the outermost scope to the `nestedModule`
+* it has to pass through `breadthFirstSearch`
+* even if it's a private key, the private key has to be passed through
+* so if `breadthFirstSearch` is fully public, won't that mean `#visited` needs to be public too?
+
+* remember that Entangle is supposed to be a distributed language based on loose couplings and encapsulation
+* so each module can be though of as an independent node
+* because `breadthFirstSearch` is public, can't a bad actor monitor all the data going out of it
+* and see what data goes into `nestedModule` to figure out the value of `#visited`
+* and then replicate it?
+
+* if you can fully clone something, doesn't that mean you can impersonate them?
+* so by fullying cloning `nestedModule`, could you impersonate it,
+	and make modifications to the original `breadthFirstSearch` and `#visited`?
+
+* so it seems like at least something still need to be kept private
+* `nestedModule` should have some sort of secret key that allows it to modify `#visited`
+* has to be secret, otherwise people could clone `breadthFirstSearch` and impersonate `nestedModule`
+* so it seems like even for clonable modules, some data should be kept private?
+
+### Static Bindings vs Secret Urls
+
+(continued from preceding section, "Cloneable Private Tags II")
+
+* maybe it works through bindings
+* static bindings
+* every module has a unique id, url
+	* ensured by the language, the interpreter
+	* maybe maintained through a private global list
+* these urls are only known to the interpreter
+* if you reference a private variable, it is statically bound to the url
+* and kept private
+
+* if you clone it, it doesn't clone the bindings, instead creates bindings to the copies of the objects
+
+		breadthFirstSearch
+			#visited: ()
+			...
+			nestedModule:
+				someNode#visited := true
+
+* `#visited` creates an object, which has a unique id
+* even if you clone it, won't have the same id
+
+* static bindings go both ways
+* so `#visited` also has a reference to the url of `nestedModule`
+* and knows to accept modifications from it
+* but if somebody clones `breadthFirstSearch`, their clone of `nestedModule` will have a different url
+* and thus won't be able to impersonate the original `nestedModule`
+* `#visited` can reject the clone's changes
+* though this can get a bit more complicated when you want to "share" the write access,
+	* aka if `nestedModule` wanted to allow a different module to modify `#visited`
+
+
+* or maybe we can make the tag visible but the value private
+* `#visited: ()`
+* the binding is visible, but the value isn't
+* so when you clone it, it copies the binding, creates a new object
+* but it doesn't see the value, the url of the original `#visited`
+
+* however, it's still passed into nested module
+* when nested modules use `#visited` in their code, it will retrieve the value
+* but when external modules try to do so, it will return `undefined`
+
+* but why are we treating these nestedModules as independent or dynamic?
+* at least in the `breadthFirstSearch` example above, `nestedModule` is statically defined
+* it does not need to be able to create these bindings itself, it can be statically bound from the start
+* it doesn't need resolve `#visited` itself, the interpreter should have already done so
+* when `breadthFirstSearch` is created, it creates `nestedModule`, and statically binds all instances of `#visited`
+* so `nestedModule` never needs to know about the variable name `#visited`, only the direct url
+* though this seems very static, maybe there are some dynamic cases where this won't work...
+
+
+* so it seems like there are two ways of mediating write access
+	1. provide a secret key (flexible, sharable)
+	2. keep track of the urls of "authorized" modules (static, secure)
+
+
+
+* in a way we can think of the "secret key" as a mapping from tag to url
+* a mapping from `#visited` to the actual memory location / url of the tag
+* it allows the nested module to compile itself, independently
+* so that anytime the nested module refers to `#visited`, it can resolve it to the direct url
+
+* so in both option 1 and 2, the nested module has some secret info about the tag: the direct url
+* the nested module needs this information in to send information and data to the tag
+* however, in option 2, the tag also has the direct url of the nested module
+* whereas in option 1, the tag is unaware, and anybody that has access to the tag's direct url can post to it
+* so in option 1, write access is sharable
+
+* also note that in option 2, we actually don't need to make the url of the tag private
+* because the bindings are static, it doesn't matter if other people know the url of the tag
+* the tag has already explicltly declared who has write access
+
+
+* I feel like as long as option 1 is implemented securely, and the compiler/interpreter is implemented correctly,
+* then it will be just as secure as option 2
+* for example, in the `breadthFirstSearch` example, reiterated below:
+
+		breadthFirstSearch
+			#visited: ()
+			...
+			nestedModule:
+				someNode#visited := true
+
+* `nestedModule` is statically declared under `breadthFirstSearch`
+* so even though it compiles itself, and has "access" to the variable name `#visited`
+* the tag `#visited` still won't be leaked
+* because the statically delared `nestedModule` doesn't have the ability to share or leak the tag
+* a nested module can only leak a tag if you give it the ability to leak the tag
+
+* though I guess this can get complicated with library functions
+* if we use library functions inside our scope, we might not know what they are doing
+* and they might be leaking our private tags
+* though I think that's just something you have to be careful for
+
+
+* another benefit of option 1 is that it stays true to the distributed nature of Entangle
+* every module should be able to compile themselves independently
+* even nested modules are just external modules with some variables passed in implicitely
+* all modules should be able to act independently
+
+### Entangle is for Web Applications
+
+* dynamic and reactive, which allows for building quick and easy UI's (similar to Angular/React/Vue)
+* unordered, parallelizable, and promotes loose coupling, perfect for distributed networks
+* private variables achieved through secret keys (think cryptography) which is secure and also flexible, as the keys can be shared
+* create data structures without worrying about execution order, for simpler and more scalable applications
+
+* combined back-end and front-end
+* RESTful API calls are just normal function calls
+
+### Tags are Private Keys
+
+* syntactically, we can actually prevent external indirect modifications
+* because while anything in the scope of the tag can just refer to it directly, `#mytag`
+* anything outside the scope has to somehow refer to the parent object, and then the tag
+* something like `parentObject.#mytag`
+* but we can simply not allow that syntax
+* any reference to `#<some tag>` will refer to tags in scope
+* something like `<some object>#<some tag>` is short for `<some object>[#<some tag>]`, and is used for indirect modification
+* but you can't reference a tag indirectly, you can't reference a tag declared under a different object's scope
+
+		foo:
+			#mytag
+			someObject#mytag := 10
+
+		anotherObject#mytag // error: #mytag doesn't exist in this scope
+		anotherObject[foo#mytag] // error: #mytag doesn't exist in this scope
+
+* in a way, `#<some tag>` is like a way of saying "this is a key that isn't a string"
+* normally, when we create or reference variables, we are implicitely using strings
+* something like
+
+		foo:
+			bar: 10
+		zed: 2 + foo.bar
+
+* is equivalent to
+
+		"foo":
+			"bar": 10
+		"zed": 2 + "foo"."bar"
+
+* note that the `"foo"."bar"` can be further expanded to `root["foo"]["bar"]`
+* so notice that it's all just a bunch of string keys
+
+* when we start using tags, like `#visited`, we aren't using string keys anymore
+
+* tags are just a way to declare a new private key
+
+### Declaring Perspectives
+
+* earlier, we talked about how one of the difficulties with perspectives and "ownership",
+	* is that you might want to delegate tagging to 3rd party apps
+	* see section "Tag Ownership - 3rd Party Tagging Apps"
+* and yet you still want those tags to belong to "you"
+* we already discussed that you have to create a copy of a tag (extend a tag) before you can use it externally
+	* see section "Indirect Tagging Restrictions"
+
+* to keep things organized, it's best to create all these tag copies in a centralized location
+* this is a "perspective"
+
+* so in terms of Cono, this is equivalent to creating tag copies directly under the user
+* every time a user uses a tag, eg `rating` or `like` or `dislike`, it implicitly creates a copy of the tag under the user
+* even if a 3rd party app uses a new tag, the implicit tag creation puts the tag under the user, not the 3rd party app
+
+* this way, when we want to view data or behavior from the "user's perspective", we have a central node that contains all the user's tags
+* and all the mappings from the user's tags to the original tags
+* so we can just do `somePlugin(...currentUser)` and it will override all the original tags of `somePlugin` with the tag copies inside the user
+* eg:
+
+		Joe:
+			#height: 10
+			#weight: 20
+
+### Urls and Memory Locations are a Feature of the Compiler/Interpreter
+
+* we've mentioned "urls" and "direct urls" and "memory locations" a bit now
+* but actually, these are part of the interpreter/compiler's job to take care of
+* the programmer should not be aware of it
+* in fact, it isn't really part of the language either
+* just the implementation of the language
+* it's up to the compiler to maintain a list of unique urls for each node
+* all the programmer needs to know is that each node is unique
+
+### Indirect Keys and Cloning
+
+* a while back we mentioned that we should not account for indirect keys
+* for example, if I have access to the key `foo.bar.mykey`, that key still doesn't belong to me
+* when the IDE shows me what data I can see, it shouldn't account for indirect keys
+* because it can get very slow and complicated to constantly traverse the graph to see what keys I have access to
+	* see section "Private Keys and Tags - Mechanism Brainstorm"
+* not to mention, it could be impossible, because if any data could be a key,
+	* figuring out what "data" I have access to could reduce to the halting problem
+* so the only keys to be considered should be the keys declared in `.keys` and `_local_keys`
+
+* however, this gets complicated with cloning
+* if we can only clone objects that we have "full" access to
+	* see section "Cloning and Source Code"
+* then perhaps it is important to consider indirect keys
+* eg, if some person does not have direct full access to some object
+* but they are part of a group that does have full access
+* then they should be able to clone it
+* if the person has a friend that has full access, then should they be able to clone it?
+* maybe you can just ask the friend or the group to clone it
+
+* we can still "aggregate" keys
+* you already inherit keys from parents
+* so whatever objects your parents can clone
+* you can clone too
+
+* this could possible work for graph traversal too
+* aggregating keys is not a problem, even with graph cycles
+* determining whether a node can traverse and reach a different node, is decidable
+* though it becomes undecidable once we factor in dynamic graphs, generated graphs
+	* eg a graph containing all prime numbers
+
+* so maybe keys have to be statically declared?
+
+* you would still be able to use arbitrary object keys
+* remember that if you "push" an object into a hashmap
+* it adds it to the hashmap's list of `keys`
+* so it's kinda like statically declaring it
+
+### Authorizing Internal Access
+
+* we've been discussing "independent" nested modules that can change their own behavior
+* but how would that actually work?
+* the nested module would give it's keys to a user
+* and the user could view the nested module from an internal perspective
+* and make changes to all the tags that the nested module has access to
+* and access all data that the nested module has access to
+
+(note: this is continued in the section "Scope Passing")
+
+### Copying Tags
+
+* in the section "Indirect Tagging Restrictions",
+	we mention that tags have to be copied if you want to use them out of scope
+
+* how would one even copy a tag if they are outside of scope?
+* we can't just do `#mytag: foo.#tag` because remember that `#tag` is private, so we can't get it's value
+* though we don't really need it's value/url, we just need to somehow associate our new tag with the private tag
+	* like saying "this tag is based on this other person's tag"
+
+
+* maybe you can only copy a tag by cloning its parent object
+* so in a way, you have to copy a tag's entire behavior in order to copy it
+* so to copy the`#visited` tag, you have to copy the entire `breadthFirstSearch`
+* you can't just tag external objects with `#visited` because it doesn't mean anything without the behavior
+
+* in terms of Cono, you can't just copy something like `#rating` or `#comment`
+* you have to copy the associated behavior
+* eg you can copy a recommendation engine to your profile, and then use the `#rating` tag on your library
+
+
+* however, seems like a weird restriction
+* why do we have to worry about the behavior, why can't we just tag info and attributes onto objects
+* and then figure out how to use those attributes later
+
+* remember that tags represent concepts
+* we can declare concepts, without declaring a usage yet
+* just grouping together data
+* to be used later
+
+### Separating Tagging from Private Keys
+
+* tags can be used in many ways
+* aggregators, state variables, perspectives, etc
+* can be implemented in different ways: using hashmaps, hidden properties, etc
+
+* tagging is a behavior
+	* the ability to indirectly declare properties
+* but private keys are just another type of key
+* they don't have to be related
+* private keys are just locally declared keys
+* but we can use both private or public keys for tagging / hashmaps
+
+* we should just treat private keys just like public keys
+* all it does is give a name to a value, just like public keys
+* anytime you reference a variable like `foo`, it is a public key, and stands for `this["foo"]`
+* anytime you reference a variable like `#foo`, it is private, and stands for `this[#foo]`
+* it's just a way of declaring a key that isn't a string
+* you can use that key just like how you would a public key
+* tagging, aggregators, state variables, etc
+* it's just giving a name to data
+
+* private vars is like scope inheritance without reference
+	* mentioned in section "Separating Referencing and Scoping"
+* it's a way to group behaviors and data for re-use
+	* and for usage within nested modules
+* without creating a reference to it
+
+### Imperative vs Entangle - Multi-Pass Algorithms and the Test Scores Example
+
+* one of the benefits of Entangle is, due to its unordered dataflow behavior
+* many algorithms that require multiple passes in imperative languages
+* can be done in a single pass
+
+* for example, let's say we are given a list of test scores
+* and we want to keep track of all test scores that are higher than the average
+
+in javascript:
+
+	var testScores = [34, 87, 51, ...];
+	var total = 0;
+	testScores.forEach(score => total += score); // first pass
+	var average = total/testScores.length;
+
+	var higherThanAverage = {}; // hashmap of good scores
+	testScores.forEach((score, index) => higherThanAverage[index] = (score > average)); // second pass
+
+in entangle:
+
+	testScores: 34 87 51 ...
+	total: aggregator(+)
+	average: total.result/total.length
+	#higherThanAverage
+
+	for score in testScores:
+		total <: score // push to aggregator
+		score.#higherThanAverage := (score > average)
+
+* note that javascript has to maintain a hashmap alongside the scores
+* whereas entangle can attach tags direct to the scores
+
+* next, let's say every student has a "tutee", a student they are tutoring (from the same list)
+* so we associate every score, with the tutee's score
+* if the tutee scores higher as average, the student is tagged with "good tutor"
+
+in javascript:
+
+	var testScores = [34, 87, 51, ...];
+	var tutees = [4, 9, 1, ...]; // each element stores the index of the tutee
+	var total = 0;
+	testScores.forEach(score => total += score);
+	var average = total/testScores.length;
+
+	var higherThanAverage = {}; // hashmap of good scores
+	testScores.forEach((score, index) => higherThanAverage[index] = (score > average));
+
+	var goodTutor = {};
+	testScores.forEach((score, index) => {
+		var tutee = tutees[index]; // index of tutee
+		goodTutor[index] = testScores[tutee] > average
+	})
+
+in entangle:
+
+	testScores: 34(tutee: 4) 87(tutee: 9) 51(tutee: 1) ...
+	total: aggregator(+)
+	average: total.result/total.length
+	#higherThanAverage
+	#goodTutor
+
+	for score in testScores:
+		total <: score
+		score.#higherThanAverage := (score > average)
+		score.#goodTutor := testScores[score.tutee] > average
+
+* notice that javascript requires 3 passes now, whereas entangle is still all in one pass
+* also notice that entangle can attach the "tutee" info directly to the scores
+* ideally, we would actually make `score.tutee` point to the tutee's score directly
+* but that is hard to represent here, because each score would look like `score(tutee: <url of tutee score>)`
+	* and we can't really show the "url" of each tutee score here, that would be determined dynamically at runtime
+
+### Tag Aliases
+
+note: this is different from the section "Tagging Aliases"
+* "Tagging Aliases" was about tagging the alias of an object
+* this section is about creating an alias of a tag, and using it to tag an object
+
+* if we do have a tag #mytag
+* and we do `#alias: #mytag`
+* then `#alias` points to the same url as `#mytag`
+* so you can do stuff like `foo#alias := 10` and its the same thing as saying `foo#mytag := 10`
+* but if you tried to use a public tag
+* `alias: #mytag`
+* it doesn't work the same way
+* `foo.alias := 10` is not the same as `foo#mytag := 10`
+* so if public and private keys are supposed to behave the same
+* why are we getting different behaviors here?
+
+### Declaring Tags with Values
+
+* private tags can have a value associated with it
+
+		foo:
+			#mytag: (user: Joe, created_at: 1039831)
+			Movies:
+				KungFuPanda #mytag := 4
+
+* so actually, we don't want `#mytag` to be cloneable, even though it's bindings are declared in `foo`, a public module
+* despite what we concluded previously, in the section "Cloning and Source Code"
+* its value is private
+* there would be no point to declaring `#mytag` as private if the public can see it's value
+* there's no point to keeping the url private, like we were trying to do before, because the url isn't important
+* the url is just for the interpeter/compiler
+
+* even if the tag has no value, like `#mytag: ()`
+* we still want to keep that private
+
+* actually this is not right
+* ambiguous, could look like you are using the tag, not declaring it
+* the above example could also mean that `#mytag` is an implicit input, that we are using to tag `foo` with
+* which would be equivalent to `foo.#mytag := (user: Joe, created_at: 1039831)`
+
+* so we need to somehow create a distinction between using a tag, and declaring it
+* perhaps if tags didn't have values, this would be simpler
+
+### State Variables and {} Syntax
+
+* maybe we can use `{}` with state variables to specify index
+* instead of `#1`, `#5`, etc, as mentioned in the section "State Variables and Indirect Modification II"
+* so
+
+		stateVar{0}: 2
+		while (stateVar{} < 10000)
+			stateVar{} = stateVar{-1}*stateVar{-1}
+
+* `stateVar{}` is short for `stateVar{current}`
+* and `stateVar{-1}` is short for `stateVar{current - 1}`
+* hmm still sorta ugly though
+
+### Aggregators vs Perspectives
+
+* on one hand we want to restrict tagging usage to the scope (aggregators)
+* on the other hand we want to allow it out of scope (perspectives)
+* confusing
+
+* we talked about how with public tags, we don't want to allow public tagging because it will allow anybody to modify anything
+	* mentioned a lot, but recently in the section "Indirect Tagging Restrictions"
+* same issue arises when we have tags declared at root
+* gets hard to track down where changes are coming from
+
+* so the issue really isn't about public vs private
+* because if you delcare a "private" tag at the root, it is pretty much the same as a public tag
+* same issues
+* the issue is whether we want to broadcast or not broadcast our taggings
+
+broadcast vs not broadcast
+* with an aggregator, we want to broadcast our indirect taggings to the aggregator, so it can aggregate them
+* with perspectives, we want to keep our taggings private, not broadcast them
+
+aware vs not aware
+* with an aggregator, the aggregator is aware of the taggings
+* with perspectives, the aggregator is not aware of the tagging
+
+* in the breadth first search BFS and `#visited` example, its an aggregator, we want our tags to be broadcasted
+* same with state variables
+* but in perspectives, like the examples in the section "Private Tagging of Public Tags", we don't want to broadcast our taggings
+* I will have to work through these examples in more detail to figure out how I want to handle this
+
+* what about cloning?
+
+* maybe these problems can be solved with a special key for write access?
+* seems to work for most cases
+
+### Copying Tags II
+
+* the weird cases is modification, not just adding a property
+
+* we can copy the original tag, and now no collisions, and no problems
+* but then we have to manually pass in the mapping when using
+	* mentioned in section "Copying Tags"
+
+* it's weird because you can't just modify a property and expect to see all the rest of the object's properties to change
+	* if some of those properties are "dependent" on the property you changed
+* some properties might come from private sources
+* for example, if you have
+
+		foo:
+			publicVar: 10
+			#privateVar: 20
+			sum: publicVar + #privateVar
+		foo.publicVar := 0
+		print foo.sum
+
+* notice how you can extract the value of `#privateVar`
+
+* however, if some of the variables are private, then wouldn't be able to clone it right?
+* because the "source code" is not completely accessible
+	* mentioned in section "Cloning and Source Code"
+
+* besides, if you can clone `foo`, just clone it and override the property
+* but if you can't clone `foo`, should you even be allowed to modify it in the first place?
+
+* notice that if we allowed cloning of objects with private values
+* you would also run into these same issues
+* for example:
+
+		foo:
+			#privateVal: 10
+			bar:
+				a: 10
+				b: 20
+				c: a+b
+				d: c * #privateVal
+		zed: foo.bar(a: 7)
+
+* notice that, `c` will change based on the new value of `a`, but will `d` change?
+
+* if we allow `d` to change:
+	* that would mean we are changing private behavior through publicly accessible variables
+	* going against the idea that "you should not be able to gain more information out of a module by cloning it"
+	* see section "Cloning Restrictions II"
+
+* but if `d` doesn't change:
+	* then for the clone `zed`, the property `c` and the property `d` come from different values of `a`
+	* `zed.c` comes from the new value `zed.a: 7`
+	* `zed.d` comes from the old value, `foo.bar.a: 10`
+
+### Tags and Plugins
+
+* could we have some sort of tag initiator,
+* that when you tag an object, it causes some properties to be added dynamically?
+* kinda like flagging an object
+* for example, maybe you have a bunch of students
+* and some of them might have very low grades
+* so you flag them with `#needsTutoring`
+* and your system automatically finds a time slot for each of these students,
+	* and assigns the tag `#tutoringTime: <time slot>` to each one
+
+* this can maybe be achieved through tag "origin"
+* when the tag aggregator notices a new tagging, it goes to the origin and fills in these extra properties
+* seems like a complex and unintuitive mechanism though, on the aggregators side
+* the aggregator will have to implement this dynamic fill-in system
+* it should be something you can just declare, like saying "_these properties_ attach alongside _this tag_"
+* define data, not behavior
+
+* this is kind of like plugins and add-ons
+* so maybe we can use the syntax discussed in the section "Plugins and addons using spread operator"
+
+		for student in students:
+			if (student.grade < averageGrade):
+				student <: ...needsTutoring(student)
+
+### State Variable API
+
+* state variables should only allow pushing states
+* not modifying existing states
+* otherwise it can get chaotic
+* if you allow anybody to arbitrarily modify the revision history of an object
+* its too hard to control and manage
+
+* if outsiders can only push states/revisions
+* then it's easy to handle malicious revisions
+* but if outsiders can modify the revision history
+* they can erase all the history, and there will be no backup
+* (remember that often times state variables are used to maintain state, so the history is meant to be persistent)
+
+* only allowing push operations
+* gives the peace of mind that any time a revision is successfully pushed to the stack
+* it is safe, not in danger of being erased or modified
+* which is what a state variable's purpsoe should be
+
+* so state variables are like private aggregators, with a public api, "push"
+
+### API Calls and Cloning Restrictions
+
+(continued from section "API Calls" and "Cloning Restrictions II")
+
+* what about api calls
+* involves some secret implementation
+* but you still want to be able to clone it
+* eg:
+		
+		apiFn:
+			a: arg1
+			b: arg2
+			result: #internalAPICall.(a, b)
+		print apiFn(a: 10, b: 20).result
+
+* maybe you can use aggregators
+* so instead of cloning `apiFn(10,20)`, you clone api arguments object, in this case `(a: ..., b: ...)`
+* and then you tag it so the aggregator picks it up, and returns the result
+* something like
+
+		apiTag: aggregator(#apiFn)
+		#apiFn:
+			a: arg1
+			b: arg2
+			result: #internalAPICall.(a, b)
+		this.apiTag := (a: 10, b: 20)
+		print apiTag.result[this]
+
+* we actually mentioned this technique earlier, in the section "API Calls"
+* and we mentioned how it's ugly and hacky
+* and how calling an API should look the same as calling any other function/module
+* for simplicity
+
+* the issue is, there are also times when we don't want you to be able to copy and tweak functionality
+* for example, if somebody wants to publish the results of a personality quiz
+* somebody could clone the post, and pass in different personality quizzes to find out more about the person
+* or even extract data
+
+		Joe:
+			#personalData
+			publicPost:
+				score: personalityQuiz(#personalData).result
+		
+		ccInfo: Joe.publicPost(personalityQuiz: extractCreditCardInfo).score
+
+* remember: you should not be able to gain more information out of a module by cloning it
+	* see section "Cloning Restrictions II"
+
+### API Keys
+
+* often times in the current web landscape, you have to pass a "api authorization key" with every api call
+* this allows the service to control who gets to call the api
+* and can also restrict the number of calls per user
+
+* if we think of this in terms of Entangle
+* having an authorization key is like having access to a private variable
+* so being able to "access" and call an API using a secret key
+* is basically just making a module private, but then distributing a reference to it
+
+* not quite the same though, because every reference to the private module has to be unique,
+* so you can track and restrict how many calls each "user" is making
+
+### Cloning Restrictions III
+
+* note that, if you want to declare a public submodule inside of a private module
+* it will inevitably have some private implementation, some reference to a private variable in the parent module
+* so if we ever want to be able to clone such public submodules
+* we have to allow cloning of modules with private implementation
+
+* so how does this reconcile with the ideas of "Cloning Restrictions" and "Cloning Restrictions II"
+* because you technically can gain more information out of a API by calling it
+* if you called the spotify recommendation API a million times you might be able to figure out how it works
+* reverse engineer it
+* so perhaps it is impossible to prevent information gain through cloning
+* perhaps the best we can do is restrict the number of calls to an API
+* and if you can clone an object with private implementation, do you "own" the clone?
+* who is responsible for the newly created bindings?
+
+### API Calls and Cloning Restrictions II
+
+* note that using passing around a reference to a private var, is different from an auth token/key
+* because you can revoke a token, but you can't revoke a reference
+* once you give out a reference, the receiver now knows the location/url of your API
+* and can call it however many times they want
+
+* in fact, even if you found some way to "revoke" their access
+* they could just clone their original clone
+
+* the way it should work is
+* the API has to provide the data
+* so you call it
+* and it fills in data into properties
+* so if you try to clone it, the clone won't work, the API just won't fill in the properties
+* will leave them undefined, and will fill in an "404 error" property or something
+
+
+* maybe this can be done with an aggregator
+* you pass an aggregator to the public API, and it fills in data
+
+### Scoping and Data Leaks
+
+* there's also the other side of this
+* if you are deep within a private module
+* and then you want to call an API
+* you can't just call the API
+* the arguments object passed to the API call
+* is inheriting all the variables of the surrounding, private scope
+* and you don't want to give that info away
+
+		#privateModule:
+			#privateVar: "hi"
+			publicAPI(a: 10, b: 20) // will #privateVar be passed in?
+
+* maybe you can declare an aggregator at root scope (so it doesn't inherit anything)
+* and then in the private scope, explicitly pass values to it
+
+* though this isn't a problem in normal languages
+* because inheritance is "lazy"
+* it only passes a variable into a scope, if it's declared in the scope
+
+
+* so it seems like we can generalize the problem to
+* we have two private modules
+* with nested scopes that want to communicate with eachother
+* without leaking any extra information
+
+* maybe the initiator declares a private aggregator at root scope
+* and passes it to the receiver
+* and this aggregator acts as a shared scope for the two to share messages
+
+### Publishing Private Data
+
+* a public aggregator can be thought of as a publishing platform
+* kind of like posting to facebook
+* you can define a bunch of private behavior and private data
+* but once you want to publish any of that data
+* you can push it to the public aggregator
+
+* note that this seems like the _only_ way to publish private data
+* after all, how else will you achieve something like
+
+		#foo:
+			#bar:
+				#zed:
+					publishThis: "hello world"
+		profile:
+			// notice: #foo.#bar is private, so inaccessible from this scope
+			// so how would we access "publishThis" from here?
+
+* before we talked about how state variables and aggregators are just a system built on top of the core language
+* but now that we have introduced private variables
+* it seems like aggregators can achieve stuff that normal static definitions can't
+
+* there is one weird way to reference private var in public var without using an aggregator
+*  if it's in the same scope, eg `foo: (#var: 10, pubVar: #var*2)`
+* you can actually use a weird method to do this to deeper scopes too
+
+		#foo:
+			publish: #bar.publish
+			#bar:
+				publish: #zed.publish
+				#zed:
+					publish: publishThis
+					publishThis: "hello world"
+		profile:
+			print #foo.publish
+
+* this is really weird though
+
+### Cloning and Ownership II
+
+* we have talked about ownership a lot
+* who "owns" the clone?
+* but maybe nobody owns it
+* when you declare a clone, or a new module
+* it is "born" into the world, and exists/acts independently
+* you can only control it's creation
+* you have no power over it's behavior after that
+
+* the clone source, and the cloner, both have different roles in terms of managing the clone
+* the clone source can always change how the clone looks, the internal implentation
+	* and that will be reflected in the clone
+* but the output controls how the clone is used, the reference to the clone
+	* determines whether the clone is created or not
+	* anybody who wants to use the clone has to ask the cloner
+
+
+* one important feature we should uphold is
+* once a clone is made, you can't take it back
+* so if I call a public API, and you give me information, you can't retroactively try to "revoke" that info
+* you can revoke subsequent calls to the API, but you can't revoke the info you already gave me
+* that would be like, Apple selling you a phone, and then saying you can't use it to download google chrome
+* once you have the data, you can use it however you like, however long you like
+
+* note that, clones follow the dataflow rules, so technically if the clone source changes the source,
+	the clone will change too
+* but perhaps the cloner can just use a state variable to save the state of the clone when it was first received
+
+### Complete vs Explicit Scope Inheritance
+
+* explicit inheritance will only inherit the variables declared inside the module
+* complete inheritance will import all variables
+
+* the last time we talked about this was way back, in the section "Scope Passing and Nested Modules"
+* where we said that "modules pass in all variables they declare to nested modules"
+* the reason being, we wanted modules to act independently
+* only be able to modify internals, nothing external
+* explicit inheritance would require the nested module to figure out what parent variables it's using, and bind to them
+	* which is sort of acting on external data
+* complete inheritance tells the parent to just pass everything in, so the nested module only needs to act internally
+
+
+* however, complete inheritance might allow outsiders (clone receiver) to access the private vars
+* because when you call an API, you are passing in an arguments object, that has inherited all your private variables
+
+* actually maybe it doesn't matter
+* even if the argument object carries the private var
+* the receiver won't be able use it
+
+		foo:
+			#privateVar
+			src: a b >>
+				result: a+b
+		bar:
+			clone: foo.src(10 20)
+			print clone.arguments.#privateVar // doesn't work, because bar doesn't have access to #privateVar
+
+* so maybe it doesn't matter if we use complete or explicit inheritance?
+
+* the only case I can think of it making a difference
+* is if we treat inner objects as "independent", and can reconfigure themselves, and so could potentially use a private var they aren't using currently
+* like maybe, if we allow a programmer to "hook into" a nested module
+* provide some sort of API in which they can perform any coding operation, like cloning or defining new references
+* then should they have access to the private vars?
+* seems like it
+
+* though I feel like the process of "hooking into" the nested module will already explicitly include the private vars
+* like, if you want to allow the programmer to hook in
+* maybe you want to map buttons to each of the private vars, and every time the programmer presses one of those buttons, it prints out the value of the corresponding private var
+* well in the process of mapping those buttons, you are exposing and using those private vars
+* so explicit inheritance will still work in this case
+
+* so what if you happen to share the private reference with the receiver
+* and the receiver tries to use it on the arguments module
+* will they be able to access the private var?
+
+### Parent Scope vs Parent Object, Definition vs Usage
+
+* there is also another big difference between complete and explicit scoping
+* that doesn't need to involve cloning
+* when you are accessing some inner module
+* can you access the module's parent variables?
+* this applies even for public vars
+
+		Car:
+			color: red
+			cost: 1000
+			wheels:
+				diameter: 27
+				trim_color: color
+
+		print Car.wheels.cost // does "wheels" inherit "cost" from the parent scope?
+
+* as you can see, it seems weird to inherit properties from the parent scope
+* it seems like it's because context only matters when we are defining the object
+* not when we are using the object
+* in fact when we use the object, we are actually in a different context altogether
+
+* so it seems like explicit inheritance is the way to go
+
+* note that this means that referencing some variable `foo` is not the same as `this[foo]`
+* because inheriting properties from the scope is only applicable during in the definition of the object
+* whereas property access like `this[foo]` is something that can be used during usage
+
+
+* so when viewing and using an object, you can't see its "context", the variables surrounding its defining scope
+* this "context" is only necessary when defining the module, a bank of variables for the programmer to choose from when defining behavior
+* so we can have the interpreter/compiler run statically, just like every other language
+* it runs through the entire source code, and then spits out a runtime program,
+	statically binding any references to context variables
+
+* properties vs scope of a module
+* when you define a module, you pull from the scope
+* when you use a module, you pull from its properties
+* the scope is like a factory, and the module is like a car created from the factory
+* when you use the car, you don't care about the factory anymore
+
+* however, we do want to achieve a sort of dynamic compilation
+* kind of like, if we wanted to define a new type of car, then we want to go back to the factory
+* so maybe we can have some syntax to somehow bring back the defining context
+
+		foo:
+			#var1: 10
+			#var2: 20
+			mult: #var1 * #var2
+			context: _context
+		bar:
+			foo.divide := ...
+				use context foo.context:
+					#var1 / #var2
+
+* so maybe we can dynamically pass around this `_context` variable
+
+
+
+* note that we can deconstruct nested scopes, or any complex tree structure
+* into a flattened array of nodes
+* each with references to other nodes
+* in fact, a flattened array of nodes can represent any graph structure, not just trees
+* so we should analyze scoping and public/private through this representation
+* to make sure it can model any graph structure, not just trees
+
+### Scope Passing, Dynamic Live Modification
+
+(continued from section "Authorizing Internal Access")
+
+* in my notes, I've mentioned multiple times this idea of dynamic independent compilation
+* I want to make the language directly analogous to how systems work in real life
+* so that systems like Reddit or Facebook or Google Docs can be easily and inuitively modeled in Entangle
+* this is why I was thinking about how to make a module independent and able to reconfigure itself
+* I want to be able to model systems like,
+* what if there was a tutoring club, that collects data about their tutees (like test scores and stuff) and stores it on their server
+* and you want club members to write tools and programs on top of that data
+* I want to be able to represent that system in Entangle easily
+* but isn't it already possible in imperative langs?
+* for example, in javascript
+
+		var tutees = database.get('tutees');
+		var testBank = database.get('testBank');
+
+		// now that you have your variables declared, you can write tools and programs
+
+		function getLowPerformingTutees() {
+			... // get all tutees with average test scores < 60%
+		}
+
+* in imperative, if you want to add or change your system
+* you just change your code, and redeploy
+
+* but in Entangle, we encourage dynamic, live coding
+* you can dynamically change a live system, or change parts of a system,
+	without affecting or redeploying the rest of the system
+
+* right now, if you want to build a tool on top of Reddit, you have to use the public REST API
+* which is clunky
+* not as clean or convenient as accessing and using the variables directly
+* instead of feeling like you're inside Reddit's scope
+* it feels more like you're in an external scope and you have to manually ask Reddit for data
+
+* but in Entangle, you can dynamically enter the private scope/context
+	* like shown earlier, with the `_context` passing
+* and access the private vars
+* instead of having to work from an abstraction like an API
+
+* this is especially easy because modules are unordered
+* so you can enter a scope and insert new properties
+* without worrying about messing up execution order
+
+
+### Handling Async Functions - Imperative vs Entangle
+
+* asynchronous functions, javacript vs entangle
+* say we have a tree structure represented by parenthesis, `((1 2)((3)(4 5)) 6 7)`
+* and we want to replace each of those numbers with their square root
+* but the square root function is asynchronous
+
+// TODO: code examples for javascript and entangle
+
+* note that while the entangle method is cleaner
+* you don't know when it will finish
+* you can "synchronize" the block, which will wait for everything inside to finish
+* but then you run the risk of it running indefinitely
+* however, any async block has this risk
+* you don't know if a http request will timeout or not
+
+* also the entangle method has a bunch of wasted updates, unnecessary updates
+* if things occur out of order
+
+
+### API Calls and Cloning Restrictions II
+
+* public API
+* maybe the way it should work is
+* you ask for a key
+* it returns a private reference to the public API
+* but a special version of the public API that only works 5 times
+* the service basically creates a private clone of the public API that only accepts 5 requests
+* and then returns a reference to that private clone
+* that reference, that private clone, is the equivalent to like a "auth key" (that we use in current api systems)
+
+* however, what if the caller (the one calling the api) cheats
+* and changes the inputs of his first request
+* so that the output dynamically changes as well to reflect the new inputs
+* that way the api caller would be able to make as many requests as they want
+* by modifying the first request
+
+* we can try to mitigate this
+* by using state variables to somehow "capture" the initial state of the first request
+* but remember that this is a dataflow language
+* so every input of the request, is created asynchronously
+* depending on how the dataflow network is executing, some parts of the request may complete before others
+* some parts of the request may start out incomplete, and then update to the complete answer later
+* if we had a request like `getData(a, b, c, a+b-c)`
+	* if `c` takes a long time to "arrive", then the request may start like `getData(3, 5, undefined, undefined)`
+	* and then turn into `getData(3, 5, 2, 6)`
+
+* so perhaps the caller has to provide a timestamp
+* and regardless of execution, the provider (aka the API) can figure out what the state of the request should have been at that timestamp
+	* talked about in the section "Timeless"
+
+* however, what if the caller changes the timestamp?
+* same problem
+* the caller can just change the timestamp every time they want to make a new request
+
+* so two ways I can think of solving this
+
+* first method:
+* use change trackers to allow the provider to track all changes made to the timestamp
+* only accept the first timestamp
+* basically forces the requester to synchronize their program properly, so the timestamp only updates once (no transient changes)
+* also relies on change trackers, something we wanted to move away from because it depends on execution order
+	talked about in the section "Timeless"
+
+* second method:
+* somehow have a global timeline
+* the requester allocates a timestamp in the timeline, and then binds their request to that timestamp
+* the timeline does not allow timestamps to be removed, once the requester allocates it, it is permanently attached to the requester
+* the provider can see how many timestamps the requester has allocated, ands stops fulfilling requests after 5 timestamps are allocated
+* however, this has the same problem as the first method
+* the requester has to synchronize their program so that they only ask the timeline for a single timestamp (per request)
+	otherwise transient changes to the timestamp will result in multiple allocated timestamps
+
+* or perhaps a third method
+* a special "write-once" module/aggregator
+* the module will only accept one value for each input
+* if any value changes, the module will move to the "invalid" state
+* you have to synchronize your inputs to this module to ensure that the value of each input is constant
+* this module will have to somehow track execution
+* so I guess the programmer will have to start worrying about how their modules are being executed
+* and possibly synchronize it
+* I guess this is unavoidable
 
