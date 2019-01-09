@@ -2549,7 +2549,7 @@ and if you want to view dependents with your perspective, you have to explicitly
 * private variables achieved through secret keys (think cryptography) which is secure and also flexible, as the keys can be shared
 * create data structures without worrying about execution order, for simpler and more scalable applications
 
-* combined back-end and front-end
+* combined back-end and front-end, full-stack language
 * RESTful API calls are just normal function calls
 
 ### Tags are Private Keys
