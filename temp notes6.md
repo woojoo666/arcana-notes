@@ -1876,6 +1876,25 @@ this is like how in javascript, async and sync functions look so different
 but in Entangle I kinda want all functions to look the same, regardless of how it's implemented internally
 
 
+there is a similar method we explored earlier, in the sections "State Variables and Actions" and "Random Syntax Stuff"
+where we keep a list of how many calls were made to a certain function
+
+	stateVariable. = 0
+	for ( reduceFn.calls with nthChild(3n+1) ): // using css selector style, selects items 1, 4, 7, 10, ...
+		stateVariable++
+
+however, this is also not as intuitive and simple as just calling a function directly
+eg
+
+	stateVariable. = 0
+	reduceFn:
+		stateVariable++
+
+however, as noted in the section "Random Syntax Stuff", the `.calls` list comprehension method is more powerful and flexible
+so it's a tradeoff of flexibility vs simplicity
+
+
+
 
 interpreter can be modeled as a function too
 so maybe, you can only clone a module if you can see the source code
@@ -3378,7 +3397,7 @@ aware vs not aware
 * if things occur out of order
 
 
-### API Calls and Cloning Restrictions II
+### API Calls and Cloning Restrictions III
 
 * public API
 * maybe the way it should work is

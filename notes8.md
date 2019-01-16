@@ -99,6 +99,11 @@ One pass for each module, queries and Eve
 * and then the query pulls from all items in the set, and then traverses through the items and performs actions
 	* this is the tag usage step
 
+Revisit 1/15/19:
+* actually similar to Prolog queries too, where you constrain a set of variables to a set of conditions
+	* constraining a var to a set of conditions, and assigning it to a predicate,
+		is the same as filtering a dataset based on conditions, and assigning a tag
+
 ### Aggregator Style vs Functional Style
 
 * aggregator style and functional style work more differently than I thought
@@ -186,7 +191,7 @@ One pass for each module, queries and Eve
 * simple: output properties defined from inputs
 * Very simple and intuitive
 
-* 
+
 * The idea of adding "actors", taggers, came later
 * But my language confines the actor to a scope, a module
 * You can use plugins too
@@ -465,7 +470,7 @@ so if you want to insert a property
 you either have to be in the same scope as the collector
 or you have to "enter" the scope
 	talked about dynamically entering a context in an earlier section
-	// TODO: FIND REFERENCED SECTION
+	see section "Scope Passing, Dynamic Live Modification"
 
 
 
@@ -546,6 +551,8 @@ maybe something like
 
 
 
+
+### Dynamic Scoping and Write Access Keys
 
 You can think of the write access tag as
 A tag visible to the compiletime
@@ -726,6 +733,8 @@ So when you do `foo.bar.hi: 10`
 To indicate that foo and bar are variable accesses
 While `hi` is just declaring a string key
 
+### Direct vs Indirect Insertion - Diagram Syntax
+
 Note that you can only do one-level insertion
 You can't do like foo.bar.zed: 10
 Because you don't have access to foo.bar#bar_insert
@@ -734,9 +743,48 @@ Maybe I should use the <: for inserting properties
 That way this is clear
 foo <: bar: 10
 
-Diagram syntax
-actually illustrates insertion well
-and shows why inserting into indirect is weird
+diagram syntax actually illustrates insertion well
+and shows why inserting indirectly is weird
+
+direct insertion: `collector <: someFn(input).val`
+
+		                      val
+		input ---> (someFn) ---------------> (collector)
+
+indirect insertion: `obj.prop1.collector <: someFn(input).val`
+
+		                      val
+		input ---> (someFn) -----------,
+		                               v
+		   obj -------> -------------(   )
+		        prop1    collector
+
+notice how while direct insertion follow a general left-to-right flow
+indirect insertion does some weird extraction then insertion, resulting in the blank `(   )` placeholder syntax
+
+like the "flow" for direct insertion
+
+		val1 -----> collector
+		val2 -----> collector
+		val3 -----> collector
+
+seems to be in the same vein as regular object declaration
+
+		val1 -----\
+		val2 --------> collector
+		val3 -----/
+
+even if the direct insertion happens inside a for-loop or something, we can imagine the arrows flowing out of the for-loop and all converging into a single static variable
+direct insertion is just syntactic sugar for object declaration,
+	since the collector is static, it can easily be converted to object declaration
+
+this is not the case for indirect insertion, where the target for the insertion has to be extracted first
+
+for direct insertion, you can imagine a bunch of values going through a series of transformations and then finally converging at the collector
+indirect insertion feels more like a "splicing" operation, where you pull out the collector, open it up, insert the values, then put the collector back
+
+
+
 
 Can only modify private vars
 makes sense with write keys
@@ -843,3 +891,955 @@ Maybe dynamically ordered, based on if you use any commutative
 * eg `testscore(joe, 60).` (from the earlier example)
 * so how does this translate to our model, aka directed graphs with one label per edge
 	* or in other words, properties with a single key
+
+
+
+
+we can view the prolog example as being like
+
+
+		(name: joe, test_score: 60, #testscores)
+		(name: mary, test_score: 85, #testscores)
+		(name: alice, test_score: 90, #testscores)
+		(name: bob, test_score: 80, #testscores)
+
+		for person with #testscores.:
+			person.#good_student:  (person.test_score > 80)
+
+use a tag in place of predicates
+use properties in place of variables
+use traversal in place of a query
+
+using a tag in place of predicates actually allows you to attach multiple predicates to the same object
+
+
+
+we talked before about tags and nondeterminism
+	// TODO: FIND REFERENCED SECTION
+
+we can do the same with the `with` keyword
+
+maybe we can even use tags
+	for powerset, attach the tag `in_set` and `not_in_set` to each
+
+
+// TODO: FIGURE OUT HOW TO DO THIS
+
+
+### Collector Passing III - Multiple Collectors
+
+what about collector passing to add to multiple collectors
+you can't really use the `...` method because you need to add to multiple collectors
+
+for each function, we have multiple outputs, each output containing the properties to insert for the corresponding collector
+for each of the functions, we need to provide a mapping between those outputs, and the collectors
+
+the key to notice is that we have many-to-many relationship
+we might have 5 state variables
+and 8 functions
+and each of those functions contribute to a subset of the 5 collectors
+in the diagram syntax, this might look like a bipartite graph
+
+in order to define such a complex graph, we need intermediate variables
+
+	fn1output: fn1(args1)
+	fn2output: fn2(args2)
+	fn3output: fn3(args3)
+
+	collector1: (...fn1output.collector1 ...fn2output.collector1 ...fn3output.collector1)
+	collector2: (...fn1output.collector2 ...fn2output.collector2 ...fn3output.collector2)
+
+
+
+what about adding to a list, appending to a state variable
+
+
+### Convergent Feedback
+
+// TODO: CLEAN THIS UP
+
+* for a breadth first search
+* we don't actually need to use state variables, which gets quite complex
+* we can use a more "dataflow" approach
+* basically, we have the "start" node, and at every node we keep track of the distance from the start node
+	* `#distance` is just 1 plus the min of all the `#distance` values for each neighbor
+* to find the first occurence of our search query, we return the node that matches the query, and is the closest to the start node
+
+		BFS: graph, query >>
+			#matches: graph.nodes.filter(query)
+			#minmatchdistance: Math.min( matches.map(n => n.#distance)... )
+			for node in graph.nodes:
+				#distance: Math.min( node.neighbors.map(n => n.#distance)... ) + 1
+
+			=> #matches.filter(#distance = #minmatchdistance)
+
+* note that we don't have to worry about infinite loops because minimizing the neighbor's distances,
+	will automatically ignore cycles (which will have longer distances)
+* this is basically just Dijkstras algorithm
+* no need for `#visited`
+
+* note that this also leverages feedback
+* the dataflow graph will contain cycles, because each node will be dependent on the `#distance` values of their neighbors
+
+* however, the feedback is convergent, so will stabilize in finite time
+
+* divergent feedback would be like longest path alg, max of distance for each neighbor
+* and would be like an infinite loop in an imperative lang
+
+### Private Keys not Private Vars
+
+// TODO: FIND PREVIOUS SECTION
+
+* private keys are shareable, allows for a more flexible authorization system
+* imperative langs use private vars
+* systems like facebook groups use private var system too: you have to be an "authorized user" to see the content
+* but it's really just a farce
+* Joe might not be in the group, but if Joe's friend is in the group, then Joe's friend can screenshot the content and send it to Joe
+* this actually makes sense in the private key model
+	* Joe's friend has the private key to the content, like a pointer to a hidden memory location
+	* but Joe's friend can share the private key, and then others can follow the pointer to the content
+
+* though this seems a little insecure and restricted
+* lets say Joe wants to share the group content with Amy, so he shares the private key with her
+* then would Amy be able to post and comment in the group as well
+* does she have "write" access?
+* doesn't seem like Joe would want that
+* not to mention, because everything Joe posts and comments is tied to his user
+* if Joe shares his private key to Amy, then all of Amy's posts would be tied to Joe
+* Amy would be able to comment on Joe's behalf, which Joe probably doesn't want
+
+* It's not just write access actually
+* maybe Joe wants to share a photo album with Amy, but he doesn't want to share all the private notes and comments he attached to each photo
+* Joe could use private tags for the notes and comments, so Amy wouldn't be able to see them
+* but if he already made the notes and comments regular properties (which is easier to work with, coding-wise)
+* then he would have to retroactively change them to private tags
+* which is ugly
+
+* so what Joe actually wants to do, is create a new private key with different permissions
+* so for the facebook group, Joe would give Amy a private key with read permissions
+	* maybe make a clone of the group content, so any modifications Amy makes gets applied to the clone, and not the original group
+* for the photo album, Joe could create a clone of the content with just the photos, not the comments and notes
+	* could do this by cloning each photo and overwriting `.comment` and `.note` to be undefined
+
+
+### API Wrappers
+
+* we talked about how Entangle/Convergence is for web applications
+* and how it can be used for writing the full-stack of a web app
+* we also want to be able to communicate with APIs in an intuitive way
+	* call them like normal functions, instead of using GET and POST, which feels a bit ugly
+* one way we can achieve this with existing RESTFUL apis, is to wrap them in a module
+
+		// reference: spotify web api documentation (https://developer.spotify.com/documentation/web-api/reference-beta/)
+
+		spotifyAPI: RestAPI
+			url: 'https://api.spotify.com/v1/'
+
+		// adds two tracks to the given playlist
+		// so '.playlists[playlistID].tracks' will correspond to the url path /playlists/{playlistID}/tracks
+		addTrackResponse: playlistID >> ...
+			spotifyAPI.playlists[playlistID].tracks.post
+				uri: 'spotify:track:4iV5W9uYEdYUVa79Axb7Rh', 'spotify:track:1301WleyT98MSxVHPZCA6M'
+				position: 3
+
+* remember that in Entangle and Cono, web urls correspond to object paths
+* so notice that we don't even need to provide the endpoints to the `RestAPI` call
+* the wrapper will dynamically convert object paths to a url, up until the `post` call
+* so `.playlists[playlistID].tracks` will correspond to the url path `/playlists/{playlistID}/tracks`
+* so `spotifyAPI.playlists[playlistID].tracks.post(...)` corresponds to `POST https://api.spotify.com/v1/playlists/{playlistID}/tracks`
+
+* maybe we should make the methods `post` and `get` and `delete` tags instead
+* that way they are distinct from the url path elements, easy for the `RestAPI` module to detect where to terminate the url path
+	* and who knows maybe some endpoints use a url that contains `.../post/...` or something, which would be impossible to reference if `.post` terminated the url path
+* so the api call will look like `spotifyAPI.playlists[playlistID].tracks.#post(...)`
+* we would also want to declare these keys in `RestAPI`, and expose them to our client module
+
+		#get, #post, #delete: RestAPI.HTTPMethodTags
+
+* notice that this also allows us to name these tags whatever we want on the client side
+* so in case we happen to be using tags with these names as well, we can use different names to avoid collisions, like `#httpget` or `#httppost`
+
+* notice that we also only need to expose these keys to the client module once,
+	* even if we create multiple API wrappers (for accessing multiple APIs)
+* because any api that extends the `RestAPI` wrapper will be compatible with these tags
+
+
+
+
+### API Calls and Internal Modification
+
+( loosely continues from section "API Calls")
+( note that this is different from the sections about "API Calls and Cloning Restrictions",
+  because while those sections talked about restricting access to API calls,
+  this section talks about fundamental issues with allowing API calls in the first place)
+
+is it ok for API calls to modify internal object properties, like imperative class "methods" do?
+eg,
+
+	Deck:
+		#cards
+		addCard: card >>
+			#cards <: card
+
+	Deck.addCard("ten of spades")
+
+note that the `Deck.addCard()` call is actually creating a clone
+but is that clone still modifying the original `#cards`?
+
+it feels like you should be able to do stuff like this
+it is analogous to an API call
+and we don't want to have a separate syntax for API calls
+	see section "API Calls"
+
+though it seems like violation of encapsulation
+handing over control to other people
+
+maybe we can use the original eventlist method, where you aggregate and iterate across all clones of the method
+	see section "Event Lists vs Sequential Logic Blocks" for eventlist examples
+	see section "API Calls" for usage of the `.calls` syntax to get a list of all calls/clones of a method
+
+
+note that the eventlist method assumes that you can detect and compile a list of all clones/calls of a method
+flag-watcher model
+though this should be possible...
+	just use a private var, and insert to collector var in body of fn
+	though that assumes that external clones still can modify that internal var
+
+
+it seems like there are cases where you want to be aware and not aware of clones
+* aware, if you want to broadcast your clone
+	similar to broadcasting changes (find referenced section)
+	also, if you are cloning private vars, then the source should know who is cloning, so they can restrict access if necessary
+		find referenced section (about cloning private vars)
+* not aware, if you want to make a private clone
+	shallow clone, doesn't copy private vars
+
+requests not calls
+	you can make a request to do something
+	but you can't force an object to do something
+	more in line with how the web works
+
+though requests are ugly
+you want to guarantee behavior if it's obvious
+defining methods, and just calling them like normal, is simple and intuitive
+
+Deck example
+	add to deck, remove from deck
+
+two ways:
+	1. normal functions way
+	2. eventlist method
+		compile a list of requests, and do a for loop
+
+APIs, state variables, list push
+	state variables are a collector with an API where you can only push
+	find referenced section
+
+normally when you clone a module, you want to copy its static outputs, and tweak them based on your inputs
+	you own the object
+however, what if one of the "outputs" is an action, to modify the original object
+	so the original object owns the outputs
+
+
+actually notice that pushing to a collector in a normal statically defined function doesn't make sense
+	it would happen one time, and you probably don't want it to happen
+
+	voteCounter:
+		#ballots
+		upvote:
+			#ballots <: "upvote"
+		downvote:
+			#ballots <: "downvote"
+
+note that it seems like the initial declaration of `upvote()` and `downvote()` will insert a single upvote and downvote
+unless we think of them as "templates", insertions that are only executed when the module is cloned
+this is how imperative languages work: a function doesn't get executed when it is declared, only when called
+though we are trying to encourage prototypes over templates...
+
+note that even for traversals, like `map()` or `reduce()`
+you have to pass in a function, that gets applied to each element in the list
+for example:
+
+	#collector
+	list.forEach
+		item >>
+			#collector <: item*item
+
+we have so far been assuming that the function passed in is a "template", inactive during declaration
+in addition, the traversal function, eg `map()`, has to call the function passed in,
+	which assumes that the clones are able to modify the original collector, even though though they are cloned externally
+
+	foo:
+		#collector
+		#numCalls: sum(...inputs)
+		insertSquare: x >>
+			#collector <: x*x
+			#numCalls <: 1
+
+		("a", "b", "c").forEach(insertSquare)
+
+
+
+what about cloning modules
+we don't want to insert to collectors when we clone
+
+diagram syntax, we only want to insert to collectors when moving from the source
+
+maybe insertion should only happen when we are cloning a module a variable number of times
+"dynamic" cloning
+so like, a `map()` or a for-loop, both clone a module based on the number of iterations
+so if there are zero iterations, then there are zero clones, so zero insertions
+it seems like we only want insertion in cases with dynamic cloning
+
+
+do we need recursion?
+	technically no, assembly code uses loops, turing machine uses loops
+what if we just had: 1 infinite set, and 1 set deconstructor
+then every time the set deconstructor is used, that is when collectors are "enabled"
+
+maybe we can make it so insertion only happens for calling functions, not cloning
+after all, it seems to work fine for imperative langs
+
+we need some way to distinguish defining a module vs "executing" it (having it actually modify the source object)
+so maybe we can leverage functions? Aka only functions can modify the source object, and it only occurs when you call the function?
+or maybe we can define a new type of module, a "modifier" module, that has a special designated property for all modifications
+	just like how functions have the special `_return` property
+and do we need a special associated operator as well?
+	just like how functions have the call operator
+	maybe we need a "execute" operator, that not only clones the modifier module, but also executes the modifications
+this feels like it can get messy though
+can we have modifiers that are also functions? then you would have to account for a "call and execute" operator
+
+
+what about conditionals?
+technically a "dynamic" cloning, because it can either happen zero times or once
+but its not in a loop
+
+
+it seems like we're introducing actions (specifically, the action of inserting), which is why this is getting messy and inconsistent
+sometimes you want the module to define the action
+sometimes you want the module to execute the action
+
+1. in the beginning, every module represented a data set, just a bank of variables, and the relationships between those variables
+	* those variables could depend on input variables or scope variables, but it could not modify these external variables
+	* read, not write
+	* every module was completely encapsulated, self contained
+2. this changed when we introduced state variables, and event lists
+	* we wanted to start modeling "changes" in variables
+	* but it still seemed to follow the data model
+	* every module just had a variable representing the "next state" of an input
+	* it still never directly modified any external variables, it was up to the `reduce()` function to chain the modules together and connect the individual states of a variable
+3. then we introduced aggregators/collectors, which were supposed to be unordered state variables
+4. then recently we introduced APIs and API calls
+5. but notice that we can model API calls using event lists model
+
+		foo: sqInputs >>
+			#collector
+			insertSquareInput:
+				x: 1 // default input
+			for x in sqInputs:
+				#collector <: x*x
+
+		bar: foo(sqInputs: (2 3 5))
+
+defines a change
+a modifier fn
+i guess you can think of modifier fns like monads
+you can chain them
+
+they are like the components of a reduction/fold
+api calls are like distributed reductions
+the variables inside the module are the map
+and the modifications defined inside the module are the reduce
+
+the only way you can apply a modification is if you send the clone back
+kind of like an api call
+the api provides the request format
+you create a request, and send it back
+and it sends back the response
+
+you send it a module with inputs
+it fills in the remainders
+	mentioned in section "API Calls and Cloning Restrictions II"
+maybe the "remainders" are any outputs dependent on private functions and vars
+
+cloning the module but not sending it
+is like cloning the request object
+it doesn't affect the api, but it also doesn't return any outputs
+
+maybe it has a flag that is set when it is a complete clone, aka showing that the request was completed and the response was sent
+
+though when would you actually want an incomplete clone?
+when you want to clone a modification fn, without actually executing the modifications?
+but for that case, it seems weird to think of it as an incomplete clone
+just because you don't want to execute the modifications, shouldn't mean that you shouldn't fill in the properties that are based on private vars
+two separate things
+
+it seems like our modules are trying to achieve two separate purposes...
+
+however, I don't think that we can simply have separate modules for modifications
+some API requests return a response, and modify the service
+and what about API calls that call API calls?
+
+
+do we need to be able to clone and "modify" API calls?
+in imperative languages, you can't, you can only wrap an api call
+something like `modifiedFn = (a, b) => {c = a*b, return fn(c, 0) }`
+"modifying" a function is more flexible, allows you to modify intermediate variables and such
+but perhaps it's too flexible?
+does it pose a security risk?
+eg allow somebody to take advantage of an API call to expose data, maybe by injecting functions or something?
+however if an API calls is exposed correctly, it would be impossible to clone and leverage in such a way
+
+note that you want nested modules to still have filled in private properties
+but you don't want them to execute modifications
+maybe when you declare a nested module as a `template`, it fills in private properties, but doesn't execute any modifications
+that includes modifications caused by calls/clones inside the module as well
+
+
+
+
+if you can expose API calls that modify an object
+then you should be able to expose an object to arbitrary modification
+after all, arbitrary modification is akin to exposing an API function `setProperty()`
+
+
+flag-watcher
+read write
+the requester should be readable by the source
+but what if some module in some hidden dark corner wants to make an API call
+the interpreter can read it, so maybe that works
+but the interpreter has to be thought of as part of the system too
+so the interpreter can be thought of as some entity that has read access to every object in the language
+however that isn't enough, every object has to be able to see the interpreter as well
+so the interpreter is like a global communication medium
+1. if somebody wants to call an API, they raise a flag
+2. the interpreter sees the flag, and raises it's own flag
+3. the API see's the interpreters flag, and makes the API call
+
+still seems weird though, to have some global entity with specific properties
+the rules and principles should make sense, independent of any objects defined in the system
+
+
+a private key is like a portal to a secret place in the universe, hidden rooms
+any secure or private behavior, can be implemented using private keys
+anytime we want to "allow" or "restrict" specific behavior, this can be done through private keys
+
+with the "hidden room" analogy, it makes sense to be able to add objects to the room
+aka write/modify the properties of a private object
+you can think of the initial declaration of an object,
+	as having access to this hidden room, and adding the initial properties
+and if you have the private key, you can go back into the room, and add more properties
+this is a rephrasing of the "dynamic scoping" idea, talked about in the section "Dynamic Scoping and Write Access Keys"
+
+so does that mean every private key is a write-access key?
+
+
+maybe using a wrapper function to modify an API request makes sense
+because you don't need to fill in anything, if you aren't actually making the request
+it's like a deferred request
+
+i think we need a specific example for an API call
+
+	addTrack: user >>
+		track: undefined // input
+		playlistName: undefined // input
+
+		trackName: track.name // intermediate var, immediately available, public
+
+		#playlist: user.#playlists.find(playlist) // intermediate var, filled in, private
+		playlistLength: #playlist.length // intermediate var, filled in, public
+
+		playlist <: track
+		print "added a track to playlist " + playlist.id
+
+		insertedPosition: playlist.indexOf[track] // the resulting index of the inserted track
+
+notice that `trackName` can be calculated without relying on the API, doesn't need to make the API call
+	because it is public, and the source code is public, so the caller can just clone the source code and execute it themself
+	so `trackname` is more like a part of the request than part of the API
+however, `#playlist` and `playlistLength` rely on private functionality, so they do rely on the API
+	filled in by the API after the API call goes through
+
+
+now lets say the user makes a sub-function for adding tracks to a specific playlist
+
+	addTrackToFavorites: addTrack(playlistName: "Favorites")
+
+notice that we could possibly want `addTrackToFavorites` to see the intermediate variable `playlistLength`,
+	because that is data that could be calculated already, before `track` is even passed in
+
+maybe `#playlist` and `playlistLength` should be another api call
+so the two relavant lines would become
+
+	addTrack
+		...
+		#playlist: getPlaylist(playlist) // calls api fn "getPlaylist", private var
+		playlistLength: #playlist.length // intermediate var, public
+		...
+
+notice that, when `addTrackToFavorites` clones `addTrack`, it will clone the api call `getPlaylist`, which will fill in the playlist info,
+	even though `track` has not been provided yet
+
+or maybe use if(track) and if(playlist)
+
+	addTrack: user >>
+		track: undefined // input
+		playlistName: undefined // input
+
+		if (playlistName):
+			#playlist: user.#playlists.find(playlist) // intermediate var, filled in, private
+			playlistLength: #playlist.length // intermediate var, filled in, public
+
+		if (playlistName & track):
+
+			trackName: track.name // intermediate var, immediately available, public
+
+			playlist <: track
+			print "added a track to playlist " + playlist.id
+
+			insertedPosition: playlist.indexOf[track] // the resulting index of the inserted track
+
+but this is getting ugly, with modules you can leave things incomplete and it will fill in as much as it can, leave the rest undefined
+	and the module will try to use data relationships to fill in as many properties as it can with the provided data
+	useful for modules with optional parameters
+	eg:
+
+		muxer: left, right, selector >> if (selector) left else right
+
+		muxer(left: 10, selector: true) // no need to provide input "right" in this case
+
+then later on, you can always fill in more properties, and the interpreter will automatically refresh the module to reflect the new data
+
+in terms of insertion and property modification, this style is more in line with state variables
+where you provide an index, and the data you want to insert
+and you can provide some initial properties to insert to that index
+and later on, provide more properties to insert to the same index
+
+this can also be thought of as a "partial request"
+
+however, often when you call functions you can leave some parameters blank (often the case for optional parameters)
+so how would you distinguish between a "partial request" and a complete request with some optional parameters
+you can't
+what we are trying to do is slightly different though
+we want to // TODO: FINISH THIS
+
+note that if we use the wrapper method
+
+	addTrackToFavorites: track >> addTrack(track: track, playlistName: "Favorites")
+
+it's actually a little more secure
+cloning the original api call, just sets the default value of `playlistName`
+but if you were to pass the clone around, the receiver could still override `playlistName` when making the call
+however, the wrapper method permanently fixes the value of `playlistName` to `"Favorites"`
+so even if the caller tried to override `playlistName`, it wouldn't change the `playlistName` being sent to the api call
+
+
+
+function calls are a way to bundle together the request parameters, and keep the response separate (in the `_return` property)
+so maybe we should just use function calls for API calls
+
+
+
+
+I was thinking back to the `#height` and `checkBalanced` example
+`tree.nodes` means every node has `tree.nodes`, inefficient, lazy evaluation
+if we have a basic `treeheight`
+
+
+lazy evaluation
+is it possible with collectors or recursive functions?
+this is especially important in streams, aka infinite lists
+which require lazy evaluation to work
+
+
+note that there are actually two ways we can do tree height
+we can either do it constructively, use a traversal and attach `#height` to each tree
+or we can do it backwards, redefine tree to include `tree.height`
+
+you can use a filter, or you can use an if statement
+
+
+
+query/traversal = prolog query
+can it achieve everything a function can?
+infinite? non halting?
+
+
+### Converting Collectors to MapReduce
+
+* lazy evaluation should be possible with collectors
+* you just keep track of every place modifications could be coming from
+* and when needed, ask every location for their modifications
+* you can even convert collectors to just regular mapreduce patterns
+
+		// using collectors
+		foo: list >>
+			#collector1, #collector2
+			for x in list:
+				#collector1 <: x
+				#collector2 <: x*x
+
+		// using mapreduce
+		foo: list >>
+			// pack all results into an object, and keep track of where each result should go
+			zipped: list.map(x => (collector1: x, collector2: x*x))
+
+			// extract the corresponding result from the object
+			#collector1: zipped.map(obj => obj.collector1)
+			#collector2: zipped.map(obj => obj.collector2)
+
+* you can see how this even works if the collector is at root level, and the insertion call is really deeply nested
+	* just carry the mapreduce result all the way up to the collector, and then do the extraction there
+* to generalize, as the mapreduce result is carried upwards, it checks each scope to see if there are any corresponding collectors, and gives the result to them
+* in imperative, this is impossible because even though you might know all the places a variable can be modified/reassigned,
+	* you don't know which one happened last
+	* actions and modifications are instantaneous
+* in Entangle, all bindings are static, modifications are "continuous"
+
+
+
+
+
+
+here's an example where you might want to execute a declared module
+
+		musicClub:
+			members
+			Joe:
+				...
+				members <: Joe
+			Alice:
+				...
+				members <: Alice
+			Bob:
+				...
+				members <: Bob
+
+
+scoping and visibility
+
+		Deck:
+			addRandomCard:
+
+		#User:
+			button: Button()
+			for button.clicks:
+				Deck.addRandomCard() // how does Deck see this call?
+
+
+* by default the language is prototypal
+* everything is a prototype
+* in imperative langs when you declare a function, it is more of a "template"
+* it declares what to execute, but it isn't executed yet
+* only when you call the function, is it executed
+* in Entangle, when you declare a module, it is already "executed"
+* but this can be unideal for some cases
+* eg methods, modifier functions
+
+
+
+note that when you start removing from the deck, you need order
+you can `add Ace, remove Ace`, but you can't `remove Ace, add Ace`
+
+state variables and versioning is an automated dynamic system
+kinda like garbage collection
+
+### API Calls and the Modifier Class
+
+* maybe method/modifier calls are flags that "bubble upwards"
+* like a tag, `#call_addCard`, attached to every method call
+* and the tag bubbles up the scopes until it finds the nearest module called `addCard`
+* the "bubble up" makes sense in diagram, nested modules just expose these special tags to the parent module
+* so just like scoping takes parent inputs and carries them to child modules
+* child modules take child outputs and carry them to parent modules
+* this follows the flag-watcher model, doesn't violate encapsulation, and necessitates that method calls be visible to the method
+* this is similar to the idea mentioned in the section "Converting Collectors to MapReduce"
+
+* I guess this is how collectors could work too
+* so in this sense, methods/modifiers can be thought of as an extension of collectors
+* methods contain a collector that collects all calls to the method
+* and then executes a for-loop or a reduce() to make the modifications
+
+* so maybe to declare a method you have to do something like
+
+		Deck:
+			addRandomCard: Modifier(<modifier fn>)
+
+* and the modifier takes care of setting up the system of collectors and for-loops
+* converts it to something like:
+
+		Deck:
+			addRandomCard:
+				#methodCalls: collector() // collector
+				#modifierFn: <modifier fn>
+				for call in #methodCalls:
+					#modifierFn(call)
+
+* this also might help explain why modifiers don't execute when declared
+* just like if you declare a nested function in a function like map(), eg `map(arg1, arg2 => exampleFunctionDeclaration)`,
+	* and it doesn't execute the function parameter
+* declaring the modifier fn inside the `Modifier(...)` also doesn't execute the function parameter
+* as opposed to, directly declaring it inside the module, like the `musicClub` example shown earlier
+	* in which case it does execute it
+
+* actually, there are two ways we can reduce methods to collectors
+* we can either collect the method calls, and clone them locally
+* or clone them externally, and collect the modifications
+
+* though note that in the `addRandomCard` example, the method call in `#User` is not in the same scope as the method, `Deck.addRandomCard`
+* so maybe we do have to use external modification, and can't just rely on scoping and bubbling-up
+* maybe a method call is short for `Modifier.#methodCalls <: ...`
+* recall the hidden room analogy: if you have access to `Modifier.#methodCalls`, then you can insert properties as you please
+
+* I am still not sure if this can break lazy evaluation...
+
+### Dynamic Collector Access and Indirect Insertion
+
+* are we allowed to modify or insert into aliases?
+* eg,
+
+		foo: collector
+		bar: foo
+		bar <: 10
+
+* or maybe something like
+
+		root[textinput].#privateVar <: test
+
+* we talked previously about modifying collectors indirectly, and how it leads to ugly diagrams
+	* see section "Direct vs Indirect Insertion - Diagram Syntax"
+* this is the same case, even with aliases
+* so this should not be allowed
+
+* though what about `for node in tree.nodes: (node.#visited <: true)`
+* in fact, this is an issue any time there is a query/traversal,
+	* any time you are extracting items from a dataset and adding tags to them
+
+* notice that these cases cannot be converted to mapreduce, using the method mentioned in "Converting Collectors to MapReduce"
+* that conversion required the collector reference to be static, eg `someCollector <: someValue`, not `obj[dynamicKey] <: someValue`
+* static collector references can be modeled in diagram syntax with an arrow pointing towards the target
+	* talked about in section "Direct vs Indirect Insertion - Diagram Syntax"
+* not so with dynamic collector references
+
+
+* though maybe `node.#visited <: true` works because while the collector is dynamic, the tag is static
+* so you can re-structure it so that `#visited` is a hashmap, and you are doing `#visited <: [node]: true`
+
+* these rules are getting kinda complicated though
+
+* also note that this: `obj[dynamicKey] <: someValue`
+* is different from this: `obj <: [dynamicKey]: someValue`
+
+* the first is dynamically retrieving a collector, and then inserting a list item
+* the second is statically retrieving a collector, and then inserting a property with a dynamic key
+* though I think both prevent lazy evaluation
+* in the first case, if you print out `obj.someCollector`, you are not sure if the insertion affected that collector
+* in the second case, if you print out `obj.someProperty`, you are not sure if the insertion affected that property
+
+
+* what about a whole list of collectors, eg
+
+		turingTape: infiniteList.map(x => Collector()) // create an infinite list of collectors
+		for k in keypresses:
+			turingTape[k] <: "a"
+
+* though this isn't a problem, we can convert this into a giant mapreduce
+* note that this also uses indirect insertion, because we are inserting into `turingTape[k]`
+
+### Modifiers and Lazy Evaluation
+
+* with queries or traversals, as long as we are traversing/querying a finite dataset
+* then we can lazy evaluate, by simply checking every item in the dataset
+* for example, in the `turingTape` example in the preceding section
+* when we want to evaluate a specific collector, eg `turingTape[20]`
+* we can simply check all keypresses, and see if there are any modifications to `turingTape[20]`
+* I guess this is pretty much the same as just evaluating them all
+
+
+* practically, you would want APIs to be publically and indirectly callable
+* if you had a spotify playlist, you should be able to share it publically, and allow anybody to add tracks to it
+* so maybe we shouldn't restrict api calling
+
+* maybe we just have to continuously evaluate any code that contains an API call
+* essentially, consider all API calls as "observed", so no lazy evaluation
+
+
+* another way
+* maybe keep track of a list of "authorized users", users with write access
+* this list is always evaluated
+* so if anybody requests write-access, they are immediately added to the list (no lazy evaluation)
+* note that anybody in scope is automatically authorized, and added to the list
+
+* this allows us to know where changes could be coming from
+* when we want to evaluate a collector, we simply check with anybody on the list of possible sources (people with write access)
+* similar to the "finite dataset" idea, as long as we keep the search space finite, it should be possible to lazy-evaluate
+
+* it gets tricky when we have dynamic collector access, like the `turingTape` example earlier
+
+
+* maybe all modules have to implement a `numCalls(fn)` function
+* that allows anybody to ask a module how many times it calls a given function
+* it's up to the module to provide that information
+* so if the module forward evaluates it, and keeps track of those calls, then it can provide that info
+* if the module knows how to lazy evaluate and determine the number of calls, then it can do so
+* if the module doesn't provide the correct number, then it's the module's fault if the collector doesn't behave as expected
+
+* but what if the query takes infinite time?
+* this is the problem with any lazy evaluation
+* if you ask for the value of a certain variable, it might take infinite time to evaluate it
+* this is just a state we have to account for, `outdated`,
+	* meaning that we are not sure if the variable's value is up to date
+* though isn't everything almost outdated all the time? you never know if an input was changed right as you updated your output
+
+
+* querying a module for calls, is basically the lazy-evaluation equivalent for flag-watcher model
+* instead of having the module set a flag when it calls a function (forward evaluation)
+* you ask a module for any flags when lazy-evaluating a function
+* because flag-watcher model allows anybody to set a flag
+* the lazy-evaluation has to query every module
+* which is kinda inefficient, so perhaps api calls should be forward evaluated
+
+* maybe we should have a special syntax for calling a method/modifier
+* maybe something like `spotifyPlaylist.@addTrack()`
+* that way, it's more apparent where method calls can be coming from
+* reduces our search space
+
+* note that Java and C++ don't allow for arbitrary method calling, eg `myObj[methodName]()`
+* you have to call them directly, `myObj.methodName()`
+* adding this restriction could make it simpler to track where function calls are coming from
+* every method call would be explicitly declared
+* kinda, you could still use aliases, `myAlias: myObj, myAlias.methodName()`...
+
+
+* is lazy evaluation even necessary?
+* yes, because Entangle encourages declaring modules as giant banks of data
+* so you shouldn't have to worry about all this data being evaluated
+* though evaluation shouldn't really be that important anyways
+* who cares if it needs to be forward evaluated?
+
+* how does lazy evaluation work
+* does it create the graph, but not create any clones
+	* this is how I've been thinking about it thus far
+	* you have to traverse the graph backwards to see what outputs/nodes are being "observed"
+	* and to traverse the graph you have to build the graph first
+* or could you defer some of compilation/interpretation as well?
+	* but don't you need to compile/parse the code to detect possible method calls?
+
+
+* flag-watcher model can be implemented using tag queries
+* every method call/clone adds a tag
+* the API just looks for any clones with that tag, using a tag query
+	* something like `currentScope.find(#someTag: true)`
+* this reinforces the idea that the caller has to be visible to the API
+	* or else the flag/tag won't be visible, and won't be picked up by the query
+
+
+
+* should we use a blacklist or whitelist model?
+* that is, should write-access be explicitly given?
+* or should everybody be given access by default, and then some users restricted
+	* restriction can be implemented using a `authKey` input and checking if the key is valid
+	* note that this is still a blacklist model, because the API has to explicitly implement the access restriction
+* but maybe it's dependent on scope
+* you declared the method in a scope for a reason
+* so it should be restricted to that scope
+* likewise, you declared the method as public/private for a reason
+* so if a method is public, anybody can modify it
+* note that you can declare private methods, eg `Deck: (#addCard: ...)`
+* and this would prevent it from being called externally
+
+
+* there is also an alternative to the flag-watcher model
+* the "inbox" method, where all method calls send a request to the "inbox" of the collector/API
+	* just a special property
+* we actually talked about this method before, using the `_incoming` property
+	// TODO: FIND REFERENCED SECTION
+
+
+* should we allow indirect calls
+* eg `Foo.Bar.Deck.addCard(card)`
+* from the perspective of `addCard`, it doesn't know where it's coming from anyways
+* `Deck.addCard()` is the same as `Foo.Bar.Deck.addCard()` from the perspective of `addCard`
+* all it knows is that the call is coming from outside the function
+
+
+* what if you have something like this
+
+		#collector
+		foo:
+			bar:
+				fn: Modifier
+					#collector <: 10
+
+* obviously `foo.bar.fn()` should trigger an insertion
+* but what about `foo.bar()`? what about `foo()`?
+* perhaps this is why we declare `Modifier`, it declares what "level" the method starts at
+* so in this case, only `foo.bar.fn()` would trigger the modification
+* but if we did something like:
+
+		#collector
+		foo:
+			bar: Modifier
+				fn:
+					#collector <: 10
+
+* then both `foo.bar()` and `foo.bar.fn()` would trigger the modification
+
+* this is sorta similar to how functions use `=>` to declare what "level" the function starts at
+	* mentioned in section "Program vs Data"
+* not really the same though
+
+
+* before, the collector itself controlled write-access
+* you directly inserted properties into the collector
+* and you could define apis inside the collector, if you didn't want to allow arbitrary insertion
+	* eg `#stack.push(...)` for pushing to a stack
+
+* but now we have indirect write access
+* instead of inserting directly to the collector, you clone a function that inserts to the collector for you
+* how do these modifiers broadcast requested changes to the collector?
+* I guess the modifiers just use direct insertion, so no broadcasting is needed?
+
+* but remember that insertion uses flag-watcher model as well
+* so when you call a modifier, it actually uses two flag-watcher systems
+* first, the method call raises a flag, that is picked up by the API, who clones the modifier
+* and when the modifier is cloned, the insertion call raises a flag, which is picked up by the collector
+
+* in fact, we can think of `<:` as an API call, "insert"
+* so when you call `Deck.addCard`, it calls `cards.insert`
+* so `Deck` itself is a collector!
+
+
+* note that `<:` can even be implemented with flag-watcher model
+* flag-watcher model can be implemented in pure functional style
+* basically, every time you declare a `<:`, it just creates a new object with a "flag", a generated tag
+	* so `mtarget <: mtag: mvak` becomes `#_insert_mtarget: (tag: mtag, value: mval)`
+* and then the collector just has a tag query, searching for these tags
+* pretty much the same way API calls are implemented using tag queries, mentioned earlier
+
+
+
+we talked previous how static tags can work even for dynamic collectors
+we also know static collectors work fine
+
+so what about static collectors and dynamic tags?
+that is still a problem
+
+	for x in list:
+		#mycollector <: [x]: "hello"
+
+it kinda works, because when evaluating `#mycollector`, we know to check this for-loop
+however, we don't know exactly which properties are being inserted, until we actually evaluate the for-loop
+
+though this is a problem for any dynamic key
+even in module declarations
+
+	foo: x >>
+		[x*x]: "hello"
+
+actually, that's not necessarily true
+if we have `bar: foo(x: 10)`, and then did `print bar.100`, then the lazy evaluator first evaluates `x*x`,
+	and then binds `bar.100: "hello"` (without evaluating it),
+	and then finally sees that we are requesting `bar.100`, and evaluates it
+to generalize, the lazy evaluation knows to evaluate all dynamic keys first, before performing any property access

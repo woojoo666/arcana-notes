@@ -800,6 +800,14 @@ reduceFn: total, x
 sum: mlist.reduce(reduceFn, 0, [5 2 7 8 1]);
 ```
 
+revisit 1/12/2019:
+* notice the `for keypress in keypress.calls` in the syntax brainstorm
+* the idea behind this was that it keeps track of all calls/clones of the `keypress` function
+* implementation of flag-watcher model
+* this is the earliest example I can find of this `.calls` syntax
+* this is explored further in the later section "Random Syntax Stuff"
+* it becomes relevant in the later section `API Calls`
+
 ### Arrow Returns and Intermediate Scopes
 
 * when using an arrow return, the output of the module does not include the body of the module

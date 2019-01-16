@@ -2423,6 +2423,66 @@ spaceBarPresses = keypresses.filter(event => event.key == spacebar).length
 
 * even has some possible performance benefits, as discussed in "Sequential Logic in Dataflow Languages.one"
 
+revisit 1/12/2019:
+* I don't know why I never gave a good example of the benefits of using regular list traversal over event listeners / sequential blocks
+* so here's an example I used in my reddit thread with veggero [here](https://www.reddit.com/r/ProgrammingLanguages/comments/8g8mru/monthly_what_are_you_working_on_how_is_it_coming/dya5uw2/)
+
+```js
+for keypresses.filter(value = "p"):
+    print("hello") // print hello every time the p key is pressed
+```
+
+* it's simple an intuitive, and leverages list comprehension techniques
+* in addition, event
+* note that you can even do things like
+
+```js
+for keypresses.filter(index % 3 = 0):
+    print("hello") // print hello every 3 keypresses
+```
+
+* if you wanted to do this using event listeners or sequential blocks, you would need a counter
+* something like
+
+```js
+var counter = 0;
+addEventListener('keypress', event => {
+	if (counter++ >= 3) {
+		print("hello");
+		counter = 0;
+	}
+})
+```
+
+* which is clearly uglier
+* also, you can't really do operations on previous events without explicitly saving them
+* eg if you wanted a running average of the last 3 mouse positions (just the x-coordinates)
+
+```js
+var runningAverage = 0;
+var lastThreeEvents = [];
+addEventListener('mouseMoved', event => {
+	lastThreeEvents.push(event);
+	lastThreeEvents.slice(-3);
+	runningAverage = 0;
+	for (i in lastThreeEvents) {
+		runningAverage += lastThreeEvents[i].mouseX;
+	}
+	runningAverage /= 3;
+})
+```
+
+* whereas using list comprehensions, we can easily achieve this in one line
+
+```js
+runningAverage: Math.sum(...mouseMovedEvents.slice(-3)) / 3
+```
+
+* another example is in the later section "Optimizers"
+* where we take a running list of temperatures, square the last term, and sum all of them together
+* there is also some examples in the section "Random Syntax Stuff",
+	* where we use the `.calls` syntax to get a list of all calls to a function, and then filter for certain calls
+
 ### Muxes, Execution Order, and Infinite Loops
 
 * currently, everything is forward-evaluated for simplicity (as in, no observation-based/call-by-need stuff)
@@ -3841,6 +3901,16 @@ vvvv move this to philosophy section? vvvv
 17. Prototypal - No "templates", no functions, no currying
 18. Abstract data structures away from execution order. Model everything in terms of structure
 19. Introduce orderings only when necessary
+20. Private keys, not private vars
+	* more in line with the the directed-graph mindset
+	* private keys are shareable, allows for more flexible privacy/security
+	* relevant sections: "Secret Keys", "Private Keys not Private Vars", // TODO: ADD MORE
+21. Flexible Scoping
+	* scope is a variable that can be passed around
+	* you can dynamically "enter" a scope and view private keys, as well as modify/insert properties
+22. Private keys are like vars bound to scope???
+	* // TODO: clarify this. we are trying to capture the idea of how private variables work, basically summarize the section "Static Bindings vs Secret Urls"
+	* relevant sections: "Separating Referencing and Scoping", "Private IDEs and Browsing Contexts", "Private Variables Revisited", "Static Bindings vs Secret Urls"
 
 ### Implementation Rules
 
