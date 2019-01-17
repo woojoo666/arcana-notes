@@ -1843,3 +1843,124 @@ if we have `bar: foo(x: 10)`, and then did `print bar.100`, then the lazy evalua
 	and then binds `bar.100: "hello"` (without evaluating it),
 	and then finally sees that we are requesting `bar.100`, and evaluates it
 to generalize, the lazy evaluation knows to evaluate all dynamic keys first, before performing any property access
+
+
+### Flag-Watcher and Lazy Evaluation
+
+* note that if we implement collectors and tags using flag-watcher pattern
+* and flag-watcher pattern is pure functional
+* then we can actually support dynamic collectors, dynamic tags, and indirect insertions
+* while maintaining lazy evaluation
+
+* lazy evaluation in terms of flag-watcher pattern is simply:
+	* check every object and ask if it has a certain flag
+	* the object has to do whatever evaluations are necessary to give an answer
+* so if there is an indirect insertion, eg something like `collectorList[k] <: 10`
+* and we are searching for the flag `collectorList.4`
+* then in order to give an answer, it has to evaluate the `collectorList[k]`
+* essentially, the query will force all dynamic collectors to evaluate, in order to see if they match the query
+
+* however, note that while this is technically lazy evaluation
+* it is not quite lazy
+* searching for a certain tag or flag basically forces every object to evaluate
+* because you need have to inspect every object, and to inspect every object, you have to first create all objects
+	* aka perform all cloning operations
+
+* so maybe, anything that uses flag-watcher pattern is forward evaluated
+* anything that raises a flag, eg an insertion, or an API call, is automatically evaluated
+* and the flag is automatically sent to the source
+* that way, we don't need to perform any searches or queries
+	* which are slow, and "break" lazy evaluation
+
+### Executing Tag Queries Outside of the Source Scope
+
+* we can think of public API methods as just tag queries placed at the root
+* because anybody can call the API method, then in order to "see" all calls, and capture all requests, you have to put the query at root
+* even if the API method is deeply nested
+* so the tag query is actually separated from the method declaration
+
+* note that if the tag query is outside of the collector/API declaration
+* then you are trusting that the one who owns the tag query is honest
+* and will forward all the requests to the collector/API
+* for example, in something like this
+
+		foo:
+			bar:
+				Deck
+					addCard: ...
+			zed:
+				User:
+					foo.bar.Deck.addCard("Ace of Spades")
+
+* the tag query would have to be placed at `foo` in order to capture the API call, and forward it to `Deck`
+* however, `Deck` has no control over that
+* if `foo` doesn't want to forward certain requests, they can choose not to
+* and `Deck` will never know
+
+### API Calls, Requests, and Cloning - The Missing Link
+
+* note that cloning actually requires the source to be visible to the caller/cloner as well
+	* not just modification
+* cloning could be thought of as working through flag-watcher as well
+* so if you can clone it, you can modify it
+
+* the source has to see the caller, create the clone, and then give a reference to the caller
+* if the source can't see the caller, the caller won't get a clone, it will be `undefined`
+
+* the `Modifier` class can manage authorization and such,
+	* so you can subclass it and define how requests are authorized
+	* the function passed into the modifier is just what is returned to the caller if the request is authorized
+
+
+* in fact, I was thinking about partial requests wrong
+* I was thinking if you did something like
+
+		foo: spotifyPlaylist.addTrack(track: "badblood")
+
+* an incomplete, failed request would look like this (if you inspected the `foo` object)
+
+		foo:
+			track: "badblood"
+			error: "unauthorized"
+
+* or something like that
+* this felt ugly to me, because you had to inspect the object to see if the request succeeded or failed
+* and you would end up with these "incomplete" objects
+* so now you have to account for incomplete objects in your code, which involves a lot of inspecting objects and checking properties
+* and it's also hard to tell in the "incomplete" object where the request ends, and where the response begins
+	* because the request and the response are just mixed together
+* and it just felt very ugly
+
+* howevery, it can actually be much simpler
+* if the clone fails, you just end up with `undefined`
+* so possibly, you just mistyped something, so the object you're trying to clone doesn't exist
+* or, it's possible that they rejected the request
+* either way, it's very clear that something went wrong
+* in addition, everything that depends on the clone (`foo` in this case) will immediately break, no need to do extra error checking or inspection
+
+* also, the request object is very clearly defined, it's the arguments object passed to the cloning request!
+* so in this case, `track: "badblood"`
+* and you can always retrieve the original arguments object using the `_arguments` property, eg `foo._arguments`
+
+* the `undefined` object could even have extra tags, like `error: "unauthorized"` and such
+* but what's important is that it's clear that the request failed
+
+
+
+* I guess what felt weird to me
+* was that you could clone an object, and you would get this incomplete clone back
+* and depending on if the source could "see" the caller, then it could "complete" the clone
+	* fill in the missing properties and apply the modification
+* it just felt like a very complex and unintuitive system
+
+* but if we recognize that the source has to see the caller to perform the clone in the first place
+* then modification and cloning become linked
+* if you can clone, you can modify, and vice versa
+* not the mention, the return value of the cloning operation is also closely linked
+* you don't have to inspect the returned object anymore
+* the mere existence of a returned object implies that the request was successful, the clone is complete, and the modification was executed
+* it is very simple and intuitive
+
+
+* note that if you can't clone an object, you can still perform a "surface copy"
+* which just copies the values and whatever properties are public
