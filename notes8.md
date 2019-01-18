@@ -1962,5 +1962,128 @@ to generalize, the lazy evaluation knows to evaluate all dynamic keys first, bef
 * it is very simple and intuitive
 
 
-* note that if you can't clone an object, you can still perform a "surface copy"
+* note that if you can't clone an object, you can still perform a "surface copy" or "shallow copy"
 * which just copies the values and whatever properties are public
+
+
+### Cloning Authorization
+
+how do you clone and return undefined?
+easy:
+
+	foo: AuthClone
+		#if_unauth: 
+			error: "unauthorized"
+		prop1: 10
+		prop2: "this is for authorized users"
+		prop3: blabla
+
+	AuthClone: source, key >>
+		if (authorized(key))
+			...source
+		else
+			...source.#if_unauth
+
+this pattern can be used for a lot of cases actually
+
+	foo:
+		#pre_reqs: some condition
+		#if_fail:
+			error state
+		success state
+
+
+now that the cloning is also a "request"
+cloning has to be authorized too
+but that means we don't have to do a search for clones
+because the source is in charge of creating the clone, and giving out the reference
+the source automatically knows how many clones were made
+in addition, if some of those clones are "template" clones, not meant to do any modifications
+the source will know that too
+in fact, you can probably just set a flag inside the clone arguments, telling the clone not to make any modifications
+this can be a flag already designated by the `Modifier` class
+
+though now that clones have to be authorized, maybe everything is a `Modifier` now
+no distinguishing between Modifiers and regular objects?
+
+### Request Authorization Using Functions
+
+* our method for cloning and returning `undefined` is a little weird actually
+* what happens if we try to override params, like `foo(prop1: 20)`
+* one usually expects the properties passed into the object, to end up in the output
+* that is kinda how it has been working since the beginning
+* inputs kind of "pass-through" to outputs
+* in fact, inputs will override source properties
+
+* we could add a rule that if you reference `_arguments`, then inputs will not by default "pass-through"
+* and also it kinda makes sense for the source to be able to control that
+
+* however, there is also another way
+
+		foo: AuthCall
+			#if_unauth: 
+				error: "unauthorized"
+			prop1: 10
+			prop2: "this is for authorized users"
+			prop3: blabla
+
+		AuthCall: source, key >>
+			if (authorized(key))
+				=> source
+			else
+				=> source.#if_unauth
+
+		caller: foo.(prop1: 20) // note that we use function call instead of cloning this time
+
+* now we can still maintain source-override behavior
+* even if the call is unauthorized, you can still see the request paramters in the object returned to the caller
+* so instead of returning `undefined`, this actually follows the "fill-in" behavior mentioned earlier,
+	where the source "fills in" missing parameters
+
+### Calling instead of Cloning for Passing in Private Data
+
+* so should we guarantee source-override behavior?
+* it has some issues of it's own though
+* what if the caller tries to override the auth function
+
+* maybe we can prevent this by making the auth function private
+
+* this actually highlights an issue with our code
+* and this problem is in our original method too (the method outlined in "Cloning Authorization")
+
+* in the code we had
+
+		AuthCall: source, key >>
+			if (authorized(key))
+				=> source
+			else
+				=> source.#if_unauth
+
+* but `AuthCall` can't see `#if_unauth`, it's private to `foo`
+* so if we want to make the auth function private, maybe `AuthCall` can provide the private key to `foo`,
+	* and `foo` uses it to store the auth function
+* however, then the caller can just retrieve the same private key from `AuthCall` directly
+* and then use it to override the auth function in `foo`
+
+* so the dilemma is this
+* assume `AuthCall`, the source, and the caller are all separate independent entities
+* how does the source clone `AuthCall` and share a private authorization function
+* without exposing it to the caller
+
+* the problem is in order for `AuthCall` to get the auth function, it has to be a public parameter
+* but if it's a public parameter, then it will end up back in the source
+	* because we are cloning `AuthCall`, so any parameters sent will end up in the output, due to pass-through
+* unless... we use a function call instead of a clone for `AuthCall`
+
+		foo: AuthCall.call
+			if_unauth: 
+				error: "unauthorized"
+			prop1: 10
+
+* so it seems like anytime you want to prevent pass-through, just use a function call
+
+
+
+* if function calls are so common
+* maybe we should use the simpler `()` syntax for function calls
+* and use the more complex syntax, eg `.clone()` or `.()` for cloning
