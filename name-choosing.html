@@ -1,0 +1,116 @@
+<html>
+<body>
+	<p>Just a simple polling app to help me choose a name.</p>
+	<p>Please continue choosing one below until there are none left:</p>
+	<div id="choices"></div>
+	<br>
+	<br>
+	<button onclick="results()">Results</button>
+<script>
+
+names = [
+"locus",
+"plexus",
+"lattice",
+"lynx",
+"nexion",
+"nexus",
+"convergence",
+"entangle",
+"notch",
+"void",
+"vix",
+"quark",
+"axis",
+"nucleus",
+"focal",
+"axiom",
+"radial",
+"maxim",
+"pivot",
+"centroid",
+"radia",
+"influx",
+];
+
+var votes = {};
+var appearances = {};
+names.forEach(name => votes[name] = 0)
+names.forEach(name => appearances[name] = 0)
+
+var elem = document.getElementById("choices");
+
+function refresh() {
+  elem.innerHTML = '';
+  var shuffled = names.sort(() => 0.5 - Math.random());
+  var selected = shuffled.slice(0, 5);
+  selected.forEach(name => {
+    var button = document.createElement('button');
+    button.innerHTML = name;
+    elem.appendChild(button);
+    button.onclick = () => {
+      votes[name]++;
+      refresh();
+    }
+    appearances[name]++;
+    if (appearances[name] >= 10) {
+      names = names.filter(x => x != name);
+    }
+  });
+  console.log(names);
+}
+
+refresh();
+
+function results() {
+  Object.keys(votes).sort((a,b) => votes[b] - votes[a]);
+  elem.innerHTML = Object.keys(votes).map(n => n+": " + votes[n]).join('<br>');
+  console.log(Object.values(appearances));
+  console.log(votes);
+}
+
+/*
+Poll Results
+------------------
+top-tier:
+	nexus: 7
+	lattice: 7
+	axiom: 6
+	convergence: 4
+	plexus: 4
+	quark: 4
+	locus: 4
+
+mid-tier:
+	lynx: 4
+	entangle: 3
+	influx: 3
+	nexion: 1
+	axis: 0
+
+garbage:
+	maxim: 0
+	notch: 0
+	nucleus: 0
+	pivot: 0
+	radia: 0
+	radial: 0
+	vix: 0
+	void: 0
+	centroid: 0
+	focal: 0
+
+---------------
+
+Public Poll (asked friends to vote for 2 out of these 6 names)
+
+Nexus - 2
+Axiom - 0
+Axis - 4
+Convergence - 1
+Quark - 2
+Lattice - 1
+
+*/
+</script>
+</body>

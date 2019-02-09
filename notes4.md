@@ -2553,7 +2553,7 @@ foo: fn1(a).fn2(b).fn3(c, d)
 foo: website.getPage(url).getElementsWithClass(class).addProperties(obj)
 	url: 'https://github.com/woojoo666/arcana-notes#untitled-language'
 	class: 'class'
-	obj
+	obj:
 		a: 10
 		b: 20
 		c: 30
@@ -2760,8 +2760,8 @@ foo: x, y =>
 ### Functions and Objects - A Unified Theory
 
 no such thing as incomplete and complete
-	* actually there is, see next section "Incomplete vs Complete Revisited"
-	* actually there isn't, see next next section "Partial Completion"
+	* revisit: actually there is, see next section "Incomplete vs Complete Revisited"
+	* revisit: actually there isn't, see next next section "Partial Completion"
 objects are a subclass of functions (but they are ultimately the same thing)
 static, not dynamic
 	* objects are where scope and output are the same, functions are where they are different

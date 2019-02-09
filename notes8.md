@@ -2087,3 +2087,12 @@ no distinguishing between Modifiers and regular objects?
 * if function calls are so common
 * maybe we should use the simpler `()` syntax for function calls
 * and use the more complex syntax, eg `.clone()` or `.()` for cloning
+
+
+
+cloning undefined
+
+returning an error when cloning? how to notify that it failed
+normally in imperative if something fails, all execution after will stop
+
+maybe any failed clones propagate

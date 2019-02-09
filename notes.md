@@ -4056,6 +4056,12 @@ Decomposition and Analyzing Shared Paths
 	* AI can be used to suggest how to fill in those details, generating the lower levels
 * code should speak for itself
 	* less comments, hide extraneous details and complexity
+* tagging, marking, labeling
+	* relevant sections:
+		* "Revisiting Core Concepts - Tagging and Labeling"
+		* "Using Tags to Create Sets, Combining Tags"
+		* "Tag Queries"
+
 
 ### Advantages
 

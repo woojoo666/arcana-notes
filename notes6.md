@@ -513,6 +513,8 @@ foo: …
 ### Spread Operator and Merging Properties
 
 * earlier, we talked about the "fixed" syntax for IIFEs (Immediately Invoked Function Expressions)
+	* see section "Arrow Operator and Capturing Implicit Inputs"
+* eg
 
 		foo: (=> a.bar(b))#
 		    a: SomeObject
@@ -842,7 +844,7 @@ you can treat tags like lists
 
 kinda like nondeterminism
 
-you can easiliy combine tags
+you can easily combine tags
 
 		#red: .r = 255 and .g = 0 and .b = 0 // use the public r g and b properties to create local tag #red
 		display(#red) // display it as a list
