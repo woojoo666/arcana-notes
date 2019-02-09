@@ -2322,3 +2322,413 @@ spread operator is shrunk down to …
 
 
 
+
+nondeterminism
+tables and columns
+set <: foo vs foo.#set.
+we can think of queries as selecting rows, and then adding tags as adding values to a new column for those rows
+we alternate between selecting rows, and defining cells in a new column
+then we can create a new row that contains the items with a certain value for that column
+note that we can start the query from multiple places
+so when we insert to a set directly
+we are skipping the intermediate step
+
+perhaps this shows a way where we can get around collectors and state variables
+in
+	
+	collect: find(#tag)
+	list.map(x =>
+		x #tag: 10
+	)
+
+`x` is actually a new variable, a new "row" in the table
+but it points to a list item
+the new "row" has a column `#tag` value `10`
+so when you do the query `find(#tag)`, it collects all the nodes with that tag
+notice that you are not modifying any list items
+you are tagging the alias variable `x`
+
+perhaps this can also help explain why we allow private tagging of public vars, public tagging of private vars, but not public tagging of public vars
+
+
+
+because the cloner must be visible to the source, then the source can have pointers to all clones
+this could solve the query problem, flag watcher
+
+
+is it possible for A to view B but B can't view A?
+possible, by proxy
+say we have three users, Joe Bob and Alice
+Joe asks for access to Bob's pictures, and Bob gives access, and can view Joe
+Joe forwards the pictures to Alice, but doesn't tell Bob
+
+
+
+parent is responsible for attaching the arguments object to the flag
+only expose the arguments object to the source, everything else kept private
+
+
+dynamic indirect modification
+we can make it so you can only modify if it's a static object
+eg `foo: ()`, not `foo: someFunction(...)` or `foo: x ? bar else zed`
+but what about `node in tree.nodes`
+we talked about this earlier
+// TODO: FIND REFERENCED SECTION
+how does flag watcher work in this case?
+
+note that modification and `<:` can be seen as an API call
+	the `set` api call to be exact
+so modification of dynamic objects
+is the same as calling/cloning a dynamic object
+
+but cloning is just like property access
+`foo.bar` is kinda like `foo.bar()`
+so if we allow dynamic property access
+then we should allow dynamic cloning
+and if we allow dynamic cloning
+then we should allow dynamic api calls
+and if we allow that
+then we should allow dynamic modification
+
+
+we have to think about all modifications in terms of requests
+in imperative languages, you can just modify other variables willy nilly
+but in a distributed network, you have to use requests to make modifications
+ensures encapsulation
+
+
+`_children` and `_clones` object
+parent
+
+
+error propagation
+we can make it just for children
+new objects or clones created in the module
+so no aliases
+
+propagation vs query
+
+
+	regex [[(.children)*]] 
+
+
+	tree
+		#nodes: children + children[[#nodes]].flattened
+			
+			for child in children
+				child.#nodes: #nodes(child)
+
+lazy evaluation
+external hashmap model
+	we don't want that
+mirrored tree and flag watcher model
+	find referenced section
+
+it's starting to seem more like the external hashmap model
+and less like tags attached to the original object
+it's more like properties attached to the wrapper, not the original
+
+recall how dynamic indirect is ugly in diagram syntax
+
+so if we have a private scope, and we dynamically tag some node with a public tag
+is the public aware of it?
+flag watcher model says no?
+
+if `foo` has a pointer to the world, but the world has no pointer to `foo`
+then it's impossible for the world to read anything of `foo`
+so nothing `foo` does can change the world
+
+however, any tags that `foo` applies, will still be visible to itself
+
+if it's a `set`call, then it has to be broadcasted, received by the source
+if it's external hashmap, also need to be broadcasted, received by the tag
+if it's a personal tag, then it doesn't need to be broadcasted
+
+so seems like three ways to scope taggings
+
+though taggings are already naturally scoped by the tag itself
+
+maybe it will propagate as far it can
+though thats confusing and hard to track
+
+originally we did it based on tag scope
+	thinking about it in terms of perspectives
+	functionally equivalent to a external hashmap
+but then we started thinking about it in terms of api calls
+
+is the tag query at the tag, or the source?
+
+note that if we go with the external hashmap model
+and we wanted to use a public tag, without broadcasting it to the tag
+then we can just create a private copy of the tag
+so in the earlier example where `foo` has a pointer to the world but the world can't see `foo`
+`foo` can just create private personal tags for everything
+
+-------------- vvv move this to appropriate area vvv -----------
+
+if you have
+	
+	foo:
+		source
+	bar:
+		caller: foo.source(...)
+
+caller will raise a flag
+it propagates to `foo`
+foo forwards it to `source`
+`source` creates the clone, and sends it back
+so by default, it acts just like a regular call
+
+however, anybody in the chain can intercept or block the propagation
+`bar` can sandbox `caller` and prevent it from sending any requests
+`foo` can sandbox `source` and prevent it from receiving any requests
+
+------------------------- ^^^^^^ -------------------------
+
+
+when we want to access the property/tag, who do we ask?
+	the tag or the source?
+ideally we would want to attach tags to the source
+and we could implement the language such that, tags are stored directly in the source object
+	even if the tag isn't visible to the source object
+
+but if we want every module to be independent
+then the source should be able to choose not to store tags it doesn't know about
+
+ultimately, where the tags are stored
+determines who gets final say on what value is returned, when executing property access
+eg if the tags are stored in the source object
+then even if the source object can't see the tag
+	or the values (because they are encrypted by the tag)
+when you do property access `srcObject.#privateTag`, it can choose not to return anything
+it can even choose to delete all tags and values that it can't read
+
+for API calls, and modifications, it makes sense to let the source object have final say
+on what gets returned from property access
+
+
+seems best to store it with the tag
+after all, anybody with access to the tag has access to the values
+naturally scoped by the tag, as mentioned earlier
+though you still need access to the source object for the value though...
+string properties should be stored in the source though
+and what about dynamic keys, matchers
+are those stored in the source object?
+
+seems like there are three parts, each defined in a separate location
+	1. source
+	2. tag
+	3. value (defined in the caller/modifier)
+
+
+
+everything really depends on who can view the value
+
+we can reduce it to tag scope, if we make private scopes have to decalre a new tag
+but we can reduce it to source scope, if we make private tags just external hashmaps
+
+the value/defintiion determines the value of the value
+the tag determines the visibility
+
+the tag is just a value, a address location, an encryption key
+the tag scope doesn't necessarily see everybody that uses it
+
+when you define a object with properties
+it's up to you to make sure that all object usages have access to the object
+
+likewise, if you define extra properties, you are really defining a wrapper
+and it's up to you to make sure all usages of those extra properties, can see the wrapper
+though its more difficult to do so, because it's hard to tell who can see the wrapper
+
+
+though, without some sort of concensus, it is confusing
+we have to determine whether or not a certain property is overdefined
+if we have multiple private scopes that disagree on the value of a certain property, can be very confusing
+we talked about this earlier
+	find referenced section
+
+on the other hand, it is very restrictive to force the source object to be aware of all tags
+so basing it off tag scope seems like the best way to go
+
+though there are cases where that can feel unintuitive too
+
+	#publicTag
+	#privateScope:
+		privateObj:
+			#publicTag: 10
+
+`#publicTag` can't see `privateObj`, so this would be illegal, if tagging is scoped to tags
+but shouldn't `privateObj` be able to define its own static tags without making `#publicTag` aware
+though `privateObj` could always create it's own tag
+
+we can't allow both tag scope and source scope, because then each scope can have their own idea of the tag value
+
+	#publicTag
+	publicScope:
+		someFn: someObj => someObj.#publicTag: 20
+		someFn(privateObj) // somehow pass privateObj into here??
+	#privateScope:
+		privateObj:
+			#publicTag: 10
+
+hmm not sure actually
+
+also note that tag scope makes sense because tags are static
+when you do `foo.#someTag: 10`, the `#someTag` is a static reference
+whereas `foo` can be a dynamic object
+
+
+but actually, why not have dynamic tags
+aren't you supposed to be able to share private tags
+how can you share them if all references to them have to be static
+
+note that if you share a tag, and you are using tag scope
+and you use the (shared) tag in a private scope, without letting the original tag know
+then you end up with conflicting values for the tag, depending on your scope
+to fix this, every time you share a tag, you have to be aware of everybody that receives the tag
+share "read" and "write" access
+so that any updates to shared tags, can propagate to the original tag
+
+
+if we reduce to tag scope, then private scopes can just declare private copies of tags
+but we can reduce it even further, if we make it source scope
+and simulate tag scope by just using hashmaps instead of tags
+
+
+ultimately, we need a concensus, a ground truth
+so we don't never conflicting values for the same variable
+in addition, modifications and taggings are API calls
+the result of the API call indicates whether or not the "concensus" was updated or not
+	whether the modification was received
+
+the simplest ground truth is the source object
+so all tags and modifications have to be received and approved by the source object
+
+conceptually, this is how the language works
+implementation can be whatever, as long as it ensures the same surface behavior
+	no conflicting values for a variable/tag
+
+I still can't think of anything wrong with using tag scope though
+you can reroute all `<:` API calls to go to the tag instead of the source
+so if you want to share a tag, you have to share "write access" for the API calls to go through
+
+I guess this is just a side effect of how external hashmaps work virtually identically to object properties
+
+proxies
+if you had a website like New York Times
+and they censored all dissenting comments
+you can create a local proxy, where you attach your own personal tags
+this is a new source object, that pulls properties and values from the original source
+but any new local tags, are directed to the proxy object, not the original source
+I guess this can be thought of as the "perspectives" idea I explored much earlier
+you have to explicitly declare a "perspective" and it will act as a auxiliary ground truth
+
+we can make tag scope simpler if we restrict private tags to modification `<:` and public tags to static declaration
+makes it easier to think about where the API call needs to go
+
+distributed concensus
+
+users should have the power to say whatever they want
+sources should be appear however they want
+
+if a certain tag says "joe is a liar"
+and it's attached to joe
+then doesn't it look like joe said it?
+
+responsibility
+
+different from Cono because in Cono, each user can tag something differently
+in our language we need concensus
+
+remember that we can use keys as hashmaps too
+so if we had
+
+	#height
+	someObject <: #height: 10
+
+according to tag scope, it would be stored in `#height`
+and then we do
+	
+	#height <: someObject: 10
+
+what happens? does it get stored in `someObject`? isn't that weird?
+
+
+private key args
+possible?
+mentioned prev that impossible
+but if you think of how the web works
+it is possible
+website exposes public key
+encrypt using public key
+website decrypts using private key
+our lang currently uses symmetric key encryption methodology for private keys
+so how does this assymetric key model look?
+actually it's possible
+`[encrypt(publickey, data)]: data`
+
+actually, private keys are not related to encryption at all
+encryption is just an implementation
+private keys are just non-enumerated keys
+	aka keys that are not declared in the `keys` property
+	find referenced section
+how it is implemented is irrelevant (could use encryption, or any other method)
+
+in order to achieve this behavior where `some.path.to.foo(a b c)` the arguments are not exposed along the path
+can be achieved like so
+caller scope overrides all outer variables, so the reference to `some.path.to.foo` is actually a proxy
+	the proxy encrypts the arguments before sending
+source scope overrides all calls, using another proxy
+	decrypts the arguments, before calling the intended source
+
+
+
+actually inconsistency
+declaring new key, but when you use it, scoping works differently
+
+	foo: #bla >>
+		#bla: 10
+		bar:
+			#bla: #bla + 10
+
+once again, shows that we should really just be using an external hashmap here
+we are intentionally trying to mix the two concepts but it's just not working
+
+diagram snytax
+	find referenced section
+we are receiving the var, but we can't necessarily write to it
+api calls work fine though?
+
+
+3 ways we can handle
+1. read, but no write. Has to create a proxy/hashmap, tag scope
+2. read and writes, uses api calls, tag/source scope
+3. direct write, passing an object gives the direct object url, which can be used to directly call it (kinda like if you were passed the url of a website)
+	breaks encapsulation, unideal
+
+
+confusing, sometimes we want to override the private var, sometimes we don't (when using it as a tag)
+when using it as a tag, no matter how many times you "tag" something, you don't want to override it for nested scopes
+when using it as a variable, you do want to override (though how often would u use a tag as a private var...)
+so perhaps, we need a syntax `%foo: 10` which converts to `[foo]: 10`, that way it doesnt' override
+
+
+I guess one of my main qualms with tag scope, is that it can be difficult to keep track of what tags you have "write access" to
+if you did something like
+
+	foo:
+		#weight: 10
+		#height: 20
+		#color: red
+
+how do we know which of these modifications will succeed? which will fail?
+
+but what if we simply made all tags have 100% write access?
+as in, there are simply declared as a blank external hashmap, `#foo: ()`
+that way, you never have to worry about write access, as long as you have read access and your ancestors are forwarding your API calls
+	remember that modifications are just API calls to the `set` method
+
+after all, tags aren't used for private/public, that is what the `keys` property is for
+they aren't really a "core" part of the language
+so tags can just be a provided data structure, just like state variables
+
