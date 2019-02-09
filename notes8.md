@@ -2082,6 +2082,17 @@ no distinguishing between Modifiers and regular objects?
 
 * so it seems like anytime you want to prevent pass-through, just use a function call
 
+* pass-through is nice for when you want to add tags while creating a clone
+
+		foo: bar(10, 20, #mytag: "hello")
+
+	can be shorthand for
+
+		foo: bar(10, 20)
+		foo <: #mytag: hello
+
+* can't really do so with a function call
+
 
 
 * if function calls are so common
@@ -2090,9 +2101,224 @@ no distinguishing between Modifiers and regular objects?
 
 
 
+
+### Cloning undefined
+
 cloning undefined
 
 returning an error when cloning? how to notify that it failed
 normally in imperative if something fails, all execution after will stop
 
-maybe any failed clones propagate
+maybe failed cloning/calling sets a special error flag, propagated upwards
+error propagation
+maybe it doesn't need to propagate the flag
+just use a query, and it will search for the flag in descendants
+(internal implementation can optimize by propagating the flag)
+
+
+
+`undefined` can be thought of as a dynamically created location that was never explicitly defined
+	kinda of like taking a wrong turn on a road and ending up in some unexplored (or undefined) portion of the world
+* so it doesn't quite make sense for it to have properties
+* but it could have tags
+	* because this dynamically created location will have a unique memory address
+	* and recall that we could just invert the tag and the source,
+		* so instead of storing it as `source: (tag: value)`, we store it as `tag: (source: value)`,
+		* basically storing the tag as an external hashmap of `<source, value>`
+	* see section "Private IDEs and Browsing Contexts II"
+
+* instead of `True` and `False`, we can use `()` (aka defined) and `undefined`
+* so `foo.` doesn't stand for `foo: True`, it stands for `foo: ()`
+* that way we can use the same mechanism to define set items, collectors and empty objects
+* or maybe we can just define `True` as `()`, and `False` as `undefined`
+
+### Error Propagation and Tag Queries
+
+* recall tag queries from "Tag Queries"
+we can use the same method
+don't need to propagate errors
+when you use a tag query
+the interpreter will automatically use propagation in the internal implementation to optimize
+	// TODO: FIND REFERENCED SECTION
+
+
+### Sharing Private Key vs Private Var
+
+	source
+		#foo.
+
+		bar:
+			#foo: 10
+			shareVar(bar.#foo)
+			shareKey(source.foo)??
+
+
+
+
+### Example and Exploration - EBook Reader
+
+inspired by cracking the coding interview (chapter 7 problem 5)
+
+
+		Library
+		ReaderUI:
+			fontSize
+			pageColor
+			fontColor
+		Book
+			rawText // maybe an epub file?
+			Pages[] pages // dynamically generated
+			currentPosition: // position in rawText
+
+			lineLength: readerWidth / fontSize // number of chars per line
+			linesPerPage: readerHeight / fontSize
+			lineSplitter: text, position >>
+
+				lastSpace: text.matches(" ").filter(< lineLength)[Math.max] // position of last space
+				lineEnd: lastSpace
+
+				prevLine: arr[index-1]
+
+				additionalTags:
+					#origPosition: position // points back to the original position in the raw text
+
+			lines: rawText.split(lineSplitter)
+			pages: lines.group(size: linesPerPage) // group lines into pages
+
+	notice: even though `lines` uses `split` or `substring`, the operation will store the start and end of the string operation, as well as the extracted string, but if the extracted string isn't used doesn't need to be computed. In this case, for unrendered pages, only the start and end positions of the strings will be used
+
+
+
+syntax ideas
+
+	mapped property access:
+		text.matches(" ").map(obj => obj.position) // long syntax
+
+		text.matches(" ").*[position] // short syntax 1
+		text.matches(" ")[[position]] // short syntax 2
+
+	can probably use the same for filters:
+
+		text.matches(" ").filter(< lineLength)
+
+		text.matches(" ")[[< lineLength]][[position]]
+
+	function inversion:
+
+		someLibraryFunction(someInput)
+		someinput[^^ someLibraryFunction]
+		someInput.^someLibraryFunction
+
+		someLibraryFunction(someKey: someInput)
+		someInput[someLibraryFunction(1: this.someKey)]
+
+	search and insert:
+
+		at any time, you can initiate a search, and look for functions or code to insert
+		for example
+
+		pages: lines. [initiate search here]
+
+		and then search for "group array items" or "unflatten array"
+		and then you can either insert code snippets
+
+		pages: lines.reduce(acc, line => next: acc.last.length <  4 ? acc.last <: line : acc <: [line])
+
+		or import a function into the current scope and automatically insert a function call
+
+		groupFn: arr, size >> arr.reduce(acc, x => next: acc.last.length <  size ? acc.last <: x : acc <: [x])
+		pages: lines.^groupFn(size: 4)
+
+
+
+
+hashmap vs object
+state machines
+matices
+
+
+
+clone args obj instead of req
+weird to have clone return undefined
+clone vs call, ambiguous
+result of the action vs the action itself
+api calls are mostly actions, so you mostly just want the result
+but cloning ops should still be able to return undefined
+say you are creating a new `Student`, but fill in wrong fields
+it's not enough to just set a flag
+because you want property accesses to fail as well
+maybe regular property access will fail, but private tags will still work
+or maybe everything will fail, but you can use special `.error` to get error code, and `.source` to get original object
+
+
+declare vs use private key
+almost always want to declare as `()`
+creates a unique address
+if you declared `private #foo: 4`, and did `bar.#foo`, it would be the same as `bar.4`
+so you'd really only want to declare it as not `()` if you were sharing keys, or key aliasing
+
+though often you might declare a bunch of private keys
+having to put `private` before all of them might seem cumbersome
+but you could also:
+make the entire module private
+or use block notation
+
+	private
+		#foo
+		#bar
+	#foo: 10
+	#bar: 20
+
+
+### Capture Blocks Revisited
+
+Capture Blocks III
+Spread Operator and Merging Properties
+Capture Blocks vs Immediately Invoked Function Expressions
+
+capture blocks still work great with `...`
+recall IIFE
+
+one option was 
+
+	foo: (=> website.getPage(url).getElementsWithClass(class).addProperties(obj)).call
+		url: 'www.someurl.com/some/path'
+		class: 'someclass'
+		obj:
+			a: 10
+			b: 20
+			c: 30
+
+or another 
+
+	foo: ... website.getPage(url).getElementsWithClass(class).addProperties(obj)
+		url: 'www.someurl.com/some/path'
+		class: 'someclass'
+		obj:
+			a: 10
+			b: 20
+			c: 30
+
+though this is sort of weird, because normally you can't declare properties in-line
+	very ugly, and ambiguous
+though we still want it for normal IIFEs...
+what about
+
+	foo: website.getPage(url).getElementsWithClass(class).addProperties(obj) using ...
+		url: 'www.someurl.com/some/path'
+		class: 'someclass'
+		obj:
+			a: 10
+			b: 20
+			c: 30
+
+I think `using` is best
+can be used for using a different scope as well
+though is that a security concern
+
+
+capture blocks stay as three big dots ...
+spread operator is shrunk down to …
+
+
+
