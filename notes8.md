@@ -3084,6 +3084,345 @@ perhaps something like this (note: parts omitted if they are identical to the pr
 note that using a regular tag or property to store the "hash"
 allows for multiple hashes or "perspectives", as mentioned in the previous section
 
+### Tag Scope vs Source Scope - Cloning
+
+actually really obvious difference between tag scoping and source scoping
+i can't believe I hadn't thought of it yet
+cloning
+
+if you clone with tag scoping, the clone won't inherit the tag
+if you clone with source scoping, it will inherit the tag
+
+so source scoping is the way to go
+
+however, we still have moments, like the `#height` example, where we want private tags
+in that case, we would have to use a proxy
+but we can't just clone the input nodes, what if we don't even have that power?
+proxies work differently from cloning
+
+### Proxies
+
+Bob's graph
+Joe proxies it, and tags it with #height
+Bob clones his own graph
+those tags won't be on the clone
+
+	Zoo:
+		animal: (...), mammal: animal(...), dolphin: mammal(...)
+
+	BobsTags:
+		animal <: #cool.
+		dolphin <: #cool.
+
+Bob thinks that animals are cool and dolphins are cool
+notice that Bob does not care about the relationship between animals and dolphins,
+	does not notice that `dolphin` is a descendant of `animal`
+
+notice that when `Zoo` tags `animal`, it gets inherited by `mammal` and `dolphin`
+this is because when `Zoo` tags `animal`, they are actually modifying the core definition of `animal`
+and `mammal` and `dolphin` are based on that definition
+
+on the other hand, when Bob tags `animal`, he is not modifying the core definition, just his surface interpretation
+if he does for some reason want his tag to propagate to the descendents of `animal`
+he can tag based on a shared property/tag of these descendents
+for example, if `animal` had the property `#canMove`, then Bob can tag that property itself, `animal.#canMove <: #bobsTag`
+or query for all objects with that property, and tag each one, `for obj in Zoo with #canMove: (obj <: #bobsTag)`
+
+this way, Bob is still unaware of how these objects were created, or who they were cloned from
+he is tagging purely based on the surface appearance of the objects
+so if Zoo for some reason creates a new object `chair: animal(#canMove: undefined, #hasBlood: undefined, ...)` and overrides every property in `animal` with `undefined`
+	essentially a useless clone, because it isn't inheriting anything
+then Bob has no idea that `chair` was cloned from `animal` in the first place
+how objects are created is kept private
+
+
+the idea of a proxy:
+	imagine looking at the world through a window
+	and using markers to draw on the window, annotating the things you see
+	it doesn't know anything about what object is a clone of what
+	it treats every object as just another object
+great for data processing
+it doesn't have any power over the creation of the data, or the structure of the data
+all it does is annotate and group the data
+
+
+when you proxy an object, or multiple objects
+creates a wrapper object
+the wrapper also transforms any property accesses, and proxies them
+so if you do `proxyObj.someProp`, it will proxy `sourceObj.someProp`
+
+
+proxies serve the same purpose as a hashmap
+meant to decouple the tags from the source object
+so you can annotate and group input objects, without affecting them
+and keeps all annotations within the scope
+
+proxies allow the tag to be treated like any other source object property
+proxies still follow source scoping, while an external hashmap would be like tag scoping
+this is great for functions like `find` and `filter` and such
+
+however, there are still some differences between using a proxy vs using an external hashmap
+proxies can be cloned, though that can still feel a little weird...
+if you somehow have two inputs that are aliases for the same input object, and you create proxies for each of them, then you have different proxies, with different tags
+an external hashmap would just treat the two inputs as the same
+
+
+
+### Cloning Authorization Revisited and Proxies
+
+How to allow company to debug your info
+Temp key?
+
+Function call might not go thru
+This is a result of full encapsulation
+It's not that you can't make function calls
+It's that you _can_ block function calls
+
+Though that's super low level
+Better way to block
+Is thru proxies and returning undefined
+So maybe we don't need to specify how it works
+
+
+Two ways to achieve clone control
+One: control how the arguments are handled
+Two: arguments always override and pass through, but you can control what is exposed, expose a proxy instead of direct pointer
+
+
+Cloning is a core language mechanic
+Proxying is not
+Clone authorization is not
+Isn't it weird to have a low level clone and a high level clone
+
+Actually we don't need a high level clone
+We can enforce that all cloning can happen, no authorization needed
+If you can see it, you can clone it
+However, you can use proxy to essentially prevent cloning
+
+Proxy can be used to block from outsiders
+Can also be used to sandbox internals
+
+
+Private vars is just a public var and mapping created in the programmers context
+Remember that the public doesn't have access to the programmers context
+Only the output of the program
+
+
+
+proxy is weird?
+it's used to allow tagging without letting outside world know of any activity
+but at the same time you would want to allow cloning right?
+
+
+does it ever make sense to clone tagged objects, and should those tags be inherited?
+usually, when you are tagging objects, you don't really clone them
+I guess one example could be, if you are tagging tools on the internet, eg bookmarking math tools (like graphing calculator websites and such)
+but you could also clone one of those tools, and modify it to suit your needs
+in that case would you want the tag to carry over?
+
+think about data pipelines
+and the window analogy
+we are never really going to clone the input data, just sort and group them
+from our perspective, they are just a collection of distinct objects, their relationships to eachother are irrelevant
+
+seems like tag scope still more intuitive, because we still retain simply clone behavior
+	don't have to worry about how to carry over tags
+
+say I like Bob's HTML template, I can "like it" and add it to my #html_templates collection
+and then I can also clone it
+but you wouldn't want the clone to have the same tags
+
+that is because the "tag" is separate from the relationship between the cloned template and the original template
+the "tag" doesn't care
+
+### The Link Between Proxies and Hashmaps
+
+in fact, we can think of a hashmap or a tag as a singular proxy scope, bubble
+and if we want to, we can "expand" that scope to start defining relationships between tagged objects
+
+example with family tree of people, and how good they are at chess (who they would beat)
+	forms a graph of tags (Bob `#beats` Anna, Anna `#beats` Chris, etc), that is separate from the familial relationships
+
+let's say `Bob` thought all animals were funny, so he wants to tag `animal` with `#funny` and have it be inherited by all subtypes of `animal`
+well `Zoo` doesn't necessarily have to expose which objects are subtypes of `animal`
+so `Bob` would not be able to achieve tag inheritance anyways
+
+### dynamic inheritance
+
+actually, this brings up a new idea
+
+if we can create multiple super-imposing systems of inheritance
+why declare an initial order in the first place?
+remember that the language encourages un-ordered definitions
+
+we can break the cloning step
+into the creation step, and inheritance step
+
+mixings?
+
+though recall that cloning is not about inheritance
+there is a difference between inheriting behavior, and copying it
+
+though you can still achieve mixins using cloning, just do
+
+	foo:
+		...bar(args1)
+		...zed(args2)
+
+### movie scoring example
+
+using tags
+
+	kungfupanda <: ...
+		#action.
+		#fights: 10
+		#plot: 7
+		#character: 9
+		#art: 6
+		#weights: // score weights for action movies
+			#fights: 0.25
+			#plot: 0.3
+			#character: 0.25
+			#art: 0.2
+		#overall: (#fights #plot #character #art)
+			.map(attr => kungfupanda[attr]*kungfupanda.#weights[attr]).apply(Math.sum)
+
+alternate
+
+	kungfupanda <: ...
+		#action.
+		#fights: 10
+			#weight: 0.25
+		#plot: 7
+			#weight: 0.3
+		#character: 9
+			#weight: 0.25
+		#art: 6
+			#weight: 0.2
+		#overall: this.values.filter(has #weight).map(score => score*score.#weight).apply(Math.sum)
+
+using an external hashmap
+
+	scores: ()
+
+	scores <: [kungfupanda]:
+		action.
+		fights: 10
+		plot: 7
+		character: 9
+		art: 6
+		weights: // score weights for action movies
+			fights: 0.25
+			plot: 0.3
+			character: 0.25
+			art: 0.2
+		overall: ("fights" "plots" "character" "art")
+			.map(attr => kungfupanda[attr]*kungfupanda.weights[attr]).apply(Math.sum)
+
+alternate
+
+	scores: ()
+
+	scores <: [kungfupanda]:
+		action.
+		fights: 10
+			weight: 0.25
+		plot: 7
+			weight: 0.3
+		character: 9
+			weight: 0.25
+		art: 6
+			weight: 0.2
+		overall: this.values.filter(has "weight").map(score => score*score.weight).apply(Math.sum)
+
+
+note that you can clone this rubric for other action movies
+however, note that you would never actually clone the movie itself
+also note that hashmap version allows for string properties, cleaner
+its also easier to clone the hashmap version, because you can just clone `scores.kungfupanda`,
+	whereas in the tag proxy version, you can't just clone `kungfupanda`, which is ambiguous (do you want to clone the source or the proxy?)
+	though in the tag proxy version, you could just group the tags in a larger tag to make it easy to clone, eg
+
+		kungfupanda <: #scores: ...
+
+is there ever an example where you would clone the source objects?
+
+what about just using a wrapper object
+
+	score:
+		movie: kungfupanda
+		action.
+		...
+
+	scores <: score
+
+well now you can't just ask for `kungfupanda.#overall` like you can with tag proxy
+though hashmap won't allow you to do that either, you have to do `scores[kungfupanda].overall`
+for wrapper object, you'd have to do `scores.with(movie: kungfupanda).any.overall`, a bit uglier
+hashmap vs wrapper object?
+
+actually javascript uses wrapper objects, for example in the graph #visited example
+because javascript hashmaps don't allow for object keys
+so wrappers are a valid alternative as well
+and a proxy is really just a fancy wrapper with some syntax sugar that turns `someProxy[someProp]` into `someProxy.sourceObj[someProp]`
+
+### The Link Between Proxies and Hashmaps II
+
+maybe we can combine proxies and external hashmaps
+using a sort of "Bubble" object
+when you are inside a Bubble, all external inputs are wrapped and proxied before they enter, which allows you to attach local tags to them
+	aka from the inside of the Bubble, the outside world looks proxied, everything is wrapped in a proxy object
+when you are outside the Bubble, you can query the Bubble with an object and it will return the corresponding local value stored inside the Bubble for that object
+	from the outside of the Bubble, the Bubble just looks like a normal hashmap
+
+notice that this allows the inside of the "Bubble" to represent a new perspective, with local tags attached to objects
+allows you to defined systems based on those local tags
+and during cloning, the children will inherit the local tags of the parent (not possible with an external hashmap)
+
+though that still raises the question, when would you want to be "inside" the bubble?
+aka, would you ever want local tags to be inherited by the clone?
+
+there is ambiguity, are we overriding properties in the proxy or the source object?
+but what if we design proxies to somehow unify the two?
+that way, you can have properties in the source object dependent on properties in the proxy?
+
+this rasies the question, why is there an order? why define the source object, and then clone it to make it dependent?
+we can actually make it so there is no cloning necessary
+sattellites
+
+
+we need to stop thinking in terms of implementation
+how proxies work, and how private tags are implemented using proxies, is all implementation
+
+proxies are just a way of creating a "perspective"
+a "perspective" is a way of attaching auxiliary attributes/properties to an object
+where those properties are "stored" is important, but not relevant to the core concept
+
+the key concept is, you can define "perspectives" that have 
+you can't just share the key, you have to share the perspective
+
+when you use a hashmap, you are outside it's perspective
+and that is why you have to ask the hashmap for the values associated with objects
+whereas if you are in the perspective, you can just ask the object directly for its associated value
+
+if you clone outside the perspective, the private tags are not carried over or inherited
+but if you clone inside the perspective, they are
+
+perspectives are a way of creating "distributed definitions"
+
+note that, if you use multiple perspectives to define a single object,
+and you want to clone the object and pass on _all_ properties (from every perspective)
+you need to be in every perspective
+
+
+`let` is a special keyword that defines a new perspective
+or perhaps we can have every scope a new perspective, and `let` just attaches local vars to that perspective
+
+remember that scoping is an approximation, so we need to allow for dynamic scoping
+so we need to be able to share perspectives
+
+
+
 
 ### garbage collection and recomputation
 "reference" sweeping isn't possible because technically everything is persistent
@@ -3132,3 +3471,8 @@ we should use `list.filter(someCondition).any` or `list.any(someCondition)`
 that way, we specify that the output of the filter could be unordered
 and the interpreter doesn't have to maintain order
 which allows for many optimizations
+
+### `is` and `not`
+
+`is` is short for `... = true`, so you can say `if (node is #visited)` to say `if (node.#visited = true)`
+`not` is the opposite, short for `... = false`, so you can say `if (node not #visited)` to say `if (node.#visited = false)`
