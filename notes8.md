@@ -2732,3 +2732,262 @@ after all, tags aren't used for private/public, that is what the `keys` property
 they aren't really a "core" part of the language
 so tags can just be a provided data structure, just like state variables
 
+
+
+
+
+
+
+### Full Encapsulation
+
+full control over anything created inside
+	all ingoing edges and outgoing edges
+but don't we already have that?
+if you're declaring it inside, just change how you declare it?
+	eg instead of making an API call directly, make an indirect one
+but the whole point of mocking and testing is to control the environment, without modifying the objects inside
+we should have control over child object, _regardless_ of what they look like
+that is true encapsulation
+
+so for example, in some java code like
+
+	class Foo {
+		private Bar bar = new Bar();
+
+		public void method () {
+			bar.sendMessage("this is Foo"); // send a message to Bar
+		}
+	}
+
+this is a static reference to `Bar`, and is impossible to mock (without Java reflection)
+normally, for testing, we would have to change the code to make `bar` an injected instance
+that way we can create a mock class `BarMock extends Bar` and inject that instead
+
+however, with full encapsulation, we don't have to do anything like that
+we can simply do
+
+	Bar: MockBar
+	Foo:
+		...
+
+and any references to `Bar` are just aliases for `MockBar`
+
+even if some module makes some external api call using a direct url, like
+
+	foo:
+		url: "www.example.com"
+		post(url)
+
+you can modify the environment like so
+
+	post: mockPost
+	foo: ...
+
+
+what about dynamically typed imperative languages?
+Javascript can do something similar, but only by overriding variables
+
+	testFunction(fn) {
+		var oldPost = post; // save post() fn
+		post = mockPost;
+		fn();
+		post = oldPost; // restore post() fn
+	}
+
+however note that this would not work in a multi-threaded environment, because it would break `post()` for everybody using it
+
+this brings to the second point of encapsulation: child modules should not have control over their environment
+note: they can still modify their externals (api calls and such)
+but the externals have to approve those modifications, so the child module still doesn't have power/control
+
+in javascript, notice that `testFunction` has to modify the environment, overriding the global function `post` in order to mock it for testing
+
+in addition, even trying to modify the behavior of `fn` is a violation of encapsulation
+if we were simply overriding `fn` with a `mockFn`, that would be fine
+but we are trying to tweak the internal behavior of `fn`
+what if `fn` was some external server that we shouldn't have access to?
+you can see how trying to change just one aspect of it's behavior (in this case, the `post` behavior) is insecure
+
+in our language, you would have to do
+
+	foo: fn >>
+		fn.defer(post: mockPost) // somehow make all calls to fn have the default parameter (post: mockPost)
+		fn()
+
+or maybe
+
+	foo: oldFn >>
+		fn:
+			oldFn(post: mockPost) // note: we don't actually want to call oldFn, this should be a template, only when fn is cloned does it actually call oldFn
+		fn()
+
+note: we don't want to call the original `fn` when we are setting the `post` parameter
+
+
+
+also, javascript has trouble mocking private vars in closures
+
+	var (function () {
+		var privateVar;
+		return function () {
+			privateVar();
+		}
+	});
+
+but our lang has private keys?
+
+
+dynamically created keys, like trees or strings
+uses an equality function, can't just use memory address equality
+does this make scoping mroe complicated?
+
+strings shouldn't be able to be tagged
+perhaps likewise with all dynamically created keys
+
+what if source and tag were both dynamically created keys, eg both strings
+how would you tag it?
+
+note that if you can tag anything untaggable, by wrapping it
+if source scope, wrap/clone the source
+if tag scope, wrap/clone the tag
+
+
+whether we want a tag to be usable or not, has to be explicit
+can't be implicit
+eg, in `#height` example, we want `#height` to be usable inside the `for node in nodes` loop, but not outside the `calcTreeHeight` function
+assuming that `#height` is a public tag
+otherwise, if it were locally declared, we could just use tag scope
+
+maybe string tags are source scope
+and # tags are tag scope
+eg
+
+	source:
+		this <: tag: 10 // modify string key
+	source <: tag: 20 // invalid, outside source's scope
+
+that way you use string keys to declare public properties, properties that can't be modified outside
+
+note that, even if you make a local tag public (by declaring it in keys)
+eg
+	
+	source:
+		declare #tag: ()
+		this <: #tag: 10
+		keys <: #tag // add #tag to public keys list
+	source <: [source.keys.0]: 10
+
+still doesn't work, because you aren't in the tag scope
+
+note that a cleaner way to make a local variable public is just to create a public alias
+
+	source:
+		declare #tag: ()
+		#tag: 10
+		tag: #tag // make #tag public
+	print source.tag // prints 10
+
+are you ever not in tag scope?
+how would you share tag scope?
+
+is there any issue with just using external hashmaps as tags?
+
+note that sometimes we do want to store private vars in the source object
+for example, what if we used a private password to access certain properties in an object
+
+	declare #passkey: "mypassword"
+	foo:
+		#passkey: "hello authorized user"
+
+if the private values are stored (and encryped) in the source object
+then we can access them by passing it in directly, eg `foo["mypassword"]`
+	without being in tag scope
+we can even serialize and export the object, and it will have this encrypted info
+
+
+
+	foo
+		bar:
+			let #sometag.
+			#sometag: 10
+			sometag: #sometag
+		baz:
+			let #sometag: foo.bar.sometag
+			#sometag: 20
+
+
+	foo:
+		let #sometag: "someString"
+		this <: #sometag: 10 // is this stored at tag, or at source (because the tag key is just a string)
+
+
+	dijkstra: source, graph >>
+		for node in graph.nodes:
+			node <: #distance: ...
+				if (node = source) 0
+				else node.neighbors[[#distance]].(Math.min) + 1
+
+
+
+
+we talked previously about Students
+this generalizes to a broader set of programming problems
+where we want to do something like "select the student with the highest score"
+notice how hard it is to formalize this without repeating code
+
+	students.filter(s => s.score == students.map(x => x.score).apply([], Math.max))
+
+we reference `.score` twice, and `students` twice
+
+we can characterize this set of problems as problems where we need to select a subset of items based on an item's "quality" relative to all other items
+so in this case, the "quality" we are selecting for is `.score`, and we want to maximize it
+
+in these sorts of problems, generally if we think of a forward pipeline, we have to first calculate the quality for each item
+then calculate the selected qualities
+and then trace backward and figure out which items had those qualities
+
+this was actually one of the original motivations for tagging, and the language itself
+I was working on a project where I needed to mark certain items in a set for processing
+but figuring out which items to mark, and what to mark it with, was a very complex function
+and at the end, I needed to trace back to find out which items led to the values I wanted
+I actually needed to mark things multiple times for multiple different reasons
+I used tons and tons of hashmaps to achieve this "marking"
+
+tagging is a great, non-destructive way to propagate information "backwards" or "outwards"
+
+you can tag properties of an item to point back to the item, and then just pass the property values to a function
+and when the function spits out the selected value, use the tag to retrieve the original item
+
+
+however, python and Numpy can do something similar, without tagging
+
+	bestStudent = students[students == np.amax(students)]
+
+
+note that in a typed language, you can't just add tags to an object, you have to either use a hashmap, or subclass the object to include the tag property
+
+
+### garbage collection and recomputation
+"reference" sweeping isn't possible because technically everything is persistent
+everything could be referenced somehow
+	esp with dynamic references, `root[inputString]`
+in imperative, when a program finishes executing, you can immediately garbage collect all its data
+but there is no concept of "programs" in dataflow, everything is persistent, in a giant distributed network
+
+
+
+
+
+### Breaadth First Search and Lookahead Optimizations
+
+	for node in nodes:
+		#distance: neighbors[[#distance]][Math.min] + 1
+	result: nodes.filter(query).firstBy(#distance)
+
+lookahead optimization turns
+
+	bla.sortBy(prop).first
+
+notice it doesn't have to sort, only find the minimum
+
+
