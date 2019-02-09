@@ -2967,6 +2967,124 @@ however, python and Numpy can do something similar, without tagging
 note that in a typed language, you can't just add tags to an object, you have to either use a hashmap, or subclass the object to include the tag property
 
 
+
+### unified primitives?
+
+another possible difference between tag scope and source scope
+if you had an array of numbers with duplicates like so: `(1 2 2 3 4 5 5 5 6)`
+if you tagged each number with, say, their respective indices
+then would duplicates be treated as the same object, and have colliding tags?
+	this would be like an external hashmap
+	tag scope
+or would duplicates be treated as different objects
+	this would be like source scope
+
+it also depends on whether or not we "unify" all references to the same number
+eg, if `foo: 3`, and `bar: 3`, do `foo` and `bar` point to the same thing?
+in javascript, every instance of a number is a difference instance
+but in our language, perhaps we want to stick to the "single-pass" idea, where we try to unify all behavior that is based on the same value
+	find referenced section
+
+but in certain cases, we would have different objects, eg `((1 2) (3 6) (1 2) (2 9))`
+	notice that the first and third pair are "equal" but different objects
+	we would need to override the `equal` operator
+with an external hashmap, and an overriden `equal` operator (and possibly overriden `hash()` function), both instances of `(1 2)` would share the same tags
+	because the hashing function would hash them to the same value
+but with tag source, even with an overriden `equal` operator, the instances would have different tags
+	well we _could_ still make them share tags if we wanted to...
+	at that point we'd basically be using an external hashmap though
+
+in this case source scope seems to make the most sense, if the syntax looks like `(1 2) <: #tag: 10` then the behavior should match
+	and an external hashmap seems to have mismatched behavior, in terms of tagging different but "equal" objects
+though we could still enforce it so different but "equal" objects share the same tags...
+
+
+if we unify numbers and other primitives, we can still force items in arrays to be distinct by wrapping them in objects, eg
+
+	nums: (1 2 2 3 4 5 5 5 6)
+	numObjs: nums[[num i => (value: num, index: i)]]
+
+
+if you tried to do something like
+
+	for obj, index in (foo bar bar zed)
+		obj <: #indices: ()
+		obj.#indices <: index
+
+would this work? wouldn't the `num <: #indices: ()` for both `bar` occurences be a collision? you are creating two `()` objects for the same value
+it might seem like it isn't a collision because its the same value, but it isn't the same value, its two new objects
+for the same reason, you can't do something like `x: (), y: (), x: y`
+
+
+maybe equality should be done through hashing, to ensure commutativity
+
+
+
+
+it makes sense to have tagging be based on hash
+	like how an external hashmap would behave
+after all two items with the same hash should be treated as the same item
+
+for a practical example, imagine tagging a url, www.example.com#anchor
+that tag should show up even if you go to www.example.com
+because we define the url system to hash these two urls to the same hash
+
+
+maybe you have a property `hash` and you point the tag to that property
+eg `new #tag(hash: 'myhash')`) would tell the `#tag` tag to look for the `myhash` property
+
+or maybe instead of hash, you can put objects into a set, and the tag gets applied to the set
+that way, you can have "multiple hashes", aka you can categorize objects based on different criteria, different perspectives
+and then have tags local to each perspective
+aka maybe one tag treats each object as a separate object, and another tag treats objects with the same hash as the same object
+
+though recall that sets are achieved using tags
+
+### Hashing As a Tag
+
+we can achieve the idea of a "hash" through tags
+if you want to have multiple objects hash to the same value
+you can represent that using a property, like a `hash` property
+and then, instead of mapping across nodes, you map across `hash` values
+
+	P: a b >> // Pair prototype
+		1: a, 2: b
+		hash: a + ',' + b // convert it to a string
+	list: (P(1 2) P(3 6) P(1 2) P(2 9))
+
+	for hash in list[['hash']].values
+		hash <: #indices: ()
+	for pair, index in list
+		pair.hash.#indices <: index
+
+notice how you have to use two passes
+this actually makes sense
+recall that every "pass" represents a unique dataset
+here, the first pass represents the hashes, in which there are 3 hashes total
+the second pass represents the objects, in which there are 4 total
+
+imperative has it's own way of achieving this,
+	using the syntax `if (hashmap[hash] == undefined) hashmap[hash] = []`
+dynamically initializing properties to empty arrays
+kinda like lazy initialization
+whereas we are doing eager initialization
+
+though I think our syntax could still be cleaner
+perhaps something like this (note: parts omitted if they are identical to the previous example)
+
+	let #hash.
+	P: ...
+		#hash: a + ',' + b
+	list: ...
+
+	for hash in all(#hash).values
+		hash <: #indices: ()
+	...
+
+note that using a regular tag or property to store the "hash"
+allows for multiple hashes or "perspectives", as mentioned in the previous section
+
+
 ### garbage collection and recomputation
 "reference" sweeping isn't possible because technically everything is persistent
 everything could be referenced somehow
@@ -2991,3 +3109,26 @@ lookahead optimization turns
 notice it doesn't have to sort, only find the minimum
 
 
+
+### dangling property accessor
+
+maybe `[someProp]` stands for `x => x[someProp]`
+which is why `list[[someProp]]` applies the property access to every element in the list
+in fact, maybe we can just treat `[]` as an operator, `a[b]`
+so if you omit `a`, it turns it into a function
+just like if you omit `a` in the operator expression `a < b`, so you can do things like `list[< 10]` to get all items less than 10
+
+
+### Exception to Pass Through
+
+`foo("hello" "world")` is not the same as `foo(1: "hello", 2: "world")`
+it maps to implicit args
+
+
+### "Any" instead of "First"
+
+instead of doing `list.filter(someCondition).first` when we only want a single item
+we should use `list.filter(someCondition).any` or `list.any(someCondition)`
+that way, we specify that the output of the filter could be unordered
+and the interpreter doesn't have to maintain order
+which allows for many optimizations
