@@ -1775,7 +1775,7 @@ for example, if a bunch of movie critics have different ratings of a movie, and 
 
 ### Perspectives and Cloning Restrictions
 
-also, you can't just access dependents using your perspective and your tags
+also, you can't just access an object's properties using your personal perspective and your tags
 because that would imply cloning it and changing the inputs
 for example, in the bmi example mentioned in the earlier section
 	see section "Cloning Restrictions"

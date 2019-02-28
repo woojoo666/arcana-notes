@@ -24,7 +24,7 @@ Everything in Axis is data. There is no execution, no instantaneous actions. All
 
 ### Basic Syntax
 
-The basic syntax is rather intuitive.
+The basic syntax is rather intuitive, and looks similar to javascript objects definitions.
 
 	x: 10     // define variables using ":"
 	y: x + 3  // math expressions are supported
@@ -32,39 +32,35 @@ The basic syntax is rather intuitive.
 	someString: "hello world"
 	someBoolean: true
 
-	someObject: (name: "Joe", age: 20)   // objects are collections of variables
-	someList: (1, 2, 3)                  // lists are collections of values
+Everything in Axis is an "object", which is just a collection of properties.
 
-note that indented blocks have "implied" parenthesis around them. So
+	someObject: (name: "Joe", age: 20)   // objects are collections of variables
+	someList: (10, 20, 30)                  // lists are collections of values
+	someList2: (10 20 30)                   // for lists, commas are optional
+
+	someObject.name                      // use "." to access properties, so this will return "Joe"
+	someObject.age = 20                  // equality operator is a single "=", so this will return true
+
+note that indented blocks have "implied" parenthesis around them. So the above definition of `someObject` can also be rewritten like so:
 
 	someObject:
 		name: "Joe"
 		age: 20
 
-is equivalent to the earlier definition of `someObject`. You can do the same with `someList`:
+You can do the same with `someList`:
 
 	someList:
 		1
 		2
 		3
 
-Also note that you can omit the commas for a list
-
-	someList: (1 2 3)
-
-Access nested variables using the `.` accessor
-
-	someObject.name  // this will give the value "Joe", as defined earlier
-
 Lastly, the keyword `undefined` basically means that you are trying to access a value that hasn't been defined. For example, if we try to access `someObject.height`, it will return `undefined`.
 
 Because everything in Axis is data, there are no "errors" like traditional imperative languages. Bad code will never result in a program crash or a runtime error. Instead, a value will simply evaluate to `undefined`. For example, even if you tried to use property access on `undefined`, eg `undefined.height`, it would simply return `undefined`.
 
-Parameters and Cloning
+### Parameters and Cloning
 
-* prototypal
-
-In Axis, we can clone objects and overwrite the object's variables. For example:
+Axis is a prototypal language. So any object can be "cloned", allowing you to specify new properties and overwrite old ones. For example:
 
 	// define an object
 	division:
@@ -73,7 +69,11 @@ In Axis, we can clone objects and overwrite the object's variables. For example:
 
 	foo: division(p: 16, q: 7) // clone it, overriding p and q
 
-First, notice that in `division`, `p` and `q` are not defined yet. These can be considered object parameters. When we "clone" the object, we can provide values for these parameters
+	foo.remainder // returns 16 % 7, aka 2
+
+First, notice that in `division`, `p` and `q` are not defined yet. This is not a problem, and just means that `quotient` and `remainder` will start out as undefined. However, in `foo`, `p` and `q` _are_ defined, 
+
+ These can be considered object parameters. When we "clone" the object, we can provide values for these parameters
 
 * implicit inputs
 

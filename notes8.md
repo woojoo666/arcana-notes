@@ -1726,6 +1726,7 @@ kinda like garbage collection
 * or could you defer some of compilation/interpretation as well?
 	* but don't you need to compile/parse the code to detect possible method calls?
 
+### Modifiers and Lazy Evaluation II - Flag-Watcher, Tag Queries, `_incoming`
 
 * flag-watcher model can be implemented using tag queries
 * every method call/clone adds a tag
@@ -1756,6 +1757,7 @@ kinda like garbage collection
 * we actually talked about this method before, using the `_incoming` property
 	// TODO: FIND REFERENCED SECTION
 
+### API Calls and Indirect Modification
 
 * should we allow indirect calls
 * eg `Foo.Bar.Deck.addCard(card)`
@@ -1790,6 +1792,9 @@ kinda like garbage collection
 	* mentioned in section "Program vs Data"
 * not really the same though
 
+### Modifier Calls and Double Flag-Watcher System
+
+(continued from "API Calls and Indirect Modification")
 
 * before, the collector itself controlled write-access
 * you directly inserted properties into the collector
@@ -2626,7 +2631,7 @@ you have to explicitly declare a "perspective" and it will act as a auxiliary gr
 we can make tag scope simpler if we restrict private tags to modification `<:` and public tags to static declaration
 makes it easier to think about where the API call needs to go
 
-distributed concensus
+distributed consensus
 
 users should have the power to say whatever they want
 sources should be appear however they want
@@ -3422,6 +3427,749 @@ remember that scoping is an approximation, so we need to allow for dynamic scopi
 so we need to be able to share perspectives
 
 
+notice that localized tags with source scope means that:
+	*even if you make a tag public, those outside the perspective won't see taggings made from within the perspective*
+so if you tag `foo` with `#mytag` inside the perspective
+then even if you make `#mytag` public, you won't see that `foo` has the tag `#mytag`
+you can query the perspective though, just like you can query a hashmap for the tag value of any object
+	and remember that hashmaps are just point-like perspectives, singularities
+
+but what exactly is a perspective?
+remember that scoping is just a way to implicitly inherit properties, its just syntax sugar
+can we model perspectives as a node in a graph, just like everything else?
+
+perspectives are proxies
+instead of reading from url `foo.bar`, you read from `myperspective.foo.bar`
+you have to route all your requests through the proxy
+
+if you have multiple proxies, you can chain them
+the proxies will each attach their private tags
+
+so maybe tags are perspectives? every tag is a proxy?
+
+
+what happens if you try to do `let #mytag: "tag"`
+and you have some input objects that already have the properties `tag: ...` defined
+
+well actually, in order to do `let #mytag: "tag"`, you would have to have permission to use the already existing proxy, `"tag"`
+if you don't, you have to create a new proxy
+
+actually now that I think about it, proxies is pretty much just tag scope
+you have to have access to the tag in order to read/write using that tag
+it's not source scope because you still have to ask the tag/proxy,
+	so even though when you clone the object in perspective, the tags are carried over
+	that tags are still "stored" in the perspective/tag/proxy
+
+the interaction between cloning and tagging mainly just showed that source scope is not possible
+and established some key rules:
+	cloning in perspective will carry over the tag
+	reading a tag out of perspective doesn't work
+		but is this actually necessary?
+
+
+it seems like there's not too much point separating the proxy/perspective from the tag
+why not just make all tags proxies?
+and basically make it tag scope
+maybe even make it so when you try to read a tag out of perspective, the interpreter will automatically redirect it to go through the proxy
+
+however, you actually do have to be "in" the proxy/perspective in order for cloning to pass on the tag
+so even if we do make all tags proxies, we still need the concept of "using" or "entering" the proxy scope
+maybe that is what `let` is for, it attaches a tag to the current scope
+
+in addition, we can think of the public initial declaration of any object, as part of the "global" proxy
+and one major use case of the initial declaration, is declaring public properties, aka properties that can be iterated across
+so perhaps we should also allow private tags to be iterated across, as long as you are in the right perspective
+notice that this is actually necessary for the earlier `kungfupanda` example to work
+	because we were iterating across properties with `#weight` using the code `this.values.filter(has #weight)`,
+	the `.values` property would only return iterable properties
+
+actually, perhaps the `.keys` and `.values` properties should always only return the public properties
+	for consistent and predictable behavior
+but you can use some property like `allkeys` or `allvalues` to include the tags in the current scope
+and maybe even have a special way to get only the tags in the current perspective
+	though technically you are always in the global perspective, so all public properties would be included
+	maybe a special way to get only private properties in the current perspective
+
+the idea of a global proxy feels wrong though
+it's supposed to be a distributed network, each node should store its own properties, and communicate directly with other nodes
+perhaps this distributed network behavior only applies to nodes/objects created inside the proxy
+but objects that are created outside the proxy, have to be access "through" the proxy
+and the proxy creates these "auxiliary" objects that contain the private tag info for a corresponding external object
+
+wait but now that objects created in perspective use source scope for private tags
+	aka private tags are stored in the object itself
+it feels weird to not be able to access those private tags outside the perspective, even if the private tag was made public
+eg
+
+	foo:
+		let #x.
+		someObject:
+			#x: 10
+		xTag: #x
+
+	foo.someObject[foo.xTag] // invalid
+
+local tags are more than just for privacy, they are also used to define non-colliding keys
+so why are we preventing users from using tags outside their scope?
+if a tag is just a user-defined key, and it's stored with the source object, then why can't the user access it?
+	are we stripping it away when it exits the scope? and if so, why?
+
+maybe we can make `someObj[someKey]` act like syntax sugar for `someKey[someObj]`
+that way you can use a tag "out of scope", it just redirects the property access to the tag anyways
+but isn't that a hack, turning our source scoping back into tag scoping again
+now the source doesn't "own" the tag, it still has to route back to the tag proxy, to figure out the corresponding value
+
+what is ownership
+
+maybe it does depend on where the object was created
+so if the object was created outside the perspective, and then passed in and tagged, then you can't access those tags outside the scope
+but if the object was created and tagged inside the perspective, then you can access those tags outside the scope
+
+though now you have to worry about where the object was created
+more mental overhead
+
+wrappers are also an option, but its ugly
+
+the idea for ownership feels like, if a source object "owns" and stores a tag
+then as long as you have the object, and you have the tag, you can access the value
+you don't have to rely on any proxies or external hashmaps or anything
+it can act independently and privately
+
+### Design Committee Example
+
+lets say we have a design committee trying to decide on a design for a car
+people can send suggestions to the committee
+the design committee comes up with a few designs of their own
+then scores them all (tags the designs)
+and releases a list of the top 10 designs, along with scores
+
+	committee: suggestions >>
+		...
+		top10designs: ...
+		scoreTag: #score
+
+when the public looks at the list of potential designs, how do they access the score?
+first, note that score is a tag, so that it doesn't collide with any of the properties 
+
+if the item you access happens to be a suggestion, then doesn't make sense to have tag attached
+if the ite
+
+say some citizen Bob wants to go through the published list, and find his suggestion among the 10, and determine its score
+ideally it would be like
+
+	for design in committee.top10designs:
+		if (design = Bob.design) print design[committee.scoreTag]
+
+however, notice that if `design` happens to be a suggestion (aka an input to the `committee` module),
+	then the score tag wouldn't be directly attached to it, so we can't do `design[committee.scoreTag]`
+we can think of it as a pointer back to the original suggestion object, so of course it wouldn't have the `#score` tag attached
+
+`committee` can instead choose to use wrappers, so each item in `top10designs` is a pair containing the original object and the score
+this sort of makes sense, they are objects representing the output of the committee, `suggestions --> committee --> top10designs`
+	so the pointers shouldn't point back to the original suggestions, they are pointers that contain new information, the added `score` info
+however, in that case we wouldn't be able to use `(design = Bob.design)`, we would have to do something like `(wrapper.design = Bob.design)`
+
+I guess this sort of makes sense
+you can think of `committee` as a critic that assigns a score to the input objects
+you can either make `top10designs` point to the objects before being scored (aka without the `#score` tag), or after being scored (aka wrappers containing the object and tag)
+you choose whether or not to "apply" the perspective to the object `top10designs`
+
+however, when you're in the perspective, you can do both `(design = Bob.design)` and `design[#score]`
+in addition, the objects "own" their tags, so it doesn't have to ask the perspective or some external hashmap when retrieving the `#score` property
+	it can act independently and privately
+
+though this only works because the perspective wraps and proxies all input objects
+so instead of asking the perspective for info, the perspective bundles itself with the inputs
+
+
+
+what would be ideal
+if all tags were global
+at least for reading
+writing could still be scoped
+
+
+i thought the whole point of perspectives and local tags was to make them non-colliding
+so there's no order to "applying" perspectives, unlike functions in functional langs (where you have to worry about the sequence of operations applied to an object)
+all perspectives should be able to exist at once, a superposition of all perspectives
+though that's assuming you have access to all perspectives
+
+maybe we can just make the syntax something like
+
+	for design in committee.top10designs:
+		if (design = Bob.design) print design.@committeePerspective.scoreTag
+
+that way, you have to have access to the perspective first, and then you ask for the tag from that perspective
+
+notice the special syntax `.@committeePerspective`
+we have to distinguish it from normal property access because the perspective is not a property of `design`
+or maybe we can have it so the current perspective automatically attaches all available perspectives to every object
+or maybe we can make it so the `.` operator will look for properties or perspectives that match
+no, the `.` operator should be used for reading object properties only, so it's consistent and intuitive
+
+
+lazy evaluation
+you still have to go back to the proxy/perspective to ask for the tag value
+wrapped on demand
+
+maybe declaring a current perspective is just a "default"
+
+
+if we are in public scope, we can still query another person's tag by querying their perspective
+so if there is a way to do so, why can't we just have `.` or `[]` be shorthand for it
+there is only one tag after all
+there shouldn't be any ambiguity
+
+the fact that we can't, implies that different perspectives can have different values for the same tag
+which doesn't seem right
+
+in order to prevent conflicts
+we have to have some sort of central authority
+discussed a lot in the earlier sections, and was the premise of the whole tag scope vs source scope discussion
+
+we decided on source scope
+
+two ways we can handle the accessor operator (`foo.#bar` or `foo[#bar]`):
+
+first method: changes between tag and source scope depending on if the tag is in perspective
+	if the tag is in perspective, it will use source scope (just ask the object directly)
+	if the tag is out of perspective, then it will query the tag itself
+	we can implement this in a few ways:
+		always check if the tag is in perspective first (which kinda implies that we are always using tag scope, even in perspective)
+		store all tags that are currently in perspective on each object (basically storing the perspective on every object, very inefficient)
+	this method means the behavior of the accessor operator depends on the perspective
+
+second method: always uses source scope, so if the source object was created outside the tag's perspective, then it returns undefined outside the perspective
+	if the object was created in perspective (and thus, created with the tag value attached), then even outside the perspective, the object will carry the tag value
+		can be accessed if you have the tag
+		gets carried over during cloning
+	if the object wasn't created in perspective, then it had to be proxied when it was "imported" into the perpsective, so the tag could be attached to the proxy of that object
+		so outside the perspective, the proxy is gone, and the tag value is inaccessible
+		you have to explicitly query the perspective/tag
+	the behavior of the accessor operator depends on where the object was created, and if it matches the current perspective
+
+the second method makes sense because when you are asking an out-of-scope object for an out-of-scope tag, it naturally doesn't have that information
+this changes when you are in perspective because it's a proxy of the object, not the original object
+in addition, for objects that are created in the perspective, there is no need to strip away those private tags
+also, for objects defined with private properties, we can't just strip them away when leaving the scope, that would break functionality
+	likewise, we have to carry over those private properties when cloning
+
+however, the second method is extremely confusing, the behavior depends on if the current object was created in the current perspective,
+	so we hvae to keep track of two things: where the object was created, and what the current perspective is
+	lots of mental overhead, and very hard to explain
+
+### Private Properties vs Virtual Properties
+
+I think we are mixing together two ideas, "private properties" and "virtual properties"
+
+private properties:
+	these are properties created with a private/local tag
+	they are defined like normal properties, so you can't set them for objects that were defined out of scope
+	they are carried with the object, even after leaving the definition scope
+	so you can still access them out of scope, as long as you have access to the key/tag
+	these are useful if you want to define hidden functionality of an object
+	consequently, we have to carry over private properties during cloning to retain that functionality in the clone
+
+virtual properties:
+	these are properties dynamically attached to objects
+	they are scoped to a "perspective", and disappear from the object when you leave the perspective
+	you can think of them as a "mental image" of an object, complete with all your personal opinions and conceptions about the object
+	these are useful when you want to attach auxiliary info to data you don't own, like for data processing operations
+	however, when you leave the perspective, to get that information you will have to query the perspective itself
+	analogy:
+		Bob has a lot of opinions on lots of different songs, and he can construct his own mental framework for scoring and rating songs based on his opinions
+		however, outsiders have to ask Bob if they want to know those opinions and ratings
+	this is pretty much exactly how an external hashmap would work
+
+note that these are mutually exclusive to an extent
+if the object is created outside the scope, then it must use virtual properties
+if the object is created in the scope, then it only makes sense to use private properties
+
+in addition, usually we are only utilizing a private tag for one of these use cases
+for hidden functionality, we would use private properties
+and for data processing, we would use virtual properties
+but rarely would we use the same tag for both
+
+perhaps we might want to use virtual properties on an object created in scope
+like, if you create an object property within the tag scope,
+	but you don't want the property to exist out of scope, and you don't want it carried over to clones made out of scope
+though in that case, why aws it created in the virtual properties scope? just declare two scopes, one for the object creation, one for the virtual property
+for example, in the design committee example, you would probably want `#score` to act like a virtual property, even for designs created by the committee
+but then, the objects created by the committee should be created outside the scoping used for scoring, and passed in
+	so that they are treated just like the suggestions created by outsiders
+
+this sort of reminds me of my discussions about objects vs functions
+I was similarly mixing up objects and functions, and trying to combine the two
+but ultimately I realized that they were separate concepts
+functions are just objects with a special property and operator
+
+we can think of virtual properties as private properties attached to a proxy
+so if you want to create a virtual property on a private object, you have to explicitly proxy it
+
+
+
+
+
+
+I think the key here is proxies
+just like functions are special objects
+inputs to private scopes can be treated as special objects too
+for every input object, it is automatically proxied, and you can use the `_source` to get the original object
+note that you might have multiple levels of proxies/perspectives, but `_source` should return the top-level original object
+
+note that for functions we have to explicitly declare it as such, using the `=>` operator and call operator
+maybe for input proxies, we should do the same?
+the `let` operator is doing double duty right now, declaring a private key and also creating a proxy/perspective
+maybe we should have some special syntax for declaring proxies
+though for these input proxies, they should apppear identical to the original object, aside from the additional private tag
+
+what if you try to set other properties of the original object, properties aside from the private tag?
+since they don't relate to the declared private tag, these set-property calls will be forwarded to the original object
+but what if we want to have an infinite number of private tags in the current perspective
+like a class of tags
+and some of those tags collide with the original object
+
+
+what about feedback
+what if we had an object created in perspective, then passed out, then passed back in
+when it is passed back in, would it be proxied? should it be proxied?
+if it is proxied, then it might lead to conflicting tag values
+	because there is the tag value that was attached at creation, and the tag value attached to the proxy
+but how would we tell that the object was created in the perspective?
+
+	
+	foo:
+		let #mytag: ()
+		randomNums: ()
+		for i in range(0,10):
+			x: Math.random()     // generate a random number
+				#mytag: "hello"  // attach a private tag to it
+			randomNums <: x
+				
+	foo <: maxNum: Math.max(foo.randomNums)
+
+
+Change feedback example to have tag based on time
+Normally the idea behind virtual properties is to allow us to tag objects that we can't modify
+The problem is we don't know which objects we can modify and which objects we can't
+
+Currently we are treating objects coming from outside as proxied
+But it's possible that we pass in an object that originated from inside
+Technically that object is not modifiable
+And technically the proxy doesn't have a tag value yet, so there wouldn't be a conflict assigning one
+    Though what would happen if it already has a tag value
+And technically when we compare the proxy with the original, it won't be the same, so technically no conflict
+But it could still be confusing
+
+We could make it so when we import the object, it notices that it originated from the inside, and finds the match, and doesn't proxy it
+In addition, we would be able to modify the object again, at least as long as we are in it's source scope
+
+I think this ties into dynamic scoping and how we can authorize a different scope to have write access
+
+
+key example
+
+	
+	foo: someInput >>
+		let #mytag: ()
+		bar:
+			zed:
+				msg: "hello world"
+				#mytag: 10
+
+		someInput <: #mytag: 20 // what happens??
+		
+	foo(someInput: foo.bar.zed)
+
+note that foo cannot modify `someInput` because it is out of scope
+but at the same time, `#mytag` already exists in `someInput`, so we can't treat it like a virtual property
+
+
+Explicitly declaring proxies is also a bit of a problem
+	eg, for some input `someInput`, if we want to be able to tag it, explicitly proxy it using `proxy(someInput)`
+It can be confusing, as mentioned earlier
+    Note: find referenced section
+Maybe a tag has to be either a virtual property or a private property
+This actually solves the issue, because when the object leaves, the virtual property gets stripped away,
+    And if it gets imported again, it will find the original object and attach the corresponding virtual property
+If we separate the two, virtual properties basically become the same as an external hashmap
+
+### Virtual Properties and Cloning
+
+it seems like based on external hashmap, cloning shouldn't pass on tags
+but also, it we think of tagging as a function
+then you don't know if, when you tweak some parameters when cloning, if the new object "deserves" the inherited tag
+so instead, you have a sort of filter, that adds the tags to all inputs
+it's kind of like how a regular private property works, its dependent on the other properties in the object
+but in this case, we don't know what those other properties are going to be, so we have to wait till after it is cloned, and analyze it afterwards
+
+one of the main reasons why we want to have virtual properties in the first place
+is so we can use common functions, like filter and such, in a more intuitive manner
+	it is more intuitive to filter an object based on its properties, instead of based on an external hashmap
+
+EXAMPLE
+
+but if we re-use a module that uses properties, and apply it to a set of objects with virtual properties, will it break if cloning doesn't pass on tags?
+no, I don't think so, I think we can still apply the tags to the clone before it enters the module
+
+EXAMPLE
+
+then again, now that virtual properties act pretty much identical to external hashmaps
+the reason for having them starts to diminish
+one of my reasons for thinking about them was that, I wanted to be able to pass around the object (with its virtual property) without worrying about having access to the external hashmap
+but with our current formulation of virtual properties, you have to stay in scope anyways
+
+
+though there is a way to automatically tag clones
+instead of manually tagging them
+you can define the tag as a dynamic value based on other properties
+	just like you can do with normal properties
+and then leverage the fact that virtual properties are carried over during cloning
+
+	foo: someInput >>
+		let #mytag: ()
+		someInput <:
+			#mytag: someInput.someProp1 + someInput.someProp2
+
+		someClone: someInput(x: 10)
+
+so now, even though it's a virtual property, it still looks and feels similar to a normal property
+
+Wait but this behavior can be replicated for cloning too
+
+Instead of "someInput <: #mytag: 10"
+do "someInput(#mytag: 10)"
+
+Note that this may seem different because you are creating a new object, and it has to send a clone request to the source
+So this might seem like "source scope"
+But note that someInput can't even see the value of #mytag
+So perhaps it can be stripped away as well
+
+I wonder if cloning also can cause this self feedback issue
+
+If you don't want cloning to carry/pass on private tag, just use a hashmap
+Properties imply inheritance
+
+Distributed definitions work for virtual properties?
+
+
+Well any object created inside the private scope (cloned or from scratch) still carries the private properties
+They are just encrypted
+This is not the case for virtual properties
+
+
+Ownership is about who you can ask
+Scoping is defined such that it is guaranteed, if you modify an object within it's declaration scope, it will be received by the object
+And you can ask the object directly for the updated value
+this is not guaranteed when you are outside the object
+
+The proxy creates an object that is guaranteed to receive the value
+
+Leaving a perspective is like entering a perspective with negative properties
+
+
+
+
+### separating virtual properties from private properties ???
+
+while we can combine them, by changing behavior based on where it was created
+problem is, the point of virtual properties is to allow any object to be modified
+but private properties have rules for where they can be modified
+	has to be in scope
+so it starts to run into some conflicting ideas
+
+
+
+one of the main use cases of virtual properties was to be able to treat them like normal properties
+but can this work for code reuse?
+can we find cases where, normal code that is used for normal properties, can be re-used with virtual properties?
+its rare to find because most examples with virtual properties declare a new property, whereas examples with normal properties don't
+	normal property modification is usually done with public properties
+
+maybe we should allow you to say something like `let virtual somePublicVar: ()`
+which basically makes references to the public var `somePublicVar` reference a virtual property
+so you can repurpose a function that modifies public properties, to use a virtual property instead?
+
+
+
+
+
+One example is a "color plugin", a plugin to add a property `color` based on an object's `r` `g` and `b` properties
+
+	colorPlugin:
+	    color: r+g+b
+
+but say we have a set of objects that we want to add `color` to
+but they don't have the `r g b` properties
+could we use virtual properties?
+
+we somehow "map" references to `r g b` into references to `#r #b #g`
+so that the plugin will work without modifying the original object?
+
+however the most intuitive way to handle this in imperative langs, is just to use a wrapper
+but our method will still have all the original properties, whereas the wrapper would need to carry them over
+though that's not too bad either, you have to know the internal of the plugin fn to see what properties to set, so you would also know what properties to pass over
+
+our method also accounts for equality checks, wrappers makes it a bit more complicated
+however, our method makes all references to the properties `r` `g` and `b` change
+what if we wanted to override the property `type` for a certain object
+	remember that tons of objects use the property `type`
+virtual property method would override all references to the property name `type`
+	eg `foo.type` and `bar.type` would all change
+if you want to override a specific object, wrappers seem to work well
+
+
+One example where you would want wrappers not virtual properties
+say you are manipulating a list of lists
+eg doing a merge sort on a list of lists, sorting by the length of each list
+`MergeSortByLength()`
+
+note that mergesort by itself needs the length of the parent list, in order to split the list into two parts and recurse
+so if you override length, it will break the sort
+
+
+Note that using virtual properties to override public properties like r g and b like in the example above, causes conflicts if there are hidden properties we are not overriding behavior for
+eg if an object had `#hiddenProp: r+g+b`, then this value would not be affected by our virtual property override
+this can be very confusing, as explored in earlier sections
+	eg section "Indirect Tagging Restrictions - Explicit Tags Only"
+
+seems like most cases where virtual properties work well, hashmap work just as well (cases where we aren't reusing the code for anything else, or behavior for a specific tag/property across all objects, kinda like tag scope)
+    Only difference is cloning I guess
+and cases where virtual properties don't work that well, wrappers work better  (cases where we want to reuse code that uses properties to instead use virtual properties, behavior targeted as specific objects, )
+
+to map between scopes, you can either
+pass in the tags or
+passing a mapping, eg you pass in the user object, and use user.likeTag to get the tag for likes
+
+it  feels like the mindset is just to create new tags for every scope
+but then you have to create mappings between every scope
+N^2 mappings for N scopes
+public tags are useful for "normalizing" tags, allowing other scopes to use them without mapping
+they are pretty much just tags declared in global scope, and since everybody is in global scope, everybody can see them
+however, we don't allow modification of global tags, which eliminates these advantages
+
+Spotify example
+a song recommendation engine based on your likes
+but your likes should be private
+so you clone the recommendation engine into your scope
+but then how does the `#like` tag used by the recommendation tag, map to the `#like` tag used in your private scope
+do you have to manually bind it?
+
+if you clone it normally, you are passing in an object, and using it in _their_ scope, so you should use a wrapper to override properties
+if you apply it as a plugin, you are running it in your own scope, and you can use virtual properties
+
+virtual properties are good for creating an environment, a layer
+wrappers are good for wrapping individual objects
+
+
+actually, separating private properties and virtual properties
+has made code reuse between them effectively impossible
+
+note that you can convert normal properties into hashmap style
+eg `tree.left` turns into `left[tree]`
+rather ugly though
+
+what about infinite "tag classes", an infinite set of tags where any tag in the set can be dynamically constructed
+	talked about earlier
+	// TODO: FIND REFERENCED SECTION
+if we want to check which tags are on a given object
+we can't iterate across all possible tags (as we would if we were using external hashmap model)
+
+also a difference in where it's stored
+where it's stored matters for scoping 
+and where it's stored matters for scoping
+and scoping matters a lot for writes, modifying vars
+
+what if we had an "enemy" tag and a "friendly" object
+	aka a tag that won't allow any writes from us, and an object that will
+	then if want to tag the object, we simply modify the object
+if we have an "enemy" object and a "friendly" tag
+	then if we want to tag the object, we store the tag in the tag itself, treat it like a hashmap
+this illustrates why we would need virtual properties
+
+we can make it work the same syntactically though
+for base operations like `[[someProp]]` and `<:`, as long as you provide the key it will work the same way
+for both virtual and normal properties
+
+for stuff like `hashmap.add` where it needs to add the key to the list of public keys, it won't work
+because it's not an actual key, its a virtual one
+
+so what actually happens?
+what happens if we have a function like `hashmap.add()` that takes in a key
+and we pass it a virtual key
+will it fail?
+or treat the key as a hashmap, pass the entire hashmap
+
+what if you clone a hashmap inside your scope?
+then could you do stuff like `hashmap.add()` with virtual keys, for that hashmap?
+maybe could work if the hashmap you are cloning is completely public
+but what if there is a part that is private
+eg a hashmap-like object, that during the `add(key, value)` function, modifies a private value
+then we don't know how it will behave with a virtual property
+
+maybe it does "as much as it can"
+	clones everything public, and the virtual key will appear undefined in any private behavior
+that seems like very unpredictable behavior
+we don't know how the private behavior uses the input key
+
+we need to consider how virtual properties interact with the 3 core components of our language:
+1. property access
+2. cloning (includes API calls and modification, flag watcher)
+3. private vars and scoping
+
+For each of these, we have 2 aspects of virtual properties to consider:
+1. passing around the key
+2. using the key
+Actually those are same thing, if you use the key you have to be passed it first
+
+it seems like we already have an idea of how virtual properties works with each of these individually
+	property access: when you try to access a virtual property, it asks the tag
+	cloning: inside the scope, cloning works as normal. modification and "<:" aka "set()" operations are re-routed to the tag. The "flag" is captured by the tag scope
+	privacy&scopes: inside the scope, virtual properties look like normal properties
+
+let's consider a hashmap declared outside the scope
+and calling the hashmap.add function
+(unfinished)
+
+### 
+
+We talked earlier about how virtual properties are carried during cloning
+And that can be useful for generating a bunch of objects with an attached dynamic property
+
+But why not just clone the original object and attach the property directly as a private property
+instead of using virtual properties
+	eg `someObject(#privProp: 10)`
+
+well virtual properties preserve equality, but is that really useful here?
+
+unlike hashmaps, virtual properties are carried during cloning
+unlike wrappers or clones, virtual properties preserve equality
+
+but do you even need both? If you are using the virtual property to create a template object, just create a clone instead, you don't need equality
+and if you are using virtual properties as a tag, just use hashmaps, you don't need cloning
+
+virtual properties do just feel natural in some cases, like "marking" or "tagging" an object
+
+virtual properties are useful for state variables, where each state of an object might have a associated virtual property
+eg for breadth first search, you might have a "#visited_1" tag to represent whether or not the object was visited on the first iteration
+and then a "#visited_2" and "#visited_3" tag and so on
+you don't want to have to clone every object every iteration
+you could still just use hashmaps in this case though
+
+### Functions Created in-scope and Property Access Inversion
+
+The hashmap example is weird because we are calling the `add()` function
+So we are essentially trying to pass in the virtual key to the hashmap like a normal key
+But the hashmap shouldn't be aware of the virtual key
+We shouldn't be trying to change the behavior of the original hashmap
+But virtual keys shouldn't change the behavior of the original object
+Just like you can't use virtual keys to try to override an existing property
+
+we can make `[[]]` work for virtual props because it is short for `.map(x => x.#someKey)`
+And that is a function created inside the scope of the virtual property
+So we can simply invert the property access and make it `.map(x => #someKey[x])`
+we can similarly modify any function created in scope
+but not outside our scope
+
+So perhaps the way it works is, virtual keys can be passed around like normal keys inside the scope
+You can even pass it as input to functions created within the scope
+But if you try to pass it to a function/module outside, it fails
+Blocked by the proxy surrounding the tag scope
+
+But what if you try to call standard library functions with the key
+Eg, getNumProperties(x)
+
+Cloning external functions will work fine as long as the function doesn't make any modifications
+a "pure" function
+
+### Virtual Properties and Distributed Definitions ??
+
+distributed definitions seems like a very intuitive use case of virtual properties
+you have a bunch of scopes each with their own private definitions and behavior
+and they expose public behavior that all aggregates into  the creation of an object
+something like
+
+	foo:
+	    privScope1:
+	        #privVar1: 10
+	        foo <: a: #privVar1 * 2
+	    privScope2:
+	        #privVar2: 20
+	        foo <: b: #privVar2 + foo.a
+
+notice that while privScop1 and privScope2 are inside foo's scope, they are still independent modules, so they store their own private vars
+
+however, this is actually an example of private properties, not virtual properties
+`#privVar1` and `#privVar2` are used only once in this
+they aren't being used as keys
+so we can use private properties for this instead
+
+### Iteration and Virtual Properties - StoreOrder Example
+
+StoreOrder example
+
+StoreOrder:
+    cart:
+        item1: count1
+        item2: count2
+    total: cart.properties.map(...).apply(Math.sum)
+        item, count => item.price * count
+
+now we live in a SuperTax country that adds a tax
+
+foo: storeOrder >>
+    for item, count in storeOrder.cart
+        storeOrder <: #tax(item)
+
+Keys are rarely referenced individually, more useful as groups
+Like "for k in object.keys"
+
+Hashmaps are just objects with add/remove
+But virtual properties are used to *declare keys*
+So now that we know that these variables are being treated like keys, they can have special behavior
+
+Private vars are just virtual properties at the object scope?
+
+Virtual properties work just like normal properties within scope?
+But we only use virtual properties on objects out of scope, thats the whole point
+
+Note that StoreOrder.cart is actually a hashmap because the keys are objects
+And even though the keys are objects we want them to be public
+
+We still could have implemented StoreOrder.cart using virtual properties
+Basically generate a #cart tag for the given user, and tag the items that are in their cart
+But here, it seems more intuitive to use a hashmap
+
+So in some cases you do want a hashmap
+Are we just adding more ambiguity by adding vietual properties?
+Now the user has to decide if he wants to use a hashmap or a virtual property
+
+Though for a hashmap, it seems like we want object keys to be public by default
+Because the point of putting it into the hashmap, is we can use the hashmap later to iterate through them
+For virtual properties, we would want object keys to be private
+Because you don't iterate through the tag directly, you check objects to see if they have the property/tag
+
+Though sometimes you do want all objects that have a certain tag...
+
+I just realized that allowing <: for in scope variables
+Is allowing one-level deep modification
+when we do
+
+foo:
+    bar.
+    bar <: x: 10
+
+We are modifying bar's internal properties from foo's scope
+
+Note that you only need virtual properties when you want to tag objects out of scope
+So we never need to use virtual properties for public properties
+Because all objects are in public scope, no object is created outside of public scope and imported in
+All objects have access to public tags
+
+Virtual properties are just a way of bringing property access syntax to hashmaps
+Eg the "with" syntax
+And that's good enough for now I think
+
 
 
 ### garbage collection and recomputation
@@ -3476,3 +4224,271 @@ which allows for many optimizations
 
 `is` is short for `... = true`, so you can say `if (node is #visited)` to say `if (node.#visited = true)`
 `not` is the opposite, short for `... = false`, so you can say `if (node not #visited)` to say `if (node.#visited = false)`
+
+
+### databases serialization saving state
+
+when you write a server
+how do you save state? like what if you want to shut down the server, without losing user data
+you can actually save the entire state of the server if you want, all the nodes and all the values and all the urls
+but if you want to be more efficient and only save relevant info
+then you have to design around that
+you can use a `data` object
+and make sure to only write strings to it, make sure that it isn't dependent on any pointers/references to the main server program
+and ensure that the server program depends only on the `data` object, and can restart and load completely from the `data` object
+then, the language will know that it only needs to store the `data` object, and everything else can be loaded dynamically
+
+
+### problems with plugins and ... operator
+
+* what if you did
+
+	foo:
+		...privateAPI
+		someVar: 10
+
+* would it override `someVar` in `privateAPI`?
+* I think in general, the `...` operator can present security concerns
+
+
+* maybe the `...` operator automatically creates an implicit clone
+* or maybe it creates a shallow copy
+* because it can't override private properties anyways right?
+
+### templates ?? and shallow copies?
+
+* you can use `template` keyword to declare that the following code should not be "run"
+* it is short for just wrapping the block in the `template` object, eg `template foo: ...` is the same as `foo: template(...)`
+* basically doesn't execute any cloning or `<:` modifications
+* it still creates a shallow copy of objects though, for convenience
+* can be useful for making templates for api requests, without actually making an api request
+	// TODO: find referenced section
+
+* this can be useful if you want to write generic plugin functions like:
+
+		setColor:
+			this <: color: r + ',' + g + ',' + b
+
+* but you don't want to modify the parent object of the plugin
+* note that this modifies the public property `color`, so you can't just use an argument and be like `someArgument <: color: ...`
+* it has to be within the scope of the object it is modifying
+* so this is a function that is meant for being used as a plugin, eg `foo: (r: 10, b: 20, c: 30, ...setColor(this))`
+
+* hmm though actually you don't need templates for this
+* just do
+
+		colorModule:
+			color: r + ',' + g + ',' + b
+
+		foo: (r: 10, b: 20, c: 30, ...colorModule(this))
+
+* I guess this can be useful for abstracting pieces of code that require the `<:` function, like
+
+		somePlugin:
+			for i in range(myRange):
+				nums <: i**2
+
+* well even this will work fine, because it sets the `nums` property of `somePlugin`
+* and you can just use `...somePlugin(this)` to apply it
+
+* I guess templates are only useful for shallow copies?
+
+
+### Protected Member Access During Cloning
+
+* note that Java allows access to protected member variables when extending a class (even for anonymous classes)
+* and it even overshadows variables in the local enclosing class/block
+
+```java
+class SomeClass {
+	protected String someVar = "member var";
+}
+
+class Main {
+
+	public void someFunction () {
+
+		final String someVar = "local var";
+
+	    SomeClass instance = new SomeClass() {
+	        public void someMethod () {
+	            System.out.println(someVar); // will print "member var"
+	        }
+	    };
+	}
+}
+```
+
+* we could do the same thing for our language
+
+
+* however, I think it is a little unintuitive because it is not immediately apparent that `someVar` comes from the parent class, not the enclosing scope
+* after all `SomeClass` is most likely defined in a completely different file
+* I think this is the reason why javascript doesn't have this sort of scope extension
+
+* if we want to reference member variables, we can always use `this.someVar`, like how javascript does it
+* note that we can always explicitly reference the enclosing scope as well, `enclosingScope.someVar`
+
+
+
+
+
+
+You can use virtual properties to extend and attach plugins to objects
+For example, if you wanted to extend all arrays with matrix functions, you can do
+
+let #matrix: import Math.matrix
+for list in input
+    list <: #matrix
+
+input.foo.#matrix.invert()
+
+
+
+
+one thing about virtual properties is that we expect to see them attached to the object
+hashmaps don't allow for that
+
+sure it could be ugly to have all tags of all enclosing scopes attached
+but for the most part I don't think you would have too many nested scopes with tags
+so by default, it's fine to aggregate all virtual properties for each object
+and allow iteration across them
+
+
+
+
+hmmm note that in single pass "test scores" example
+	see section "Imperative vs Entangle - Multi-Pass Algorithms and the Test Scores Example"
+we had something like
+	
+	total: collector(+)
+	for score in testScores:
+		total <: score // push to aggregator
+
+(note: irrelevant parts omitted)
+
+however, notice that we don't seem to be pushing to `total`
+we are pushing to the arguments of `total`, aka `total._arguments`
+which is weird, that means we are modifying a child of `total`, which goes against our modification scope restrictions
+this is indirect modification
+unless, perhaps, using `collector(+)` creates a module that sums up the list items of `total`
+that way, it works even if we insert into `total` directly
+
+### Asymmetric ??????
+
+* something that isn't really accounted for in the language
+* is that it seems theoretically possible to pass arguments to a function, without revealing them to any of the intermediate nodes
+	* remember that in flag-watcher model, the "flag" has to propagate until it reaches the source, who fulfills the clone request
+	* so there are many intermediate nodes that have to carry-over the flag, and any one of them can choose to block it if they wish
+* originally, we mentioned that the arguments is just an object
+* so one might think something like `foo("hello", "world")` is the same as some flag `request_clone: (source: foo, args: (1: "hello", 2: "world"))`
+* however, that would expose the arguments "hello" and "world", as the flag is being propagated towards `foo`
+
+* in practice, we could theoretically pass them privately to `foo`, even though the information has to pass through intermediate nodes
+* using asymmetric key encryption
+* the caller simply encrypts the arguments using foo's public key, and then when foo received it they can decrypt it
+
+* currently I haven't put much thought into the implications of asymmetric encryption
+* it could effect the mechanics of private scopes, and private key sharing
+
+* currently my language focuses on what is "possible" or "impossible", whether some private information is possible to access or not
+* and with asymmetric encryption, technically the information is possible to access, just infeasible
+* which is a concept I haven't explored yet
+
+* however, for now, we will stick with the idea that arguments can be kept private while being passed, but they can still be blocked
+	* after all, even if the data is encrypted, the intermediate node can still choose to block all data, without knowing what the data is
+
+
+I need to make sure that private argument passing doesn't break any of my language mechanics though
+
+
+actually we can think of private argument passing a different way
+what if the caller and source have a secret password they somehow both know about
+(maybe negotiated in the real world or something)
+and the caller encrypts their arguments with the secret password
+and puts it in a secret property, eg `caller <: js3259ds29dc9d: encrypted_value`
+so none of the intermediate nodes know where to find the value, or how to decrypt it
+but when it gets to the source, the source can find it and encrypt it
+
+### Private Argument Passing and Virtual Properties
+
+remember that we want to carry over virtual properties during cloning
+but does private argument passing affect this at all?
+
+
+
+### Too much emphasis on scope
+
+are we putting too much emphasis on scope?
+
+remember that scope is an approximation
+and we should be able to achieve everything it provides, without scope
+// TODO: FIND REFERENCED SECTION
+
+but right now scope provides:
+* automatic flag-watcher propagation
+* complete control over internals, ability to "block" in-going and out-going calls
+* private properties
+* virtual properties
+
+I think the most important one is the second one
+"complete control over internals"
+
+what if we want multiple parents, eg multiple modules with complete control over the child module
+maybe this can be thought of as, the flag propagates to both parent modules, so either one can propagate it
+and both have to block it for it to be fully blocked
+
+### Shadowing Variables to Block Calls
+
+we don't have to think about "control" as choosing whether or not to propagate the flag
+we don't have to use flag-watcher model at all actually
+we can think of it as providing an environment for the inner modules
+so to block outgoing calls, the parent just has to overshadow
+
+	foo: ...
+	parent:
+		foo: template(foo) // creates a shallow copy of foo
+		child:
+			foo.methodCall()
+
+actually we would need to over-shadow all ancestors too, otherwise `child` could do `someAncestor.foo.methodCall()`
+
+using this model, even if we guarantee that method calls reach their callee (no flag-watcher model),
+	the parent model still has complete control over the child
+
+but now we have th mathematically define what it means to "provide" variables and "shadow" variables
+
+flag watcher is easier to formulate mathetmatically
+we can implement it using flags and queries
+
+in fact what if we just did that
+use `parent` and `child` to determine where the queries go
+we can see how multiple parents would work
+
+
+we can think of it in terms of IDEs and contexts
+the interpreter is itself a program of our language
+except, it doesn't have scope
+when the interpreter reads the input program, when it sees a variable,
+it binds it to the correct object (resolves the url/reference) based on scoping rules
+
+private and public variables are both bound this way
+its just, public variables are also declared under "keys" property
+
+i guess this is how we can mathematically formulate how providing variables and shadowing variables works?
+
+
+and with this formulation, it seems like it is flexible enough to work with any dependency graph
+you can simply control which variables are provided to which objects
+
+we define environments and variable name binding in terms of core language rules
+
+### Errors and Virtual Properties
+
+we don't want errors tags to show up normally
+only if you are in programming/debugging mode
+
+think kinda makes sense too because
+it's weird to attach tags directly to to `undefined`
+
+
