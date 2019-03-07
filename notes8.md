@@ -1112,7 +1112,7 @@ it seems like there are cases where you want to be aware and not aware of clones
 	also, if you are cloning private vars, then the source should know who is cloning, so they can restrict access if necessary
 		find referenced section (about cloning private vars)
 * not aware, if you want to make a private clone
-	shallow clone, doesn't copy private vars
+	makes a "manual copy", just copies what it sees, doesn't copy private vars
 
 requests not calls
 	you can make a request to do something
@@ -1967,7 +1967,7 @@ to generalize, the lazy evaluation knows to evaluate all dynamic keys first, bef
 * it is very simple and intuitive
 
 
-* note that if you can't clone an object, you can still perform a "surface copy" or "shallow copy"
+* note that if you can't clone an object, you can still perform a "manual copy"
 * which just copies the values and whatever properties are public
 
 
@@ -2326,11 +2326,9 @@ capture blocks stay as three big dots ...
 spread operator is shrunk down to …
 
 
+### Representing Object-Key Space Using A Matrix
 
-
-nondeterminism
-tables and columns
-set <: foo vs foo.#set.
+we can imagine a table/matrix with each row representing an object, and each column representing a key, and each cell representing the value stored at that key for a certain object
 we can think of queries as selecting rows, and then adding tags as adding values to a new column for those rows
 we alternate between selecting rows, and defining cells in a new column
 then we can create a new row that contains the items with a certain value for that column
@@ -4252,15 +4250,15 @@ then, the language will know that it only needs to store the `data` object, and 
 
 
 * maybe the `...` operator automatically creates an implicit clone
-* or maybe it creates a shallow copy
+* or maybe it creates a manual copy
 * because it can't override private properties anyways right?
 
-### templates ?? and shallow copies?
+### templates ?? and manual copies?
 
 * you can use `template` keyword to declare that the following code should not be "run"
 * it is short for just wrapping the block in the `template` object, eg `template foo: ...` is the same as `foo: template(...)`
 * basically doesn't execute any cloning or `<:` modifications
-* it still creates a shallow copy of objects though, for convenience
+* it still creates a manual copy of objects though, for convenience
 * can be useful for making templates for api requests, without actually making an api request
 	// TODO: find referenced section
 
@@ -4291,7 +4289,7 @@ then, the language will know that it only needs to store the `data` object, and 
 * well even this will work fine, because it sets the `nums` property of `somePlugin`
 * and you can just use `...somePlugin(this)` to apply it
 
-* I guess templates are only useful for shallow copies?
+* I guess templates are only useful for manual copies?
 
 
 ### Protected Member Access During Cloning
@@ -4447,7 +4445,7 @@ so to block outgoing calls, the parent just has to overshadow
 
 	foo: ...
 	parent:
-		foo: template(foo) // creates a shallow copy of foo
+		foo: template(foo) // creates a manual copy of foo
 		child:
 			foo.methodCall()
 
@@ -4483,6 +4481,30 @@ you can simply control which variables are provided to which objects
 
 we define environments and variable name binding in terms of core language rules
 
+
+### Entangle is now Axis!
+
+* well this was decided a few weeks ago actually
+* I wanted my name to convey two things:
+	1. a network of bindings
+	2. bindings converging to a single node
+* so I made a list of possible names, and first narrowed it down to 6 (using [./name-choosing.html](./name-choosing.html))
+* then I polled my friends, and Axis was the top choice
+* note that a lot of my final names were already sort of taken
+* Quark was a language by a small corp, and Axis and Nexus were small recent languages on github
+* but there are tons of languages of tons of different names on github, so the only ones that aren't "taken" are esoteric
+* and ideally you want a simple easy to remember name
+* like Java, or Lisp, or Python
+* so I decided, I'll take Axis for now, and I'll deal with conflicts if they arise later
+
+* Axis is actually a great name because:
+	1. it's simple
+	2. it's mathematical, which points to the mathematical simplicitly & elegance that I am shooting for with this language
+	3. it conveys the idea of a "central point", a central axis, to which bindings can converge or come out of
+	4. you can have multiple axises, each having bindings going in and out, creating a sort of "forest" of vertical axises with connections to eachother
+	5. I can create a unique design language out of the idea that is rather unique amongst current languages
+	6. it kind of combines the words "Axiom" and "Nexus", two of my other top names
+
 ### Errors and Virtual Properties
 
 we don't want errors tags to show up normally
@@ -4492,3 +4514,1580 @@ think kinda makes sense too because
 it's weird to attach tags directly to to `undefined`
 
 
+
+this is starting to make me wonder
+if its possible to formulate public properties in terms of virtual properties
+the biggest difference is where it's stored
+but I wonder if that is possible to resolve
+
+
+
+
+
+is it really possible to always proxy?
+say you want to append an argument to all outgoing argument objects
+is that possible? with asymmetric encryption, we talked about how intermediate objects can't see data
+but what if you used the same encryption method
+you shadow the target with a proxy, that also uses asymmetric encryption (with it's own public/private key)
+then, when the caller calls the proxy, it decrypts the arguments, adds the additional argument,
+	and then encrypts it with the intended target's public key, and sends it over
+so the caller never actually sees the real target, only the proxy
+
+however, as long as the caller has access to at least one real target
+then any property they access from the real target, can be checked that it is "signed" by the real target
+so as long as you have access to one real target, you will have secure access to the entire network that
+	is reachable from that target
+and the intermediate nodes can't intercept or change anything
+
+is it possible for the caller to ensure access to a real target?
+maybe when the user downloads a program, it already has the public key of the target hardcoded in
+so even if the user's admin network tries to "mock" the target and proxy it
+the user's program can tell that it isn't the real target
+
+have to make sure that the public key can't be modified though
+maybe it's a private key?
+
+
+
+the reason we can't make global properties like virtual properties
+and another major difference between virtual properties and private properties (aside from where it's stored)
+is that, with global or private properties, you can only modify them in an object's declaration scope
+with virtual properties, you can modify them anywhere
+
+which seems kinda ugly actually
+like, when using virtual properties, no matter where you are using it, you have to worry about something in a completely different scope (but still in the virtual property scope) modifying that virtual property
+
+with private properties, you can only modify objects in declaration scope
+but what if we had something like this
+
+	foo:
+		bar: ...
+		someScope:
+			barAlias: bar
+
+		someScope.barAlias <: test: "hello"
+
+technically `someScope.barAlias` points to a variable in scope, namely `bar`
+but `someSCope.barAlias` is itself an out-of-scope reference
+so should this work?
+
+the reference is out of scope, the value is in scope
+I don't think this counts as "in scope"
+
+also, it is confusing if you have something like
+
+	foo:
+		bar: (1 2 3)
+		...
+		...
+		someScope:
+			...
+				...
+					bar <: 4: "hi"
+
+because it looks like `bar` is finished, but then we modify it later
+
+maybe you have to explicitly specify that you are "accepting modifications" from your declaration scope
+eg
+
+	foo:
+		bar: collector(1 2 3)
+
+
+
+
+With public properties, we don't know how it acts on objects coming from outside of scope, because all objects are within scope
+With private vars, we could say the same thing, we don't really have any examples showing what should happen
+
+Difference between virtual and private is where you are allowed to modify the objects created inside
+Private: declaration scope
+Virtual: tag scope
+
+If we compare write scope and read scope
+Private: declaration scope write, tag scope read
+Virtual: tag scope write, tag scope read
+
+Seems weird
+though I guess this makes sense if you consider that for a virtual scope, the tag scope is used as the "declaration scope"
+	so it's still "declaration scope write, tag scope read" in a sense
+
+
+Should we have separate scopes for viewing and cloning
+Aka you can restrict a certain scope to only being able to view, and not clone
+And a subset of the scope is allowed to clone?
+But then we would have 3 levels of permissions: reading > cloning > writing
+
+This kinda makes sense because if you have some long chain
+foo.bar.x.y.some.path(10)
+And you also have a chain of aliases
+a: foo
+b: a
+c: b
+...
+Then you might be accessing the variable from a long indirect method
+almost like viewing it from a series of cameras (camera a looks at foo, camera b looks at the image from camera a, etc)
+So when you clone, it has to trace backwards along that chain until it reaches the source
+Which means all these property access and aliasing has to go both ways, "bidirectional communication"
+
+Flag watcher never ensured that
+Flag watcher would only propagate up scopes
+Not along references/pointers
+
+Actually though that seems fine
+When you "access" an object, you are seeing it "directly", you get a pointer to it's location
+Note that also we don't want to put too much emphasis on scopes
+If the parent object wants to prevent clones, they can create a proxy
+It also keeps things simple: what you can view, you can clone
+
+
+
+
+imagine if you wanted to have an object with some "private public properties"
+that is, in the `keys` property, you have some private properties in there as well, but they would somehow be invisible
+that way, when you are in public scope, you can only iterate through a subset of the properties
+but in private scope you can iterate across the entire set of properties
+
+this makes me think perhaps the `keys` property should be unordered...
+
+actually, also the `<: someItem` so far has been described to add a list item
+but shouldn't this be unordered too?
+after all, how would we determine the order of these insertions anyways?
+
+	x: collector()
+	foo:
+		x <: someItem
+		bar:
+			x <: someItem2
+
+remember these are unordered statements
+should we just assign some arbitrary order?
+
+
+
+
+ #allkeys is a special property redeclared at every scope
+ when should it be used?
+  <:, static declared, [ ], [fn] ?
+
+
+use `collector` ? or no
+maybe `collector` has a special `_set` property
+that can only be called within declaration scope?
+
+
+what if you clone with private variables, will it get passed over? pass-through (override)
+
+	foo:
+		var #bar.
+		baz(arg1: 10, arg2: 20, #bar: 30) // baz can't see #bar, so this is just shorthand for wanting #bar: 30 in final object
+
+
+clones are unordered
+so that means so are <: calls
+
+
+
+the rules of cloning
+
+`<:` calls are invisible as well
+
+what if we don't want to notify
+i dont think we should worry about that
+
+revisit "Cloning and Source Code"
+
+clone chains are ordered
+because we have to know who is overriding who
+
+what happens when we do
+
+	inputObj >>
+		calleeObj(inputObj)
+
+and `inputObj` and `calleeObj` both have private vars (in their own respective scopes)
+
+
+
+
+api calls too loose?
+ugly?
+we can modify a nested var from a completely different scope?
+no
+remember, you might have multiple paths to a variable
+it's up to the api to control what is public and what isn't
+but once something is available
+doesn't matter how you access it
+scope is an approximation
+
+
+
+absolute vs relative action time
+
+we use actions and cloning
+but what if we want ordered
+we can store the timestamp
+but this is weird
+in lists, we don't store the index in the item
+the list determines the index dynamically
+because we use relative
+contextual
+when you click the "addtrack" button, it is relative to the current track list you see
+this is state vars
+
+
+
+game mods
+they modify the install directory
+so that the program works differently
+but you wouldn't be able to do this with our model
+because you can't "modify" the input to the program
+you'd have to re-clone the program with new inputs
+
+uninstallers don't touch modified files
+so its kinda like virtual properties
+but not, because they modify the program
+
+I guess for an offline game, the entire source would be offline
+and you could clone that
+it's up to the developers to decouple the "input files" from the program though
+they could technically just encrypt the entire thing if they wanted
+
+
+
+earlier we talked about how to "securely" and privately pass inputs
+to a clone, because with pass-through
+if you make inputs public so its visible to the source, then it will be public on the clone too
+	see section "Calling instead of Cloning for Passing in Private Data"
+
+however, we shouldn't worry about that
+theoretically, if we use assymmetric encryption, we can ensure secure communication between caller and callee
+so even if some input parameters are public, only the callee and the caller will see them
+so you can do something like
+
+	foo:
+		#privateVar: someSource(input1: 10)
+
+to keep the input private from outside the callee and caller
+
+assume a secure direct channel between a caller and callee
+note that, when accessing the callee, intermediate nodes can still intercept using proxies and such
+but the caller will still have a secure direct channel with whatever object it ends up accessing
+
+going back to
+
+	inputObj >>
+		calleeObj(inputObj)
+
+and `inputObj` and `calleeObj` both have private vars (in their own respective scopes)
+
+what if `inputObj` and `calleeObj` have different private vars?
+what if they have the same private vars? override?
+non-colliding private var should be passed through
+colliding private vars, argument obj should have precedence
+but how do we do both these mechanisms, while keeping private vars private?
+
+callee checks it's private keys against the argument obj, property access, checking for collisions
+if it finds a collision, it takes the value from the argument obj
+
+note that properties from the argument obj could end up depending on properties of the callee!
+eg:
+
+	foo:
+		a: 10
+	bar: foo(b: this.a*2)
+
+should we allow this?
+can we prevent it?
+
+even more complex, is if the argument obj has private vars dependent on the callee
+
+	inputObj:
+		var #privateVar: this.a*2
+		publicVar: #privateVar / 7
+	foo:
+		a: 10
+	bar: foo(inputObj)
+
+note that this is creating new behavior for the input obj
+it is creating a new value for `publicVar`, dependent on the private behavior of inputObj
+almost as if we are cloning `inputObj`!!
+
+this sort of makes sense actually
+the output object is a combination of the arguments object and the callee
+it's not the same object as the arguments object
+so naturally it has to copy over properties from the arguments object
+
+so what does this mean if the arguments object has an API call, or a `<:` call
+actually, this applies to stuff like
+	
+	someCollector: collector
+	for node in nodes:
+		someCollector <: node.value
+
+because this is equivalent to
+
+	someCollector: collector
+	nodes.forEach(node => someCollector._set(node.value))
+
+but the initial prototype is already sending `node.value` to the collector, with `node.value` being undefined
+you have to use template
+
+	someCollector: collector
+	for node in nodes: template
+		someCollector <: node.value
+
+but this is quite ugly to have to remember to do every time...
+
+
+### Cloning Libraries of Modifiers
+
+cloning libraries?
+what if you had a library of api calls, so they are all declared as templates
+but then you want to clone the entire library, eg
+
+	`foo: Math(a: 10), x: foo.add(20), y: foo.subtract(30)`
+
+does cloning the library "run" the templates, or not?
+well regardless, you could always just use a template when cloning the library, eg `foo: template Math(a: 10)`
+that way we are sure it won't be run
+
+
+### Functions As Templates
+
+functions by default use templates
+so major built-in functions like `forEach`, `map`, for/while loops, all work without explicitly using `template`
+
+if you want an immediately invoked function, use `(... => ...)()`
+
+### Running a Template
+
+notice how this shows template are special
+normally, cloning with zero arguments does nothing
+however, for templates, cloning it "runs" the template, and strips away the template object
+so if you want to clone a template to create another template, you have to do so explicitly
+	`foo: template someTemplate(a: 10)`
+
+or maybe calling, not cloning, strips away the template
+so you can clone templates all you want
+functions do double duty then: they are for whenever you want to create a template, or for creating functions
+calling does double duty too then
+so what if you want a function that isn't a template?
+	aka a function that is "run" when created, and "run" every time it is cloned?
+	just use a regular object, with your own designated return "property"
+what if you want a template that isn't a function?
+	just leave out the return value
+
+note that this means it doesn't really make sense to access properties of functions anymore
+	because they would all be undefined anyways, since no cloning or evaluation
+this makes functions and objects very different, almost like imperative...
+
+this basically means that functions can only be cloned or called
+so a module can either have one output (from function call) or many (from property access)
+
+### Templates and Modifiers
+
+API calls and modification seems to add a lot of complications
+	breaks lazy evaluation (// TODO: FIND REFERENCED SECTION)
+	adds the need for templates
+ultimately comes down to allowing a source to track who is cloning it
+even if we model it using flag watcher
+necessitates bidirectional communication, aka when you can view something then they can view you
+	in order for the "flag" to be visible from the "watcher"
+
+
+maybe we should have a special type of function that uses `<:`, "Modifiers"
+	note that this doesn't include functions that call modifier
+	because if you clone those functions, you will clone those modifier calls as well, so naturally it will work
+we actually explored this idea earlier
+
+in an earlier section where we talked about flag watcher, and how that means calls to modifiers should be broadcasted
+	see section "Modifier Calls and Double Flag-Watcher System"
+but then in a later section we talked about how that implies all cloning should be broadcasted
+	see section "API Calls, Requests, and Cloning - The Missing Link"
+but that isn't necessarily true
+we only need to know about modules/functions that directly use modifiers, aka modules that have `<:`
+those are the only calls that affect collectors
+a module that doesn't call a modifier directly, can still be cloned
+and it will keep calling nested calls, until it reaches a call made to a modifier
+at which it will stop
+
+well also for private behavior, as that also necessitates communication with the clone source
+
+### Pure Modules
+
+so maybe we should have a special annotation, "pure" that indicates that it makes no modifications and no private behavior
+aka like a GET request (with no private behavior)
+though pure modules can can still make calls to non-pure modules
+all it means is that the module can be cloned without notifying the source module
+	aka, manual copies behave the same as cloning
+
+this way, templates and functions can still make calls to pure modules, and evaluate individual properties
+and those can be accessed, even from templates/functions
+so this includes calls to operators like `+` or `*`
+
+
+actually, the main reason why we want to have these "pure" modules
+is so we can be sure that we aren't making modifications when we don't want to
+	eg declaring an API method
+
+so it does matter if some nested call calls a modifier
+because that determines whether or not we want to use a template or not
+
+
+private isn't actually related to this issue
+while it does require communication with the source,
+it's fine if a module with private behavior (but no modifications) is cloned unnecessarily
+
+
+maybe we can make it so templates only "run" when a property is accessed
+so calling a function, immediately "runs" the template (because it's accessing the `_return` property)
+but this is bad
+we don't want behavior to change based on whether a property is accessed or not
+property access should be a "free" operation, like reading from a file
+you shouldn't have to worry about every property access
+
+maybe we could have a separate template object, with a special "run" operator
+just like how functions are a separate object, with a special "call" operator
+but this only matters if we truly need functions that aren't templates, or templates that aren't functions
+and this also doesn't really resolve how we should treat property access of templates
+
+### Pure Complete and Pure Public
+
+pure vs pure complete:
+	pure: current module doesn't make any modifications
+	pure complete: module and all created sub-modules don't make any modifications
+
+when accessing template properties, evaluate if pure
+eg:
+
+	foo: template
+		first: 1 + 2
+		second:
+			a: 3 + 4
+			b: someModifier(a)
+		third: somePureFn(5, 6)
+
+	foo.first // returns 3
+	foo.second.a // returns 7
+	foo.second.b // returns undefined
+	foo.third // returns result of somePureFn(5, 6)
+
+note that it actually only calls modules that are "pure complete"
+because it has to be sure that the called module, also doesn't make any modifications
+	unless it can request that the callee also defers evaluation of its properties
+
+
+notice that a malicious module can declare itself as "pure" without actually being pure
+and then that would cause unintended modifications
+
+
+or maybe we can have something called "pure public"
+pure public:
+	if a module declares as "pure public", then all calls to it will be manual copies
+	if the module isn't actually pure public, then it's the module's fault for declaring as such
+this way, you can't have a malicious module
+
+
+
+so three ways we can go about accessing properties of templates
+
+1. always return `undefined`
+2. evaluate if clone source is "pure complete"
+3. evaluate if clone source is "pure public" (but not necessarily complete),
+	do a manual copy, and defer evaluation of all nested properties
+(4) don't allow modification, which forces all modules to be pure
+
+
+
+
+
+
+
+
+maybe the whole point of templates is that they are meant to be cloned and applied
+so accessing properties of a template doesn't make sense
+
+
+diagramatically, this whole "send request, get response" is actually kinda ugly
+before, with our diagram syntax, we only had cloning, property access, and insertion
+
+
+what if we only allow insertion, and modules that insert, no response
+but what if you have a module that does have a response, but also calls a modifier?
+same problem
+
+though what if we restricted modules to either returning a value, or doing an insertion
+	but can't do both
+
+
+
+
+### Property Access vs Insertion
+
+(in the next few sections, I refer to supplementary diagrams in the OneNote page "Property Access vs Insertion.one")
+
+// TODO: CLEAN UP AND CLARIFY ONENOTE NOTES "Property Access vs Insertion.one"
+
+[DIAGRAM: PART I](Property_Access_vs_Insertion.one)
+
+
+two ways of thinking about creating a playlist
+1. dynamically, using apis
+	request to create a playlist, it returns the new playlist (response)
+	then add tracks to the returned playlist
+	do it from "outside" the scope
+2. staticly, turning a list of tracks into playlists by genre
+	mapreduce
+	does it from "inside" the scope
+
+
+
+
+
+
+map(x => x.#sometag)
+
+dynamically inserts objects into a dynamic set of tags
+akin to the { if (someSet == undefined) someSet = []; someSet.push(x); }
+a super loose mapreduce that takes inputs and pushes results into dynamic sets
+currently we have to declare sets beforehand, static
+and we have to declare them as collectors
+maybe you can declare a collector of collectors
+the reason we can push into this, is because we aren't actually changing the collectors
+	after pushing, it is still a collector
+	type stays constant
+in imperative, we can't just declare an infinite array of arrays, and then push into them
+
+
+another way is the way we talked about earlier
+	// TODO: FIND REFERENCED SECTION
+using a different pass to declare the collectors
+
+
+### Property Access vs Insertion II - Symmetry
+
+(continued from previous section)
+
+* in a mapreduce, the initial function exists, but results aren't bound to anything
+* the mapreduce function is responsible for binding both inputs to each call to the function, and output from each
+* instead of having the function specify where it's outputs should go,
+	* (like in imperative where we would modify some external or global variables while inside the function)
+* we let the surrounding system, aka the mapreduce, do all the wiring and binding, and determine how the function outputs affect the surrounding system
+* we talked about this much earlier
+	* sort of mentioned in section "Versioning is just Arrays/Maps", and also in audio notes "Recording 25", but I believe there was a section that goes more in depth about this
+	* // TODO: FIND REFERENCED SECTION
+
+* with API calls and modifiers, the output is already bound, which is what makes it weird
+* though inputs can be already bound too...
+
+* it is actually rather elegant, diagramically
+* inputs can "fan out" to any module within scope that uses them
+* and outputs can be inserted into any collectors in scope, from multiple modules they can "fan into" a single collector
+* and when you clone a module, it clones these "fan out" and "fan into" bindings
+* so there is this sort of inherent similarity, symmetry, between inputs and outputs
+
+
+[DIAGRAM: PART II](Property_Access_vs_Insertion.one)
+
+
+* so in fact, we shouldn't think about API calls in terms of "send request" and "get response"
+* the request and the response are both encoded in the clone
+
+* but how come it seems like the "request" is in the arguments object, and the "request" and "response" are in the clone
+* and how come you can override inputs in the arguments, but not outputs?
+
+* maybe you can override outputs...
+* aka override collectors
+
+* and if you don't want it to be overridable, make it private
+* just like with inputs (if you don't want an input to be overriden, make it private)
+
+* ANYTHING can be overriden
+
+### Insertion - Prototypes vs Templates
+
+(continued from previous section)
+
+* playlists example revisited:
+
+		playlists: collector()
+		playlist1:
+			name: "playlist1"
+			tracks: (...)
+			playlists <: this
+		playlist2:
+			name: "playlist2"
+			tracks: (...)
+			playlists <: this
+		playlist3:
+			name: "playlist3"
+			tracks: (...)
+			playlists <: this
+
+* now you can clone one of them, and it would automatically be inserted into playlists
+
+		playlist4: playlist3(name: "playlist4", tracks: source.tracks.+("Bad Blood") ) // appends "Bad Blood" to playlist 3
+		print playlists.length // prints "4"
+
+* see how you don't really need templates for `<:` to be useful
+* not all Modifiers need to be templates, you can use prototypal style too
+
+* templates are useful if you know what pattern/structure you want to enforce, without any usages
+* eg you know that all playlists should have the `tracks` property, but you don't have any initial playlists to serve as a prototype
+* so you create a template with the `tracks` property, so that other people can clone it and create playlists that follow that structure
+
+* prototypal is best for initial design, prototyping
+* hard-coding stuff to make it work for your specific use case
+* after the project grows and patterns are noticed, and structures are standardized
+* then templates become more useful
+
+### Templates and Property Access
+
+(continued from previous section)
+
+* this also helps to explain why accessing properties in tempaltes doesn't make sense
+* if templates don't make any insertions to outputs
+* then it doesn't make any requests from inputs either
+
+* technically, although defaults are set, the inputs and outputs aren't defined yet
+* the cloner/caller has to provide both the inputs and the outputs (though usually just the inputs)
+* accessing a property would be as if the input is defined already
+
+### Overriding Collectors
+
+(continued from section "Property Access vs Insertion II - Symmetry")
+
+* being able to override collectors may actually lead to some interesting new design patterns
+* I have not seen any language with a similar behavior
+
+* though its a bit esoteric to override collectors
+* because usually you override inputs to see how the module behavior changes with different inputs
+* however, if you override outputs, the module behavior doesn't change
+* so you don't need to really clone the module, you can just assign the output of a single module to multiple variables
+	* aka have multiple variables reference one module
+
+
+[DIAGRAM: PART III](Property_Access_vs_Insertion.one)
+
+
+* could be useful if you have feedback
+
+* maybe if you have multiple outputs, its an easier way to map them to variables in scope
+
+eg:
+	
+	foo:
+		out1: someFunction(1)
+		out2: someFunction(2)
+		out3: someFunction(3)
+
+	bar:
+		fooOut: foo()
+		a: fooOut.out1
+		b: fooOut.out2
+		c: fooOut.out3
+
+re-written to use overriding collectors
+
+	foo:
+		out1 <: someFunction(1)
+		out2 <: someFunction(2)
+		out3 <: someFunction(3)
+
+	bar:
+		a, b, c
+		foo(out1: a, out2: b, out3: c)
+
+* though notice the difference in how `foo` is defined in both examples
+* for outputs, you have to remember to use collectors and `<:` instead of static definitions and `:`
+	* so that you can override the collectors
+
+### Asymmetry Between Property Access and Insertion - indirect reads vs scoped writes
+
+* there still does seem to be a bit of assymmetry in terms of inputs vs outputs
+* inputs use a single unified syntax
+* outputs use both `<:` and `:`
+* `<:` also is a "level deeper", and has weird restrictions like you can't do `foo.bar <: ...`
+
+* the conclusion we made about inputs and outputs is because we'd like to preserve "symmetry"
+	* if outputs aren't being used, then inputs shouldn't be either
+* but another way of looking at this, is that in our language, inputs = outputs
+* this idea is further supported by our concept of feedback, which actually does allow outputs to be inputs
+
+
+* the reason why we can do `someInput.some.path` but we can't do `someOutput.some.path <: ...`,
+* is because in `someInput.some.path`, `.` is actually an operator, you are operating on the input `someInput`
+* **values you can access are different from variables that are in scope**
+* so `someInput.some.path` is a value you can access, via these `.` operations
+	* similar to doing something like `((1 + 2) + 3)`
+* but `someInput` and `someOutput` are the only variables in scope
+* so those are the only variables you can read from or write to
+
+* but what if you did `foo: someInput.some.path`?
+* now it's a variable in scope, but you still shouldn't be able to write to it
+
+* perhaps there's a difference between variables created in scope, and variables simple used as aliases, like `foo` above
+
+* but that begs the question, what if you did something like `bar: someOutput`, could you insert into `bar`?
+* is this property of being "created in scope", something that is statically bound to the declared variable name,
+	or is it a property that can be evaluated and determined dynamically
+
+* maybe inserting into `foo` inserts into the variable `foo` but not the value `someInput.some.path`
+* so it kinda feels like non-determinism, you are inserting another possible value into the variable
+* you aren't modifying the value
+* however, for objects created in scope, like `someOutput`
+* anybody using it, can extract the entire set of possibilities stored there, so you would get a list of all values inserted
+	* which is what we want
+
+* being able to tag a variable without modifying the value it's pointing to,
+* feels almost like virtual properties
+* which brings up an ambiguity: if we now do `foo.someProp`, is it operating on the original value `foo` pointed to, or the new "set of possibilities" that we have created?
+
+### Indirect Writes, and Pass-By-Reference Model
+
+when you use `:` you can only have one writer, whereas with `<:` you can have many
+with reads, you can always have multiple readers, because readers will never interfere with eachother
+and, as we already discussed, slightly different scoping rules
+
+it seems like there is an inherent asymmetry between inputs and outputs
+
+true symmetric would be like, every node has a bunch of connected communication channels to other nodes
+	kinda like websockets
+and through any one of these channels, you can read or write
+
+
+referencing another variable, is not actually reading from it
+reading, is property access
+
+
+reads are anonymous, unordered
+
+but so should be writes, and clones for that matter
+	contrary to what I said in the sections about "clone origin" and `_origin`
+	see section "Binding Origin"
+
+
+we talked earlier about how indirect modification is ugly, diagrammatically
+but we don't need to think about it that way
+we aren't extracting a value, and then writing to it
+we are extracting a url, and then accessing the object at that url, and writing to it
+it is sort of like memory addressing, like how imperative languages treat pointers and objects
+this is pretty much just "pass-by-reference"
+
+
+[DIAGRAM: PART IV](Property_Access_vs_Insertion.one)
+
+
+like, imagine if you asked `reddit.com` for it's top link, and it returns it
+and then you send a post request to that link
+that's sort of how it's like
+
+
+maybe you can actually insert anytime you want
+however, most of the time, it's ignored
+sort of like the `_incoming` idea talked about before
+	// TODO: FIND REFERENCED SECTION
+
+insertions are anonymous, and unordered, sort of like non-deterministic possible values
+to read from these insertions, you have to explicitly use a for-loop
+and "extract" them, sort of like the "fan-out" syntax used in the diagram syntax
+
+if you are actually reading from these insertions, you probably want to prevent arbitrary people from inserting
+so that is when you use scoping and private variables
+it's up to you to make sure that access to that node is controlled and restricted
+
+as for named insertions, there can only be one
+
+but you want to prevent arbitrary people from doing these as well right?
+often times you are reading from certain named properties
+	and sometimes they aren't defined, intentionally
+so if arbitrary people can just modify them, then they could define them, and mess with your behavior
+
+
+
+when you override, you are just re-mapping variable names
+so when you define a module, you are defining a structure with some default mappings to objects
+and wen you clone+override, you are copying the structure, with different mappings
+every variable name can be changed or overriden
+
+
+### Unified Access - Read/Clone/Insert Privileges
+
+* access is anonymous
+* once you have access to an object, you can read from it, clone it, write to it
+* completely anonymously, the object doesn't know who you are (unless you explicitly tell it)
+* and thus, the object can't discriminate based on "where you're from" or what scope you're in
+
+* this might seem too insecure
+* but actually, this just abstracts away security from functionality
+* you can implement the security however you like
+* you can make it really hard to access this object, or really easy
+* but once somebody gains access, they can interact with it however they want
+
+* note that if you give a module insertion access, that gives all it's clones insertion access too
+* eg if `foo: someInput >> (bar <: someInput)`, and somebody has access to `foo`, then they can clone `foo`
+	* which will cause another insertion to `bar`
+
+### Insertion Restrictions
+
+maybe you can't insert properties, only virtual properties or set items
+when you have access to a module, you only have access to the outside
+you can interact with it, but you can't modify it's internals
+
+but it's internals, it's properties, are just mappings right?
+
+
+recall that a Modifier is any module/function that uses `<:`
+because when cloned, it modifies the behavior of other modules
+
+it seems like the only way to allow external users to modify a module,
+	is to expose Modifiers, or to use `<:` directly
+however, Modifiers are a bit unintuitive
+because you would never really use them in a prototypal way
+if you were simply hard-coding some functionality, you would just use `:` and map/reduce functions directly
+you wouldn't really use `<:`
+
+instead of:
+	
+	playlists: collector()
+	playlist1:
+		name: "playlist1"
+		tracks: (...)
+		playlists <: this
+	playlist2:
+		name: "playlist2"
+		tracks: (...)
+		playlists <: this
+	playlist3:
+		name: "playlist3"
+		tracks: (...)
+		playlists <: this
+
+you would just do
+
+	playlists: list
+		()
+			name: "playlist1"
+			tracks: (...)
+		()
+			name: "playlist2"
+			tracks: (...)
+		()
+			name: "playlist3"
+			tracks: (...)
+
+so the natural way of doing it, isn't conducive to cloning, isn't useful as a prototype
+
+perhaps tags would work better here
+
+
+	var #playlist: ()
+	playlist1:
+		name: "playlist1"
+		tracks: (...)
+		#playlist.
+	playlist2:
+		name: "playlist2"
+		tracks: (...)
+		#playlist.
+	playlist3:
+		name: "playlist3"
+		tracks: (...)
+		#playlist.
+
+
+This only works for virtual properties tho
+Otherwise it can't track clones?
+Or rather, it shouldn't
+When you use normal properties, and you search with "objects with ___ property", you usually specify a set of objects to search
+
+Inserting properties definitely isn't conducive to prototypal style
+Would immediately result in a conflict, overdefinition
+
+### Accessing Externals vs Defining Internals
+
+If access is always from the "outside" of an object
+How would we dynamically enter an object and modify internals
+Distributed definition
+Shared write key?
+But also shared access to all private vars
+
+Reason why writing properties from outside is weird
+Is that you are writing it from the wrong scope
+Recall that when you override properties, you also override name mappings
+But if you are overriding name mappings, over shadowing scoped vars, you are in the wrong scope
+
+When you define an object, you define two things
+How the object looks from the outside
+What the object behaves like on the inside
+
+Ultimately, somebody has to create the initial object definition
+That initial definition can determine if the object accepts modifications from the outside or not (as well as declaring all the other behavior of the object)
+
+
+The anatomy of an object definition:
+define the structure (you can do this entirely using private properties if you wish)
+Or you can do it using dataflow diagram
+While defining the structure, define some named parts of the structure, "parameters", such that they can be changed
+Define some public properties, pointers that point to certain parts of the structure
+Note that parameters can have the same name as variables or properties already in scope
+These as "default bindings"
+As parameters, they can still be overridden
+But they have default values bound to them initially
+
+We can generalize it even further, because public properties are just properties with keys defined in public scope
+
+
+
+But wait, problem with letting anybody insert
+Is then person A can take an arbitrary object and insert into it
+And then person B can iterate through the inserted items of that object
+And thus, person A and B can use any arbitrary object as some mode of storage or communication
+
+perhaps the object has to be declared as a collector
+in order for the objects inserted, to appear on the "outside"
+Aka in order to iterate across inserted items
+
+However, this works different from our previous scoping rules for collectors
+It isn't figuring out at compile time that you aren't "in scope" for the collector
+This is a runtime, dynamic "failure" to insert
+It just won't do anything
+kinda like trying to access a nonexisted property
+You are allowed to do it, just won't be very useful
+
+Still feels a little ugly that insertions are not scoped anymore
+Though I guess it feels simpler, that write access is managed just like read access
+If you want it scoped, just make it a private var
+It abstracts scoping away from functionality
+Orthogonal concepts
+Insertion is not inherently bound to scope, they are decoupled
+It also matches API calls, which are also open access
+
+But can we come up with an example where we would want indirect modification, and it's still "clean" scalable design (and not spaghetti code)
+Also, how would we create some sort of object with private insertion access, but public read access?
+We can't use private var with public alias, because you would still be able to insert via the public alias
+
+
+
+all this begs the question
+if we have a single point of permission access for reading, cloning, and insertion
+why not writing as well?
+why not make it so, if you have access to an object, you can write/modify it however you like
+and if you want to prevent people from modifying an object, just make it private
+	or make it's properties, and the scoped variables the object depends on, private as well
+
+right now, we sort of have a single static definition, a single writer that defines the object
+and then everybody else has to view the object from the "outside"
+but if we also allow write access, then it becomes a more distributed, communal model
+anybody can modify!
+
+but this is too flexible?
+somebody could, for example, modify the definition of the number 2
+it becomes impossible make an object with public properties that isn't modifiable?
+
+
+
+
+
+another reason templates shouldn't have reads
+imagine a "read" request with authentication
+then you have to send data
+so it isn't just a property access anymore, it's a function call
+unless...you could do `foo["someProp"(password: "hunter2")]`
+
+
+
+
+there are actually only two ways to introduce feedback:
+1. self-reference, a variable whose definition contains a reference to itself (and not a clone of itself)
+2. insertion
+
+there are some major benefits to non-feedback code
+* adirected graph, so easy to synchronize
+	* though technically you can synchronize feedback code as well, wait for all updates to finish propagating
+* much more optimized lazy evaluation
+	* though technically you can  still "lazy-evaluate" code with feedback, it often ends up looking more like regular evaluation
+
+
+----- vvvv ideas relating to cono vvv ----------------
+
+
+often times you have to decide between
+having a central node that handles communication with an external class B
+having a layer, such that all nodes can communicate with external class B independently
+	eg, tooltips can communicate with content script, that communicates with background script
+	or, tooltips can communicate with background script directly
+
+
+
+lets say you add a tag
+or lets say, your friend adds a tag from your account
+on your side, both actions would result in the same "update" data
+but you want to display it different ways
+in that case, you want to know where the update was initiated from
+how would you do that?
+
+
+
+you have a module A and module B
+"synced" set of data
+module A makes changes, sends changes back to B
+makes incremental changes to dataset on A
+assume expensive to communicate, so instead of sending the entire updated dataset, just sends a "success" or "fail", and then A and B modify their dataset in the same way
+	code duplication, but that's fine
+every once and a while, refreshes entire dataset
+
+
+
+
+notice:
+
+		me.elem =
+			tag_template
+				.clone(true) // clone template with event handlers
+				.click(me.toggle) // notice the feedback here, this part actually doesn't work unless you add feedback (or use "() => me.toggle()"")
+				.prependTo( element.find('.cono-tooltip') );
+ 
+		me.toggle = function () {
+			console.log("toggle tag");
+			var promise = this.user_tagged ? removeTag(link, tag) : addTag(link, tag);
+			promise.then(() => {
+				// if the promise succeeds, the tag was toggled
+				this.user_tagged = !this.user_tagged;
+				if (this.user_tagged) {
+					this.count++;
+				} else {
+					this.count--;
+				}
+				this.refresh();
+			}).catch(error => console.log(error));
+		}
+
+		me.refresh = function () {
+			this.elem
+				.text(tag + ' | ' + this.count) // update text
+				.toggleClass('cono-user-tagged', this.user_tagged);
+		}
+
+
+### Parametized References and Query Parameters
+
+* something interesting about HTML GET Requests
+* is even though they are not supposed to create any state changes on the server side
+* they can send data, via query parameters in the url
+
+* so this is different from regular property access, because it is parametized
+* but it is also different from cloning, because cloning is more complex behavior, and can do stuff like
+
+		foo: bar(arg1: 10, arg2: 20, arg3: foo.someProp) // notice the feedback
+
+
+* should we introduce the concept of "parametized references"
+* where these parameters have to be simple, static, and cannot contain feedback?
+
+* I'm not sure if this is possible though
+* it might seem like something like `foo: bar(a: 10)` is simple, and static, and doesn't contain any feedback
+* likewise, something like `foo: bar(a: 10[20])`
+* but what if the number `10` had a reference to root
+* and then you could do `foo: bar(a: 10.root.some.path.back.to.foo)`, and now it contains feedback...
+
+### Formalizing Insertions
+
+* what changed
+* before, insertions were scoped
+* now insertions are "public", if you have access to the variable you can insert into it
+* however, due to the concept that all objects have full control over internals, and how they look from the outside
+* it means that nobody should be able to modify an object if the object doesn't want to be modified
+* aka, by default, the object should
+
+
+
+
+### Sets, not Lists
+
+* back in the section "Values are Lists", we changed anonymous values to be treated as list items, not set items
+* but I'm going to change that back
+
+* insertions are unordered, and for elegance, we should make anonymous values the same as insertions
+* we should encourage unordered lists
+* passing in un-named values as arguments, means they don't look like public properties anymore, so it feels more secure
+	* before, if you passed in `(a b c)`, it would look like `(1: a, 2: b, 3: c)`, but then it seems like those properties would exist in the clone result, and thus be public
+
+* to define ordered lists, you now have to use square bracket notation, `[a b c]`, just like most programming langs
+* also, for ordered statements, you have to use the `do` keyword
+	* unlike how we previously handled it, in the section "Lists and Statements"
+
+* to address the benefits of lists over sets, brought up in the section "Values are Lists":
+	* referencing values by index: we can't do this anymore, unfortunately. Use square bracket notation if you want ordered values
+	* ordered array access eg `multidimensionalArray[10, 20, 30]`: this can still work, the arguments are simply interally mapped to properties `1, 2, 3...`
+
+### Sets vs Hashsets
+
+hashsets are different from properties
+insertions are by default ignored
+but they can have duplicates
+
+
+for example, say we had
+
+		average: nums >>
+			#sum: collector(+)
+			for num in nums:
+				#sum <: num
+			=> #sum/#sum.length
+
+### Syntax ---------------
+
+`someObj <: someProp: someVal` is used for virtual properties only
+you can't define virtual properties like normal properties, even if they are in tag scope, eg you can't do `foo: (#someVirtualProp: 10)`
+
+likewise, you can't define regular properties like normal properties, even if you are in source scope, eg you can't do `foo: (this <: someRegularProp: 10)`
+
+
+
+`foo: (a b c)` is a set, and is equivalent to `foo <: a, foo <: b, foo <: c`
+to declare arrays, use square bracket notation, `[a b c]`, which is equivalent to `(0: a, 1: b, 2: c)`
+
+
+* in addition, we can access them by `items`
+* `items` is a special reserved keyword
+`items.keys` is for non-duplicates, `values` is to see how many are in each
+
+
+* previously, we explored how to handle the case where both named and anonymous arguments are provided
+	// TODO: FIND REFERENCED SECTION
+* but I think the best way would actually be to just treat each mechanism separately, and if they collide, they collide
+* for example:
+
+		foo: // implicit inputs: a, b, c
+			x: a + b + c
+
+		bar: foo(1, 2, 3, b: 10)
+
+		print bar.a   // prints 1
+		print bar.b   // prints "undefined (overdefined)"
+		print bar.c   // prints 3
+
+* it's simple and intuitive, and if you want to prevent overdefinition, you have to apply them separately, which will naturally specify a precedence order
+
+		bar1: foo(1 2 3)(b: 10)    // named arguments override unnamed arguments
+
+		bar2: foo(b: 10)(1 2 3)    // unnamed arguments override named arguments
+
+		print bar1.b    // prints 10
+		print bar2.b    // prints 2
+
+
+
+### Errors and Special Properties
+
+* continued from "Errors and Virtual Properties"
+
+* actually, using virtual properties for errors doesn't really make sense
+* because the value is `undefined`, so if you try to attach a virtual property to that, eg `undefined <: #errormsg: "overdefined"`,
+	* then you are actually just doing `#errormsg.put()`
+
+
+instead, errors properties are special
+we clone undefined
+and we attach the special error property, `#error`
+
+* you can clone `undefined` yourself to create custom errors
+
+* note that you are only allowed to attach this property to `undefined`
+* and you are not allowed to attach any other property to `undefined`
+
+* this way we prevent unintented behavior
+	* eg if you did `foo: bar.x`, and `bar: undefined(x: 10)`, then even though `bar` is undefined `foo` would be `10`
+	* which is weird
+
+
+
+
+### Pure Modules vs "Stateful" Modules
+
+* a pure module is a module where:
+	* the module itself and any sub-modules do not perform any insertions to external variables
+	* all sub-modules are pure
+* this was previously called "pure complete"
+	// TODO: FIND REFERENCED SECTION
+
+*
+
+by definition, side effects
+
+
+
+### Syntax Pairs
+
+each mechanism seems to come with a pair of syntax operators
+* templates/functions, call operator
+* define property, property access
+* insertion, items retrieval
+* state variable, do keyword
+
+i wonder if there is any reason for this
+
+one internal, one external?
+one departs from object, one to turn it back into an object?
+
+### Asymmetry Between Property Access and Insertion II - named reads vs anonymous writes
+
+lack of symmetry
+with reads, you define named properties and retrieve them
+with inserts, not named
+diagram, isn't symmetric
+cuz all reads are named, all writes and unnamed
+
+also properties you can only define from inside
+but set items you can insert from outside or define inside
+
+
+what if we had a pure property-insertion object
+
+so, imagine a node with rays shooting out of it
+that is a canonical object, and each ray is a property that can be accessed/read
+the object has a statically defined internal behavior, and properties that are externally viewable
+
+now, take that node, and flip it inside out
+now you have an object with rays going into it
+this is an object that accepts property definitions from anybody
+but you can't access any property outputs
+
+in order to access these property outputs, you have to convert the node back into a regular object
+flip it inside out again
+this can be done syntactically using an operator
+
+this is a more symmetric way to handle reading vs writing
+but this still isn't perfectly symmetric
+because while you can turn a write-object into a read-object
+you can't turn a regular, read object, into a write object
+	or else anybody could take any object, and convert it to a write object, and start writing properties
+
+But isn't that what cloning is
+
+You can use scoping to do something like insertion
+But it doesn't work with cloning
+The scoping method is just using a reference
+But with insertion, the internal functionality of the object is linked to the insertion
+
+
+imagine a graph
+inputs are lines going in
+properties are lines going to the surface
+writes are lines going out
+
+
+
+this shows that reads aren't equal to writes
+raads don't modify the source object, they modify me
+writes don't modify me, they modify the target
+however this still doesn't discount the idea of named writes
+
+
+named insertions would cause an immediate collision when cloning
+and as just shown, cloning is the major distinction here, the major feature provided by insertion
+
+reading is many to many, so has to be named
+writing has to be many to many too
+writing is named I guess, the collectors are named
+a module can insert into collectors in its scope, or also on its "surface" (aka the module's properties)
+
+but there is a difference
+with both scope inputs (inputs pull from scope) and direct inputs (inputs that are part of the object, set from arguments during cloning/calling),
+	they both act the same
+but for "writes", when you "write" to a direct output, aka a property, you are defining that property (the value is exactly what you give it, one-to-one)
+	but when you "write" to a scoped variable, you are inserting to that variable (the value is a set of all insertions, many to one)
+
+one to many - reads
+many to one - writes
+
+so i guess many values to one collector, has to be somesort of set, or non-determinism
+whereas one to many can be just copying / reading, no need for anything special
+
+
+
+be careful using set items as inputs
+if you knew `foo` was going to do `bar(baz)`, couldn't you insert items into `baz` to mess it up
+but at the same time, what if we wanted to do `numset: (1 2 3)`, and then `bar: sum(...numset)`
+you have to declare `numset` as an explicit set in this case
+
+
+maybe it is symmetric
+we talked about how you can declare set items internal, but you can't declare reads external
+reads can have implicit inputs, inputs "pulling from" the current scope
+writes can ahve implicit outputs, outputs "pushing to" the current scope
+but those are just named collectors not in current scope,
+not explicitly declared set items
+
+### The Definition of Scope
+
+in order to figure out what we should do set items
+we should come up conceptually what it means to define a module
+what are the parts we are defining
+
+all reads come from scope
+i guess you could consider insertions part of that too, all insertions to a certain module, is part of that module's scope
+kinda makes sense, because if a parent module decides to "provide more variables", it won't change the behavior of the child module
+its up to the child module to reference and use variables in scope
+
+what is scope
+scope is values that people have provided to you
+
+3 types of scope vars
+vars with names and values, aka regular vars
+vars with names but no values, aka inputs
+vars with values but no names, aka insertions
+
+this isn't as symmetric and homogenous as it seems though
+regular scope variables and input vars, are all provided through the scoping mechanism
+whereas insertions aren't...
+
+
+scope is a fancy way of giving inputs to a module you are constructing
+currently, when you clone a module or call a function, you have to explicitly pass inputs
+we could make it so you have to explitly pass inputs to modules you are defining as well
+but scope is a way of automatically mapping and binding some inputs
+we could also make it so you automatically pass scope in as input when cloning a module or calling a function
+but that is messy
+
+insertion is like a default input, an unnamed anonymous input parameter
+kinda like how function return is a default output
+just like it's useless to extract the default output if it isn't defined or used
+it's equally useless to insert into the default input, if it isn't being used (aka if the module isn't a collector and doesn't reference the special `items` property)
+there seem to be some major differences between how default outputs and inputs work though...
+
+
+parent gets to choose the inputs aka scope
+definer gets to choose the behavior, how it uses the scope/inputs
+in the case of creating an object from scratch, the parent and definer are pretty much the same thing
+
+but in the case of insertion, anybody can input, parent has no control...
+
+but parent, is part of scoping, which is an approximation
+more precisely, it is the caller/cloner that controls the inputs to a module
+
+but the caller/cloner/definer does control the input
+they can make the object private if they don't want anybody to insert to it
+though that also prevents anybody from accessing it
+
+### Scope and Insertion
+
+(continued from "The Definition of Scope")
+
+when a module references the `items` special property, it is like opening a port to the world
+it allows anybody to insert an input into the module
+and insertion inserts an item into the scope of that module
+
+
+notice that now, it doesn't make sense to treat anonymous values as inserts
+because inserts are sent in from the outside, and are inserted into the scope (which is also outside in a sense, it's an input, and not visible as part of the module itself)
+but anonymous values are defined on the inside, so they are part of the object, and should also somehow be visible from the outside, and seen as part of the module itself
+
+note that we can always have some "default inserts", by simply doing `this <: 10, 20, 30` in the declaration scope
+
+
+for most named outputs aka properties, you can have as many people reading from one property as you want
+but usually you can only read once from an anonymous output, because once you call a module, it automatically returns the anonymous output
+	so nobody else can access that intermediate module, and ask for the anonymous output (as well as any other property/output)
+likewise, for named inputs aka scope variables, each input can only come from one variable
+but for anonymous inputs, you can have multiple people inserting into it
+I don't know if there is any meaning to this symmetry though, it is rather arbitrary
+we could design syntax so that you could retrieve from the default output multiple times
+actually, **named outputs are not properties**, I keep mixing this up
+defining a property is not the same as insertion
+defining a proerty is it's own mechanism actually, separate from property access, cloning, and insertion
+
+anytime something is exposed to the public, there is an implicit one-to-many relationship
+eg for reading, one object can be read by multiple readers
+for writing, one object can be inserted to by multiple writers
+if you expose a value/object to the public via a public property, it has to be ready to handle this one-to-many relationship
+
+### Anatomy of a Module
+
+* there are two main parts of the module: the environment, and the body
+
+The Environment:
+
+* the environment is the "scope" or the "input space" to a module
+* it is the space of objects with which the object can access
+* it is defined by the declaration scope, insertions from the public, and any arguments passed during cloning/calling
+* note that the environment isn't just whatever is "outside" the module that is accessible
+* it also includes the properties defined by the module, and the private variables defined inside the module
+* because those can also be used when defining the behavior of the module
+
+The Body:
+
+* the body is the "meat" of the module, whatever is defined and constructed by the module
+* everything in the body is carried over during cloning
+* the body has two parts:
+	1. the behavior, defined by the expressions of the module
+	2. the properties, named pointers/references to objects in the environment
+
+### Insertion and Cloning
+
+* notice that this also implies that insertions are not carried over during cloning
+* because they are part of the scope, not the behavior, of an object
+* but is that right though
+* declared inputs are carried over during cloning
+* what if you declare an explicit hashmap, one that is "user-created" via insertions, now you can't clone it
+
+* actually it is carried
+* because when the original object creates behavior based on `items`, it refers to the items inserted into the original object
+* and that behavior is cloned
+* if you don't want it to carry over, the original object can do something like
+
+		source:
+			inputs: this.#items
+			output: sum(inputs)
+		clone: source(inputs: this.#items) // now clone.output it is based on clone.#items, not source.#items
+
+
+* but what about Modifiers
+* if foo contains a modifier that is called a couple times, and bar clones foo, does bar inherit the changes made to foo from those modifier calls?
+
+
+* playlists example, would we want inserts/modifiers to be cloned for `addTrack`?
+
+* what if somebody inserts into the default `collector`, would that affect everybody?
+* well maybe the default collector is a template, so it doesn't receive inserts
+
+* maybe we can refer to `this.items` instead of `items`, so when it gets cloned, the reference automatically changes
+* though we don't use this pattern this for any other scoped variables...
+* in fact, doing so, would mean a blank clone, eg `someCollector()`, would result in different behavior
+* which is counter-intuitive
+
+
+* though wait, if you want to be able to clone a collector and insert items into your newly created collector
+* the behavior of the clone has to be dependent on the items inserted into the clone, not the original collector
+
+* lets look at similar example, hashmap
+
+		Hashmap: template
+			keys: collector(this)
+			put: key, val >>
+				Hashmap[key]: val
+				keys <: key
+				=> Hashmap[key]    // will return undefined if collision
+
+		foo: Hashmap.()
+		foo.put("key1", 10)
+		foo.put("key2", 20)
+
+		bar: foo()
+		print bar.key1    // what should this print??
+
+* notice the many "empty" calls
+* eg `foo: Hashmap.()`, and `bar: foo()`
+* and I was also going to do `keys: collector()`, but I decided that perhaps `collector(this)` might work better?
+* it's clear that we haven't completely figured out how cloning works with collectors and insertions
+* because technically blank clones shouldn't do anything, but here it feels intuitive to use them
+
+
+* how would we do this without insertions
+* aka create some sort of hashmap where external actors can affect the properties of the hashmap
+* pretty difficult
+* we could use flag watcher model
+* which is like a fancy query that searches for flags, and then a mapreduce that turns the query result into an object
+* notice that the resulting object could be cloned, and it would carry over all the user-inserted properties
+
+* one of the major shifts in mindset we had when creating the concept of insertions
+* is a shift from a graph dataflow "pass-by-value" model, to an address-based "pass-by-reference" model
+	* see section "Indirect Writes, and Pass-By-Reference Model"
+* that is, if you do `foo.bar`, it isn't retrieving the value of `bar` from `foo`
+* it is retrieving the address of `bar`, and then talking to `bar` directly via it's address
+	* (actually, the object stored at `foo["bar"]` isn't necessarily called `bar` but you get the point)
+
+* this sort of direct communication is what makes insertion make sense
+* it acts like a post request to a server
+
+* however, the complication is that now, anybody can insert and "modify" an object
+* sometimes, people may insert into an object to "help define" the object,
+	* in which case you do want it to carry over during cloning
+* other times, the insertions are characterized as ways to "use" and "interact" with the object,
+	* in which case you don't want it to carry over during cloning
+* so the question is, are insertions considered part of the internal behavior of the object, or not?
+
+* or maybe it's up to you to define that
+* maybe you have to pass in `this`, or `items`, and it will use your insertions instead of the source's
+* is this similar to how javascript uses `this`, or how python has `self` as a parameter for every object method
+
+
+* behavior is by default always inherited from the source
+* nothing is passed in from the caller/cloner automatically
+* if you want an object to be based on some part of your scope, or your behavior, or your inputs
+* you have to manually pass it in
+
+* also, this means that we shouldn't really reference `this` or `this.items`
+* because that implies that the behavior is dependent on what the current object is, and would change during a blank clone
+* though `this` is used fine, without issue, in many other contexts
+* for example, when we want to access an object key, eg `this[someKey]`
+* this doesn't cause any problems after cloning, because the properties are inherited, so the behavior is carried over and behaves the same
+* however, with insertion, the `items` special property should be different for every object, so `this.items` will never be inherited
+* or maybe it should...?
+
+* maybe a special `items` property isn't how we should reference inserted items
+* what we need, is a way to access inserted items that is:
+	* accessible from the inside, but not the outside, aka only accessible in declaration scope
+	* different for every created object
+
+* maybe we can use a private key `#items`
+* that way, it's only accessible from the inside
+* and also, it is inherited, but the clone cannot see it
+* cloning always creates a new `#items` private key, separate from the old one, but the old one still exists
+* something like
+
+		source:
+			var #items: <internal implementation>  // automatically provided by system
+			for item in this.#items:
+				...   // do stuff with inserted items
+
+		clone: source(
+			var #items: <internal implementation>  // automatically provided by system
+			...
+		)
+
+* notice how `clone` automatically creates its own `#items` key, so that it can create behavior based on its own insertions
+* however, even though the clone has cloned the reference to `this.#items`, this is still using the source's `#items` key
+* so it still references the sources `#items`
+* if you want to override the source's `#items`, the source has to provide it as an overrideable property
+* something like
+
+		source:
+			insertedItems: this.#items
+			for item in insertedItems:
+				...   // do stuff with inserted items
+
+		clone: source(insertedItems(1 2 3)) // create a clone that behaves as if only the numbers 1, 2, and 3 were inserted
+
+
+### Lists, not Sets
+
+flip flop
+now that anonymous values aren't inserts anymore
+	see section "Scope and Insertion"
+should we treat them as set items, or list items?
+
+well, set items would imply that they are keys, `someItem: true`
+whereas list items would imply that they are values, `1: someValue`
+and we are implicitly filling in the other side
+
+also note that we don't need to worry about arguments being public
+	as mentioned in section "Sets, not Lists"
+because even for explicit arguments, like `foo(a: 10)`, we shouldn't worry about revealing these arguments to intermediate nodes
+in fact, there is no such thing as an intermediate node, we should assume direct communication
+
+
+
+
+### getting around scoping restrictions
+
+how do you override vars without making them public
+is anonymosu inputs the only way?
+
+how would you "omit" certain variables from the scope, given to the child var?
+we can currently only override
+
+ntoice that we are already doing something special with arguments
+if we treat `(a b c)` as list items, then these list items aren't carried over to properties in the output, they are mapped to implicit inputs
+so if you inspect the output, you wouldn't see `1: a, 2: b, 3: c`, even though you see it in the arguments

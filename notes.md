@@ -3898,7 +3898,7 @@ vvvv move this to philosophy section? vvvv
 	* allows us to model everything using combinational logic
 	* all events and actions have a timestamp when entering the Entangle ecosystem, eg mouse events and such
 	* assume execution is instantaneous, and can happen in any order/fashion
-17. Prototypal - No "templates", no functions, no currying
+17. Prototypal - no currying, functions are simple objects
 18. Abstract data structures away from execution order. Model everything in terms of structure
 19. Introduce orderings only when necessary
 20. Private keys, not private vars
@@ -3911,6 +3911,22 @@ vvvv move this to philosophy section? vvvv
 22. Private keys are like vars bound to scope???
 	* // TODO: clarify this. we are trying to capture the idea of how private variables work, basically summarize the section "Static Bindings vs Secret Urls"
 	* relevant sections: "Separating Referencing and Scoping", "Private IDEs and Browsing Contexts", "Private Variables Revisited", "Static Bindings vs Secret Urls"
+23. anything public can be overriden, including references to collectors
+	* section: 
+24. templates have no inputs or outputs
+	aka you can't access properties of templates, and they make no clones, calls, or insertions
+	* section: "Property Access vs Insertion"
+	* follows from input-output symmetry and equality (see philosophy section)
+	* you also can't insert into them
+25. unified access: if you have access to a variable, you can access properties, clone it, or insert to it
+25. every module has two parts: the environment and the body
+	* environment: the scope, defined by declaration scope, arguments passed during calling/cloning, and insertions
+	* body: behavior + properties, carried over during cloning, defined by expressions + property assignment
+	* section: "Anatomy of a Module"
+25. when you have access to a variable, assume direct communication (private and secure argument passing, insertion, etc)
+	* section:
+25. insertions are inherited during cloning
+	* section "Insertion and Cloning"
 
 ### Implementation Rules
 
@@ -4005,6 +4021,9 @@ Muxes
 * `[]` operator is for matchers
 	* `.` operator is shorthand for a string matcher
 
+capture blocks stay as three big dots ...
+spread operator is shrunk down to …
+
 ### Copy Bind
 
 * when binding to an object, use a recursive bind to create bindings between every descendant of the input and the corresponding descendant of the output
@@ -4061,6 +4080,8 @@ Decomposition and Analyzing Shared Paths
 		* "Revisiting Core Concepts - Tagging and Labeling"
 		* "Using Tags to Create Sets, Combining Tags"
 		* "Tag Queries"
+* inputs = outputs
+	* allows for feedback
 
 
 ### Advantages
