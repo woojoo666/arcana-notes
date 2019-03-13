@@ -4753,6 +4753,7 @@ it's up to the developers to decouple the "input files" from the program though
 they could technically just encrypt the entire thing if they wanted
 
 
+### Asymmetric Encryption and Secure Communication Between Caller and Callee
 
 earlier we talked about how to "securely" and privately pass inputs
 to a clone, because with pass-through
@@ -4812,6 +4813,8 @@ note that this is creating new behavior for the input obj
 it is creating a new value for `publicVar`, dependent on the private behavior of inputObj
 almost as if we are cloning `inputObj`!!
 
+### Arguments Object Cloned during Cloning
+
 this sort of makes sense actually
 the output object is a combination of the arguments object and the callee
 it's not the same object as the arguments object
@@ -4854,8 +4857,16 @@ that way we are sure it won't be run
 
 ### Functions As Templates
 
+(continued from "Arguments Object Cloned during Cloning")
+
 functions by default use templates
+as in, any function, eg `foo: x => x*x`, is automatically a template, eg `foo: x >> template(_return: x*x)`
 so major built-in functions like `forEach`, `map`, for/while loops, all work without explicitly using `template`
+eg
+
+	someCollector: collector
+	for node in nodes:
+		someCollector <: node.value
 
 if you want an immediately invoked function, use `(... => ...)()`
 
@@ -5282,6 +5293,10 @@ like, imagine if you asked `reddit.com` for it's top link, and it returns it
 and then you send a post request to that link
 that's sort of how it's like
 
+notice that this also implies a **secure direct communication channel between caller and callee**
+which is what we are assuming anyways, and which is technically achievable using asymmetric keys
+	see section "Asymmetric Encryption and Secure Communication Between Caller and Callee"
+
 
 maybe you can actually insert anytime you want
 however, most of the time, it's ignored
@@ -5317,6 +5332,9 @@ every variable name can be changed or overriden
 * once you have access to an object, you can read from it, clone it, write to it
 * completely anonymously, the object doesn't know who you are (unless you explicitly tell it)
 * and thus, the object can't discriminate based on "where you're from" or what scope you're in
+
+* also assume a secure direct communication channel between caller and callee
+* this is implied by the pass-by-reference model (see section "Indirect Writes, and Pass-By-Reference Model")
 
 * this might seem too insecure
 * but actually, this just abstracts away security from functionality
@@ -5799,6 +5817,8 @@ with both scope inputs (inputs pull from scope) and direct inputs (inputs that a
 but for "writes", when you "write" to a direct output, aka a property, you are defining that property (the value is exactly what you give it, one-to-one)
 	but when you "write" to a scoped variable, you are inserting to that variable (the value is a set of all insertions, many to one)
 
+(note: later on, in the section "Scope and Insertion", I figure out that writing/inserting to a property is different from defining a property)
+
 one to many - reads
 many to one - writes
 
@@ -5895,8 +5915,8 @@ but for anonymous inputs, you can have multiple people inserting into it
 I don't know if there is any meaning to this symmetry though, it is rather arbitrary
 we could design syntax so that you could retrieve from the default output multiple times
 actually, **named outputs are not properties**, I keep mixing this up
-defining a property is not the same as insertion
-defining a proerty is it's own mechanism actually, separate from property access, cloning, and insertion
+defining properties is not the same as insertion
+defining a property is it's own mechanism actually, separate from property access, cloning, and insertion
 
 anytime something is exposed to the public, there is an implicit one-to-many relationship
 eg for reading, one object can be read by multiple readers
@@ -5921,8 +5941,8 @@ The Body:
 * the body is the "meat" of the module, whatever is defined and constructed by the module
 * everything in the body is carried over during cloning
 * the body has two parts:
-	1. the behavior, defined by the expressions of the module
-	2. the properties, named pointers/references to objects in the environment
+	1. the behavior, defined by the expressions of the module (reads, clones, writes)
+	2. the properties, named pointers/references to objects in the environment (property definitions)
 
 ### Insertion and Cloning
 
@@ -6061,6 +6081,52 @@ The Body:
 		clone: source(insertedItems(1 2 3)) // create a clone that behaves as if only the numbers 1, 2, and 3 were inserted
 
 
+### Insertion Items Syntax
+
+(continued from previous section "Insertion and Cloning")
+
+you have to pass in
+but by default, it should be public
+by default, when you reference items, it should be overridable, and if you want to make it not overridable, you have to explicitly specify that it is private
+
+actually, notice that we can rewrite collectors such that, there is no reference to inserted items, just an implicit input
+and when you clone collectors, you have to pass it in
+notice how collectors doesn't have to be a template anymore
+which is nice, it purely defines behavior
+the "items" can come from anywhere, eg from insertions, or from a list, etc
+the caller defines where the "items" comes from
+
+though with modifiers, you can specify a "default output"
+so why not be able to specify a default input, aka from insertions?
+
+well because the default output is in the declaration scope
+and insertion items would come from the callee scope, which the behavior of the module shouldn't depend on
+
+though actually, insertion items would be from the clone itself, not necessarily from the callee
+
+### changing behavior for every clone?
+
+technically it is possible to make behavior of the module dependent on each clone
+something like
+
+	someMap.
+	foo:
+		someBehavior(someMap[this])
+
+notice that `someMap[this]` will be different for every clone
+
+though this is only achieved by referencing an external variable
+which seems obvious, of course you can use external variables to make behavior change based on each clone
+you could also do something like this:
+
+	someVar: foo.bar
+	foo:
+		bar.
+		print someVar = bar // will print true only for foo, prints false for all clones
+
+
+
+
 ### Lists, not Sets
 
 flip flop
@@ -6083,7 +6149,7 @@ in fact, there is no such thing as an intermediate node, we should assume direct
 ### getting around scoping restrictions
 
 how do you override vars without making them public
-is anonymosu inputs the only way?
+is anonymous inputs the only way?
 
 how would you "omit" certain variables from the scope, given to the child var?
 we can currently only override
@@ -6091,3 +6157,1167 @@ we can currently only override
 ntoice that we are already doing something special with arguments
 if we treat `(a b c)` as list items, then these list items aren't carried over to properties in the output, they are mapped to implicit inputs
 so if you inspect the output, you wouldn't see `1: a, 2: b, 3: c`, even though you see it in the arguments
+
+### Chatroom Example - Full Stack Web Applications
+
+* imagine we want to create a web server that hosts chatrooms
+* the user can input a chatroom, and a username, and start chatting
+* it would look something like this
+
+chatroom example:
+
+	ChatroomServer: Server
+
+		url: 'www.chatrooms.com:5000'
+		chatrooms: collector
+
+		chatpage: Client
+			route: '/'
+			layout: pugLayout // using [pugjs](https://pugjs.org/api/getting-started.html)			
+				input.username
+				input.chatroom
+
+				div.conversations
+					for msg in currentRoom.conversation:
+						p msg
+
+				textarea.message-draft
+				button(onclick=send)
+
+			username: html.find('input.username').value
+			chatroom: html.find('input.chatroom').value
+			messageDraft: html.find('textarea.message-draft').value
+
+			currentRoom: chatrooms[chatroom]
+
+			currentRoom.activeUsers <: username
+
+			// note: send() won't work properly because we need to capture the message on mouse click,
+			//       instead of persistently binding it like we are doing here, otherwise the message
+			//       stored on the server will keep changing
+			
+			send: =>
+				currentRoom.conversation <: messageDraft
+
+* notice something interesting
+* most of the code is in the client
+* the server just contains whatever data is shared across clients
+* this just shows how much unnecessary boilerplate is in server code nowadays
+
+* how would we add a database
+* aka have persistent data across multiple server instances?
+* could it somehow automatic know what needs to be saved?
+* maybe declare server as "persistent", so it doesn't treat every server instance as a new object
+* if you close server and re-open, it will be treated as the same instance
+* or maybe the database is a singleton?
+
+### Eventlist vs Modifiers
+
+there are two ways we can handle modifier calls
+
+	// eventlist pattern
+	for callArgs in modifier.calls:
+		someCollector <: callArgs
+
+	// modifier pattern
+	modifier: args =>
+		someCollector <: args
+
+* benefit of modifiers: can accept multiple arguments, can return data (just like an API call)
+	* eg you could define `playlist.addTrack(track, user)` that returns the track position in the playlist
+* benefit of eventlists: can do "holistic" data ops, like filtering
+	* eg `for x in modifier.calls.with(index % 2 = 0)` will only run on even-numbered calls
+
+* you could use insertion instead of calling for modifiers
+* eg `modifierCalls <: callArgs`, and then use eventlist pattern on `modifierCalls`
+* but modifiers is nice because you clone this template
+* insertion is nice because it creates an eventlist style, which is extremely encapsulated
+
+if you wanted to only run the modifier for certain arguments, you would have to do:
+
+	// eventlist pattern
+	for callArgs in modifier.calls.filter(condition):
+		someCollector <: callArgs
+
+	// modifier pattern
+	modifier: args =>
+		if (condition)
+			someCollector <: args
+
+* notice that eventlist pattern uses `filter`, while modifier pattern uses an if-statement
+* filter seems much cleaner, as if-statements make the entire modifier body one level deeper
+
+* eventlists make it easy to see all the data going in, and forces you to explicitly specify all data going out
+* modifiers abstract it away, making it difficult to see how many times a module is cloned, and how much data is sent out in total
+
+* cloning/calling is traditionally thought of as a way to retrieve info
+* but here we use it as a way to insert and retrieve info
+
+* maybe what can help is if you can retrieve all clones/calls to a certain module
+* after all you can do it explicitly with a simple insertion done from inside the module to an external variable, `someFnCalls`
+* but maybe it should automatically be done by default?
+
+### Combiners - Generalizing Cloning
+
+* reading is arrows going out
+* insertion is arrows going in
+* what is cloning? it feels like an arrow going out, but there are also arguments passed in
+* it's a combination of the arguments object, and the source object
+* it creates new behavior based on a combination of the source obj and arguments obj
+* kinda like fusion, or ancestry
+
+* in fact, what if this combine operation was unordered, symmetric
+
+* veggero talked about something similar, with his reduced `self` syntax
+* but his was one-way, asymmetric, pretty much the same way I treat cloning
+* where the arguments "overrides" the source
+
+* but there are some implications of unordered
+* first, notice how you can have the arguments dependent on the source
+
+		source:
+			a: b + 10
+		clone: source
+			c: this.a * 2
+
+* notice that we have to do `this.a`, because if we just had `a`, it would refer to a variable in the scope of `clone`, and not a property of the result object
+
+* also, another implication of unordered combining
+* is that, while the clone operation obviously gives the cloner/caller a reference to the result object
+* the source should also receive a reference to the result object
+* and maybe this is actually what makes insertion possible
+
+* instead of thinking that modifiers is a result of insertion being possible
+* we should think that insertion is a result of the way cloning works
+* we can implement insertion in terms of cloning, kinda like a `insert` function
+
+* reading (aka property access) can also be implemented using cloning
+* after all, functional languages don't have property access
+* you could simply create a `accessProperty(propertyName)` function
+
+* reading and writing both derive from cloning
+* everything comes back to "cloning"
+
+* it's almost like reproduction, where DNA from the two parents combine and fuse into a zygote
+* and you get a whole chain of these combinations, mixing and matching and fusing in every which way, and end up with a diverse world of flora and fauna
+
+* it does seem like somebody needs to "initiate" the clone, the reproduction process...
+
+* I think the key thing to realize is that, the mechanism by which cloning works, could change
+* we could change whether or not it is symmetric, or how property collisions between source and argument are handled, or how to handle undefined inputs, etc
+* but the invariants are:
+	* the result is dependent on both sides
+	* the result is given to both sides
+
+* well actually, it doesn't necessarily have to be given to both sides, in functional it is only given to the caller side
+* functional flows "one-way", all functions have an input and an output, and data flows from input to output only
+
+* my language is bidirectional, every object is independent, and can send and receive data from other objects, and can have feedback
+
+* to generalize all functional-like languages, you simply need:
+	1. a program format (a way to specify behavior)
+	2. combiner (a process by which behaviors combine)
+
+* functional langs have functions and calling
+* my language has objects and cloning
+* veggero's theoretical language (mentioned in the chat) has objects and merging
+
+* it seems like the behavior part of the program also has to define an output of some sort
+* in functional, functions have an output
+* my language has property access
+* and veggero's theoretical language has a `self` output
+
+
+* note that one way we could have "symmetric combining"
+* is if we combined the properties from both sides (source & arguments) such that:
+	* if the property is only defined on one side, then take that side
+	* otherwise, the combined property is `overdefined`
+* notice that this definition is symmetric, so you can invert the order, and call `argumentsObject(sourceObject)` and it would have the same result
+
+
+
+* notice that we can implement insertion using cloning
+* just define a simple `insert()` function and retrieve its calls/clones, `insert.clones`
+* notice that we can also implement this `.clones` property using insertion
+* anytime you want to reference `.clones`, just modify the module/function to insert to a `someFnClones` property
+* so should we have both?
+* note that both `items` and `.clones` have to be special, only accessible internally
+* maybe we can use `_items` and `._clones` to specify that they are special and "internal"
+
+
+* you can use `this` to specify behavior that changes with each clone
+* you can do this with any property actually?
+* so three ways to use a variable: `#var` for private, `var` for public, `this.var` for protected?
+
+### Argument Objects and Templates - Complications
+
+* the difference between functional calling, and Axis cloning, is that in functional, you can only pass in data
+* but in my cloning/combining, you can pass in behavior
+* which makes it more symmetric
+* this also shows that it's important that the argument object is cloned as well
+* or rather, that the clone result is a combination of the source and argument object, and does not modify either of them
+
+* does this mean argument objects are by default, templates?
+* for example, if we did something like:
+
+		someCollector: collector
+		foo: bar(10, 20, someCollector <: this.val)
+
+* then it might seem like `someCollector` gets two insertions,
+* one from the declaration of the argument object, and one from the result object
+* not to mention, if you had something like this, `foo: bar(baz(zed(someModifier)))`, then the modifier would be cloned 3 times!
+
+* the way something like this is usually handled in an imperative lang
+* is the function passed in might be modified by a chain of other functions, like in the example above
+* but the function is only "called" at the end
+
+* and we can kinda do the same thing here
+* something like `foo: bar.(baz(zed(=> (... modifier functions ...))))`
+* but what if the argument passed in isn't a function, but an object
+* a modifier object
+
+
+* so maybe we should make the user explicitly specify that it is a template
+* that way, they are forced to think about when to "call" or execute the template
+* using the call operator
+
+
+actually, we already covered a lot of this, in the sections "Arguments Object Cloned during Cloning" and "Functions As Templates"
+
+
+* however, notice that if you did something like `foo: bar(baz(zed(=> (... modifier functions ...))))`
+* note how we are using `=>` to create a template
+* assume `bar` `baz` and `zed` are transformation functions that just add properties to the input
+* eg `zed: (someProp: this.someOtherProp + 1)`
+* this won't work here, because for example, `zed(=> (someOtherProp: 4))` would turn into
+
+		someProp: this.someOtherProp + 1
+		=>
+			someOtherProp: 4
+
+* the transformations are acting on the empty template body
+* when the main behavior of the template is in the output, the return property
+
+* so in order for this to work correctly you'd have to do `foo: bar(baz(zed((... modifier functions ...) => this)))`
+* but the programmer would have to remember to do this every time
+* and it does not feel natural or intuitive
+
+* actually the you don't need to do anything special, using `=> (... modifier functions ...)` works fine
+* as long as you make use of implicit inputs
+* or you can specify them explicitly, eg `a b => (someCollector <: a+b)` 
+
+* though, there are cases where `<template body> => this` works better than `=> <template body>`,
+	* eg when the body has references to `this`
+
+* so we should make the `template` keyword stand for `(... => this)`, not `(=> ...)`
+* note that the `template` keyword is for when you want the call operator to simply return a "executed" version of the object
+* whereas you would use functions if you want to specify a `_return` value to extract after execution
+
+
+* notice that something like `foo: bar(baz(zed(=> (... modifier functions ...))))`
+* and then called `foo` at the end, `result: foo.()`
+* where a function is passed in, modified multiple times, and then called at the end
+* is basically builder pattern...
+
+
+* it does seem like insertion adds quite a bit of complexity and ugliness
+* because we introduce side effects
+* which are always more mental overhead to worry about
+
+### why do combiners need an initiator?
+
+* it doesn't seem like it should be asymmetric
+* or that there should be an initiator
+* why can't both "parents" (the source obj and arguments obj) be treated equally?
+* after all, imagine two balls colliding
+* there is no "initiator" ball, both balls initiate the collision
+* or rather, neither ball initiates, it is the forces of the universe that caused their collision
+
+* however, there is an initiator, because "combining" is a behavior, that has to be part of a module/program
+* the initiator is neither the argument object nor the source object
+* it is the module that wanted to combine the two
+* eg:
+
+		initiator: arg1, arg2, someSource, someArgObj, arg5 >>
+			...
+			result: combiner(someSource, someArgObj)
+			...
+
+* notice that I used `combiner` instead of cloning/calling syntax to emphasize the symmetry between the source and arguments
+* and how they are interchangeable
+
+### Insertion and Side Effects
+
+* whats the alternative to modifiers
+* external "query"
+
+		myFlag: "raise this flag to specify an input"
+		someQuery: queryScope.find(flag = myFlag)
+
+		output: someQuery.map(item >> foo: item.input * 2) // notice that we don't need to use functions or templates here
+
+		queryScope:
+			...
+			(flag: myFlag, input: 10)
+			...
+
+
+* once you specify a default output (aka insertions), you have to worry about undefined input
+* with mapreduce you define an input and output at the same time
+
+* templates are the same but you basically specify that inputs come from calls, not clones
+* that way you can modify the behavior using cloning, without actually sending in any inputs
+* it is just another way of specifying where inputs come from and where outputs go
+
+* perhaps we can specify a better way for defining APIs and modifiers
+
+
+* pass-by-value: dataflow, functional, stateless
+* pass-by-reference: imperative, stateful
+
+
+* in a pass-by-value model, when you retrieve a property, and you clone it, it doesn't modify any other module, even it's parent module
+* it is completely isolated, and "combining" it with an arguments object results in a new object, no side-effects
+
+* in a pass-by-reference model, cloning a module can alter the behavior of other modules
+* in fact, modules use this mechanism as a way to expose "modifiers", structured ways to modify another modules
+* it allows other modules to be "aware" of when another module is cloned
+* also note that insertion implies modifiers, because once you have some program A that uses insertion, then you can clone program A
+* program A becomes a modifier
+
+* side-effects breaks encapsulation
+
+
+* feedback implies stateful?
+* what about queries? why are those "pass-by-value"? even though
+* whats the difference between insertion and queries?
+* insertion is duplicated through cloning, query is duplicated through pointers
+
+### Cloning Does Not Imply Insertion
+
+(continued from section "Combiners - Generalizing Cloning")
+
+* earlier when we said cloning should be symmetric and "bidirectional"
+* is that the result of the clone/combiner has to be "given to both sides"
+	* see section "Combiners - Generalizing Cloning"
+* and thus, we should provide a `._clones` property for every function
+* however, that is incorrect
+* we were thinking about it wrong
+* we were thinking in terms of, there is a person who provides a function, and the person that calls the function
+* eg:
+
+		Deck:
+			addCard: ...
+		foo:
+			bar: Deck.addCard(10)
+
+* in this case, `Deck` would be the one providing the function, and `foo` would be the one calling it
+* but that is wrong
+* remember that scoping is an approximation
+* so `Deck` and `addCard` are actually completely separate objects
+* there is no reason why the usage of `addCard` should affect `Deck`
+* `Deck` just happens to have a pointer to `addCard`, that's all
+
+* in addition, `foo` is a separate from `bar`, `foo` just happens to have a pointer to `bar`,
+	* and a pointer to the result of the clone operation
+* `Deck.addCard(10)` can be thought of as simply `combiner(addCard, 10) => result`
+* `Deck` doesn't need to be notified
+* and `foo` doesn't need to be notified either
+* if we did something like `bar: ignoreEverything(Deck.addCard(10))` then the result of the combiner is ignored,
+	* so `foo` is unaffected and unaware that the cloning even took place
+
+* another way to think about it is
+* let's say `Bob` has a friend `Alice`, `Bob.friend = Alice`
+* now `Alice` wants to exchange info with `Carol`, aka `combiner(Alice, Carol)`
+* there is no reason why `Bob` should be notified
+
+* so **cloning does not imply insertion...**
+
+### Insertion and Side Effects II
+
+(continued from "Cloning Does Not Imply Insertion")
+
+* in the previous section "Cloning Does Not Imply Insertion", we talked about an example where,
+* if `Alice` and `Carol` want to exchange info, there is no reason why `Bob` should be notified
+* however, insertion would allow for this behavior, for `Bob` to be notified
+* to use another example,
+* it would be like, if `Alice` created a device `droney`
+* and anytime `droney` exchanged information with another person, `Alice` was notified
+* even if `droney` tried to meet up with the other person in some secret dark alley, `Alice` would still be notified
+
+
+* this sort of makes sense because what if `droney` depends on some private behavior of `Alice`?
+* well with functional, pass-by-value style, that private behavior is independent, and won't affect `Alice` no matter how many times it is used
+* of course `Alice` can define the private behavior to not do anything useful when cloned with different inputs
+* but `Alice` won't be aware of how many times it is cloned
+
+* in functional style, if you want to make changes to another object, you have to raise flags, make requests "explicitly available" to that object
+* aka have public properties exposing the requests you are making
+* and ensure that the other object has access to you
+* in a hierarchal model, that would be like ensuring that all your ancestors propagate your flag
+
+* this can be complicated to keep track of though
+* as shown in the `ignoreEverything` example earlier, it's possible for a caller to not even "see" the result of the call
+* with imperative style, you can be guaranteed that the request was received
+
+### Central Server Model
+
+* a way to think of imperative style in terms of functional style is,
+* there is a central server that can see every object that is created
+* and every object that is created, can see that central server
+* its a "central axis", one can say :P
+* in a sense, the "combiner" is designed to fulfill these requirements
+* an object can create a request to a "callee" (an encrypted property, encrypted with the public key of the callee)
+* and the callee would be able to see it, decrypt it, and receive the request
+
+* perhaps this central server is the one that resolves urls too
+* like if you do `foo.bar`, it retrieves the address from it, and then gives it to the central server,
+	* which gives back the object at that address
+
+* though this feels very centralized
+
+### Problems with Scoped Insertion
+
+* maybe we should go back to the scoped insertion model
+* that would be functional, but still allow for constructs like
+
+		sum: collector(+)
+		for num in nums:
+			sum <: num
+
+* or actually, would it?
+* recall that for-loops are just shorthand for `list.forEach(item => ...)`
+* so what about something like
+
+		sum: collector(+)
+		someFunction( =>
+			sum <: num
+		)
+
+* how do we know what `someFunction` does? how do we get information back from it?
+* how do we know how many times it clones the body?
+
+
+* note that we have a similar problem with state variables and versioning
+* originally we thought that versioning could be simply converted to mapreduces
+	* // TODO: FIND REFERENCED SECTION
+* however, what if we had `foo: someFunction(=> stateVar := stateVar + 1)`
+* again, we aren't guaranteed that `someFunction` will make all its usages of the input function visible to `foo`
+
+### Side Effects vs Firewalls
+
+* on one hand, imperative style makes it easy to send data to other objects
+* on the other hand, it prevents objects from controlling data being sent out (hard to maintain privacy)
+* if we compare it to the real world
+* on one hand, if you have the url of any server, you can send information to it
+	* because the DNS network is sort of like the central server mentioned earlier, able to receive requests from anybody and send requests to anybody
+* on the other hand, your firewall can prevent data from leaving
+
+
+* note that even in imperative style we can sort of create a "firewall"
+* by manually copying all inputs and objects referenced by the internal body, and discarding any behavior that sends data out
+
+* stuff like for-loops and such wouldn't be affected, because they are "pure public", so manual copies result in identical behavior
+
+* likewise, in functional style, we can sort of have insertion
+* by manually copying functions and manually converting insertions into propagated flags
+* again, this would work for stuff like for-loops because they are "pure public"
+
+* pure public functions are easy to work with, because they can be manually copied and modified
+* in fact, if everything were public, then flag-watcher would always work, because every object is reachable from every other object
+* it gets messy once we start involving private behavior
+* because that is when you could have an insertion that isn't visible to the caller
+* so in that case, should it work (imperative style)? or should it fail (functional style)?
+
+* the real life analog being, say, `droney` and `Bob` interacting in Bob's private, secret house
+* should `droney` be able to privately send data back to `Alice`
+* or should `Bob` be able to privately interact with `droney`, and block any outgoing data?
+
+### Firewalls and Offline Programs
+
+* a common use case to think about is
+* if you buy and download a game
+* it might have tons of private behavior that you can't decrypt
+* but it should still be able to run locally, offline, without sending any data to the internet
+* obviously it's up to the company to write the code for the game such that it doesn't depend on external requests
+* but if they didn't make the game playable "offline", users would complain
+* so our language should allow the company to create programs with private behavior,
+* while still allowing the user to firewall such a program and block all outgoing requests
+
+* how does a firewall block requests from programs without necessarily knowing their behavior?
+* it's not like the computer can decompile the program and figure out exactly what it's doing
+* so how come it can block requests?
+
+* because there is a standard protocol that all requests have to follow
+	* DNS, HTTP, etc
+* and the computer can block the protocol
+
+* we can perhaps do a similar thing
+* insertion is a protocol that can be blocked?
+
+### Collectors And Callback Style
+
+* when creating collectors, instead of referencing the special property `#items`
+* just use functional style: `foo: collector(items => ...)`
+* and the `collector` function will input the inserted items into the function you pass it
+* follows the same functional pattern as `foreach()` and `map`, etc
+
+* why does this work so well?
+* insertion is special behavior, and doesn't follow functional principles
+* perhaps this is a clue to how we can implement insertion in functional style?
+	* or maybe the central server model is functional style?
+
+### Collectors and Insertion Diagram Syntax Revisited
+
+* in diagram syntax, when I first introduced the notion of collectors
+* I did it kind of implicitly
+* I would have the for-each module
+* and inside the module i would "send" values to an outside variable
+* but how do we know that those values can even reach that variable?
+* it's really up to how the for-each function is implemented
+* this was mentioned earlier in section "Cloning Does Not Imply Insertion"
+
+### Firewalls and Minimal Scope
+
+* you should be able to take an arbitrary bit of code and say "work independently and locally"
+* so eg, the test scores example has a minimal scope
+	* test scores example from section "Imperative vs Entangle - Multi-Pass Algorithms and the Test Scores Example"
+* by minimal scope, I mean that there exists a scope from which no insertions leave that scope
+* in the test scores example, the scope would need to contain the example, the `for ... in ...` function, and the `+` operator
+* the `Deck.addcard()` example also has a minimal scope, the scope being `Deck`
+
+* so perhaps how a firewall could work
+* you have to fence out a boundary, scope
+* and if any insertions or clones ever try to leave
+* they fail, and the boundary indicates that it is in error state
+
+* can this be done with proxies?
+* instead of manually copying all inputs, we proxy all inputs
+* so if there is a reference to an external var `foo`, we create a proxy `fooProxy`
+* and if you reference `foo.bar`, then the property access request goes through `fooProxy`,
+	* which proxies `bar` as well, creating a `barProxy` and returning it
+* and if you ever try to clone or insert into any of these external variables, it has to go through the proxy,
+	* who will simply block the request
+
+
+* what we basically need to do is ensure that we can get a "local copy" of a module, that does not send any requests out when we input our private data into it
+* obviously to create the copy of the module it needs to send a bunch of requests everywhere
+* but after the copy is provided to us, when we give it our private data, it shouldn't send any more requests
+
+* note that core language functions, like `map()` and `foreach()` and for loops, can be included in this "firewalled scope"
+* after all, they are pure public functions, so they won't be sending any requests out anyways
+
+### Firewalled Scopes and Custom Combiners
+
+* maybe what a firewalled scope does, is override the combiner/clone function
+* and sets a custom "central server" or "central axis"
+* so clone operations can send requests to other objects inside this firewalled scope
+* but the requests can never leave the firewall
+* almost as if all objects in this firewalled scope are in a local address space
+
+* this seems to work for the `Deck.addCard` example
+* as in, you could define the `Deck` module with a modifier `addCard` with private behavior that inserts into `Deck.cards`
+* but since all behavior is localize to the `Deck` module, you could create a firewalled module,
+* and use your local copy of `Deck` freely without worrying about outgoing requests
+
+* note that if the custom clone function clones any behavior that creates some clones of its own
+* then it recursively calls the custom clone function again
+* this ensures that all cloning is restricted to the local scope, and no requests can leave the scope
+
+* from the outside, the firewalled module looks just like a regular module
+* it just looks like a functional style module, one that doesn't make any insertions to external vars
+
+* i wonder if this has any relation to virtual properties
+* virtual properties create a sort of central server, a "tag scope" that collects all references to it
+* in fact, it seems like virtual properties uses insertion anyways
+* `foo <: #virtualTag: 10` turns into `#virtualTag.put(foo, 10)`
+
+* note that this custom cloner has to be able to see private behavior in order to copy it
+* so how do we ensure that the cloner itself doesn't violate privacy?
+* maybe it's up to the module to use the cloner to clone itself
+* indepedent compilation
+* and if the module decides to ignore the custom cloner, and use the global central server
+* then it won't be in the same local address space as the other objects, and it won't be able to see the other objects
+
+* how does "indepedent compilation" work in terms of combiners, not cloners?
+
+
+* while this seems to work, this still feels a little too low-level
+* you shouldn't have to override or customize the clone function
+
+
+* are people allowed to access/read nested objects of a firewalled scope?
+* eg, if we firewall `foo: (bar: (zed: (...)))`, would we be able to access `foo.bar.zed`?
+* conventionally it seems like no
+* but technically this doesn't involve any insertions, it's not like `zed` is actually inserting any data to external vars
+* but it still is sending data out
+* so it seems like firewalls isn't just about localizing insertions?
+
+* well since the firewall is like a proxy, and controls all access to `foo`
+* if you access `foo.bar.zed`, you have to go through `foo.bar` first, and to do that you have to go through `foo` first
+* so it's really up to `foo` whether or not to allow that access in the first place
+
+
+* interestingly, it seems like reads/property-access can be implemented using functional style
+* but doesn't seem to be the case for insertion/writes
+* so it seems like insertion is a more fundamental language mechanic than property access?!
+
+### Insertion as a Virtual Property
+
+* insertion is like a default virtual property
+* it is like if you declared a virtual property `#insert` at global scope
+* and then in order to insert you did `foo <: #insert: 10`
+* this sort of explains the "central server" model, because it's just like how for virtual tags you have to declare a tag scope
+
+* I guess it makes sense then why I should use the `<:` syntax for both insertion and virtual properties
+* although originally it was just out of convenience
+
+* perhaps you can leverage this to create a firewalled scope
+* just override `var #insert: virtual ()`, in your scope
+* and it will override all insertions to use your new tag scope
+
+* note that there is one minor difference between `#insert` and other virtual properties
+* is that you can insert multiple times into `#insert`, but you can only define virtual properties once
+	* eg you can't do `foo <: #tag: 10, foo <: #tag: 20`
+
+* also note that virtual properties are implemented using insertion
+* after all the syntax `obj <: #tag: val` are just shorthand for `#tag.put(obj, val)`
+* and `put()` and other modifier functions are implemented using insertion
+* so the connection between virtual props and insertion doesn't tell us anything about the connections between insertion and functional
+
+note: this actually doesn't work, as mentioned in the later section "Insertion Blocking"
+
+### Imperative Style and Global State
+
+* at its core it seems like insertion is dependent on a global awareness of some central entity
+* overriding the combiner works because everybody uses the same combiner
+
+* whereas in functional, everything is independent and local, `combiner(a, b) => res`
+* mothing it modified, it just creates a new object and returns it to the caller
+* which is what makes it so perfect for distributed systems
+
+
+* note that imperative code can be thought of as functional code applied to a global state variable,
+
+		execute(instruction, state) => next state, next instruction
+
+* so this is perhaps the main difference between imperative and functional
+* imperative code has a global state, functional code doesn't
+
+* note that insertions can be executed in a "distributed" manner
+* as in, if you have the address of the recipient, you can just send data to them directly, no need for a central mediator
+* it's only with cloning that you need the central mediator
+
+### Send and Receive Model?
+
+* it isn't completely illogical for a module to want to track clones of itself
+* after all, if the module has private behavior, then it should know when other people are using that private behavior with different inputs
+* but why does it need to be aware?
+
+* every combiner call notifies both sides to make copies of themselves, and then creates and returns the result
+	* see section "Combiners - Generalizing Cloning"
+* instead of a functional model, or imperative model, or turing machine model, perhaps we have a "send and receive" model
+* eh but how does cloning work with "send and recieve"
+* a module still has to be able to duplicate behavior
+
+* interestingly, in functional, the combiner has to be able to read private behavior
+* which can be cause for privacy concerns
+* in send and receive model, the module creates a clone itself
+
+* in functional, when you call a function, it does two things:
+	1. executes all nested calls
+	2. wires together the results and inputs of all these calls in the structure that the function dictates
+
+* if you want to personally approve all usages of your function
+* how would you do that?
+* you need to be aware of all clones
+
+
+* eg, take the chatroom example from earlier (section "Chatroom Example - Full Stack Web Applications")
+* it uses insertion to keep count of which users are connected to each chatroom
+* every clone of the `client`, with a given username, sends the info to the server
+
+* we can think of a similar example where the server just keeps track of how many users are connected
+* a counter that is incremented for every clone of the client
+* in that case, even if the user doesn't provide a username, we would want to increment the counter
+* and we wouldn't want the user to be able to "block" the insertion too
+
+### Chatroom Example - Databases and Automatic Caching
+
+* back when we introduced versioning,
+* we talked about automatic caching in the section "Optimizers"
+* where it would automatically reconfigure eventlist code to use state variables and caching, to save memory
+
+* we can use a similar concept for databases and servers
+* your server should reference another module `myhistoryfile` that stores chat history
+* when you run the server, you would be like `server(myhistoryfile.axis)`
+* when you declare a file, it automatically stores things statically in memory, instead of as a dynamic object (as most program objects are)
+* and when you declare "myhistoryfile.axis" you would be like `myhistoryfile: database()`
+* and that would automatically add checks to make sure the data you're inserting is serializable
+
+* difference between database server and client is alot of implementation
+* database is basically, "i want my clients to be persistent"
+* note that in the put-get cycle, you can save any of the nodes in between, and it will work
+* if data B depends on data A, then you only need to save data A
+* and in a cycle/feedback loop, that means you only need to save one
+
+* the internet should not be thought of as segregated into databases, and servers, and clients
+* it's just a giant distributed dynamic dataset
+
+### Can Downloaded Code Contain Private Behavior?
+
+* can templates have private behavior?
+* should templates have private behavior?
+* i guess that would be like having compiled code, or scrambled code, obfuscated code
+* but is it possible to write completely self-contained code that cannot be decompiled?
+* yes, because figuring out if two programs do the same thing is Undecidable
+
+### in Imperative, the Call Itself is an Argument
+
+* note that my modules can be called with zero arguments
+* unlike functional, that uses a "binary" two argument combiner that functional uses
+	* like `combiner(function, argument) => result`
+* my combiner combines anywhere from 0 to many objects
+* well but you still have to pass args in...
+* the reason you can pass in zero arguments is because the call itself is an argument
+* every call comes from a unique caller location
+
+* in imperative, it's the current state (instruction+memory) that is the argument
+* however in Axis there is no "state", it is timeless
+* it is just the caller location, the caller existence, that initiates the call, and serves as the argument
+
+### Using Insertion Instead of Caller Result
+
+* one major difference to note is that
+* with functional, if you pass a function as argument `fn1(fn2)`, then it will simply pass a reference to that function
+* but in Axis, `callee(arguments)`, it will clone the arguments object (as well as the callee)
+* so if there are any insertions specified in the arguments object, they will automatically be called
+* though I guess, that is simply because we allow such complex behavior to be specified in the arguments
+* as in, if we wanted to defer execution of the arguments object, we could simply wrap it in an object, and now it looks (and acts) like functional
+* `arg1: (...some behavior...), callee(arg1, arg2, ...)`
+* now `arg1` is just passed as a reference, no automatic cloning
+* but in Axis you are allowed to also use the arguments as an object itself
+* eg: `callee(a: 10, b: a+2)`
+* because Axis is prototypal, it allows dynamic behavior like this even in the arguments
+* however, as explained above, you have to be careful, as the arguments object is cloned
+
+* notice that you can do something like
+
+		caller:
+			result: collect_one() // output the first insertion
+			callee(arg1, arg2, arg3, result <: this)
+
+* and this is effectively the same as `result: callee(arg1, arg2, arg3)`
+* thus, we don't need to return the result of the combiner to the caller anymore
+* we can use insertion to achieve the same behavior!
+* so while in functional it is required for the combiner to return a result
+* in Axis, it is only required to notify and copy the callee and the arguments object
+
+
+### Implementing Hashmaps and Property Insertion
+
+hashmaps
+* I just realized that there is no way to create hashmaps using insertions
+* because we don't allow inserting properties anymore
+* even with a `put` modifier, it won't work:
+
+		hashmap:
+			put: key, val >>
+				// how would you define properties inside "hashmap", now that you are in the scope of "put"?
+
+* even if you tried to use insertion
+
+		hashmap:
+			keyvals: collector()
+			put: k, v >>
+				keyvals <: (key: k, val: v)
+
+			for (key, val) in keyvals:
+				// how would you define properties inside "hashmap", now that you are in the scope of "for"?
+
+* in addition, note that we originally didn't want to allow property insertions
+* because it would make it way too easy to cause collisions
+* because if you cloned any module that did a property insertion, it would automatically cause a collision
+	* mentioned in section "Insertion Restrictions"
+* but note that we would have the same problem with calls to `put(key,val)` or insertions of `(key: k, val: v)`
+* if you cloned any module that did a `put(key,val)` call, it would automatically cause a collision
+
+* even virtual properties/tags have this problem
+	* naturally, because virtual properties are implemented using hashmaps, and object-key inversion
+* if you had a module like `tagit: (for x in nums (x <: #tag: x*x))`, and then you cloned `tagit`, you would overdefine `#tag` for all `x` in `nums`
+
+* maybe one could use timestampes to prevent collisions
+* you would define the hashmap such that it takes the properties with the most recent timestamp
+* this is something that the insertion method could account for, but direct property insertion like `obj <: prop: val` would not have this flexibility
+
+* though we still need to figure out how to implement property insertion using insertion
+* maybe you can do property insertion if you are in declaration scope?
+
+### Implementing Hashmaps and Property Insertion - Dynamic Properties
+
+* I guess you can implement it using
+
+		hashmap:
+			keyvals: collector()
+			put: k, v >>
+				keyvals <: (key: k, val: v)
+
+			[key]: keyvals.find(=> item.key = key)[['val']]
+
+* this makes sense, because you have a dynamic number of properties, so you have to use dynamic properties
+
+
+
+### Dynamic Arguments Object - Functional vs Axis
+
+* actually, functional doesn't have merging
+* unlike my language
+* because in functional, you don't define behavior inside the arguments object
+	* you can send functions as args, but they are templates, they aren't run until the caller explicitly calls them
+* but in Axis, the arguments object is "live", and can contain live behavior
+* all functional does is copy the function, and assign inputs
+
+### Formal Model for Axis Combiners
+
+* you can't model Axis in functional, because insertion requires some sort of "global awareness"
+* you can think of it as
+
+		combiner(caller, arguments, allObjects) => result
+
+* basically, the combiner needs to look for insertions from all objects, and give them to the spawned object
+* it is kinda like a global flag-watcher model
+* any insertions raise an (encrypted) flag, that the combiner will see, and give to the result
+
+
+* this might look like imperative, `execute(state) => next state`
+* however, imperative is ordered and time based
+* doesn't really capture the distributed timeless feedback behaviors in Axis
+
+* notice that in imperative, it is synchronous, only one `execute` command happens at a time
+* whereas in my language, all `combiner` calls work continuously and in parallel
+
+* Axis is different from functional in that it has a sense of global, centralized data (insertions)
+* but it is different from imperative in that the system can be distributed, combiners work independently
+
+
+* though I guess you could consider the imperative model, `execute(state) => next state`, to be "distributed" as well
+* if instead you did it like `execute(fn, args, state) => next state`, and you tracked all variable assignments done by the function
+* then `state` contains all variables, and `next state` contains all variable assignments
+* then you could distribute it in a dataflow graph, where each function listens for updates from its input vars, and makes assignments to its output vars
+* though it has to be synchronous and time-ordered, which Axis does not need
+
+### Combining Multiple Objects and Builder Pattern
+
+* recall that the combiner usually only has two objects, `combiner(source, arguments)`
+* if you want to combine multiple objects, eg `combiner(source1, source2, source3 ...)`
+* you can't just do `source1(source2(source3(...)))` because notice how that will cause multiple insertions for deeply nested objects that will get cloned many times
+* instead, you have to make the innermost object a template, and the outmost clone a "call"
+* eg `source1.(source2(source3(...template(sourceK)...)))`
+* this is basically builder pattern
+* this is similar to what we were talking about in "Argument Objects and Templates - Complications"
+
+### Symchronization and Insertion?
+
+* synchronization and insertion
+* how do you know when it is "finished"
+* you don't know if somebody out there will end up inserting
+* though I guess, if you think of "collectors" as web servers
+* they always have to be forward evaluated and constantly listening for inputs
+
+### Combiners, Insertion and Privacy
+
+* in the section "Formal Model for Axis Combiners", we use the model
+
+		combiner(caller, arguments, allObjects) => result
+
+* however, notice that means that the combiner has to see all objects,
+	* regardless of whether those objects are private or not
+
+* though it really only needs to see insertions, so maybe it is more like
+
+		combiner(caller, arguments, allInsertions) => result + insertions
+
+* we can think of it like a communal chest
+* anybody can go in and drop something off
+* if they have access to it at least (eg like a private var)
+* now imagine the chest has a security camera
+* we can think of the chest as "able to see everybody"
+* and if you put it that way, it might sound like a privacy concern
+* but that is the wrong way to think about it
+* the chest can see anybody that wants to be seen, aka that wants to drop something off
+
+* insertion means that we don't know where an input might be coming from
+
+* but what if we do know? what if we only allow club members to drop things off at the chest
+* so we basically can statically bind the chest input to each club member,
+* 	so the chest is constantly "watched" the club members, and the club members alone
+
+* well then, using a for-loop or a foreach() to insert to the chest object
+* is like a club member, sending a helper elf to drop things off for them
+* problem is the chest is only watching club members, so it wouldn't see the stuff dropped off by the helper
+* which is why the chest needs to be able to see everybody
+* so that the chest will accept drop offs from anybody
+
+* in functional, we would use a map-reduce instead of a for-loop
+* the map function returns the data back to the caller, instead of inserting directly to the collector
+* this would be like the helper elf collecting the items to drop off and putting them in a bag
+* but the club member still has to drop off the bag himself
+
+
+* another way of thinking about insertion is automatic propagation
+
+* every function call create a tree of nested sub-calls
+* each of those sub-calls may contain an insertion
+* that insertion has to be carried up this tree of function calls, up to the root
+* and also from the root to the collector
+
+
+* all it really needs to do is send that a clone occured
+
+### Callee-Handled Insertion vs Caller-Handled Insertion
+
+take the example
+
+	collector
+	...
+	modifier:
+		collector <: someval
+	...
+	caller:
+		result: modifier()
+
+there is actually 2 main ways we can implement the insertion mechanism
+
+**Callee-Handled Insertion**
+
+* in this method, we think of the insertion as an action performed by the modifier, the callee
+* it is not a behavior carried in the clones
+* rather, it is just a duty performed by the modifier every time it is notified of a clone
+
+* the mechanism has two parts
+	1. the modifier has to be notified of any clones/calls
+	2. modifier (and all intermediates) has to propagate the insertion to the collector
+
+* in functional, neither of these happen
+* the modifier (or any function) does not need to be aware of any calls
+* and there is no propagation of information from the modifier
+
+* this is what we talked about "bi-directional communication"
+* notifies the callee of any calls, and the callee registers the insertion
+
+* if there were multiple "jumps", eg a function that calls a function that calls a modifier that performs an insertion
+* the signal would need to propagate backwards along each of these jumps
+* we talked about this in the section "Modifier Calls and Double Flag-Watcher System"
+
+**Caller-Handled Insertion**
+
+* other method is to think of the insertion as data propagated from the insertion clone to the collector
+
+* this is basically the same as just a single propagation from the call result to collector
+
+* because the caller always receives the result of the call, so it's up to the caller to propagate insertions in the result
+	* and any intermediates between caller and collector have to propagate as well
+
+* this is probably how I originally thought about it when I first came up with flag watcher
+	* see section "Flag-Watcher Model"
+
+* its also worth noting that the "central server" model, and the `combiner(caller, arguments, allInsertions) => result + insertions` model,
+* are both based on caller-handled insertion
+
+
+
+
+* 2nd method might seem cleaner and more elegant
+	* views insertion as a cloned behavior, just like everything else defined in a module
+* but the 1st method is actually more realistic
+* in the real world, if you want to clone an object, you have to notify it
+* which makes it impossible to prevent it from performing the insertions itself
+
+* but if we're talking about realism
+* somebody could also mimic cloning, by simply using a time-varying input
+* so instead of doing `foo(1), foo(2), foo(3)`, they simply do `foo(x)` and have `x` change from `1` to `2` to `3`
+	* and record the outputs while doing so
+* this is only possible because the language is "persistent"
+* in imperative, where function calls are instantaneous, you can't do this
+
+
+
+* note that these "propagations" aren't related to scope
+* because the tree of function calls is not the same as the hierarchal tree of scopes
+
+* for example:
+
+		foo:
+			#bar:
+				modifier:
+					=> insertion_value: 10
+			baz:
+				=> ( #bar.modifier.() , #bar.modifier.() ) // does two insertions
+		
+		collector: (1 2 3).map(foo.baz).flatten()[['insertion_value']] // calls foo.baz for each item, and extracts insertion_value's
+
+* note that we are using manual insertion, a functional-analog of insertion
+* where the functions have to manually pass back values to the collector
+* however notice that the collector isn't in the same scope as `modifier`
+* but each function call still is able to pass back the insertion values
+
+### Insertion Blocking
+
+(continued from previous section "Callee-Handled Insertion vs Caller-Handled Insertion")
+
+
+* in first method, calling a function and performing the insertion are bound together
+* if you want private behavior from the function, you must perform the insertion
+* or rather, if you are the source/callee module, you are guaranteed that every time you give out private behavior, you are notified, and can perform an insertion
+* in second method, it is possible to clone the object, and then block the insertion
+
+
+* one reason why 1st method is more realistic
+* lets represent a web server as a module, with tons of private behavior
+* lets say this web server computes a single function `fn`
+* every time a user calls the function `fn`, the web server creates a clone of the function with the user-given inputs
+* however, instead of giving the clone to the user, the web server keeps the clone locally, and only gives the user the output
+* our language doesn't make any reservations about where data is stored
+* so it makes sense that the server would want to keep the clone, and all its private behavior, locally
+* if the user makes any changes to inputs, the update request would have to go to the server, update the clone, and then the server would give the updated output
+* if somebody wants to clone the user's clone, then it also has to go through the root server
+* so if the server module contains any insertions to external modules
+* it is practically impossible to prevent them from happening without preventing the cloning as well
+
+* if we take this to the extreme
+
+* functional only allows you to create functions that don't change no matter how much they are called
+* but that is not how the real world works
+* you can have functions that throttle when too many calls are coming in at once
+
+* my language should accurately represent what is achievable, because if it doesn't
+* then people will just use other languages to achieve their purpose
+
+* if insertion is realistically impossible to block, then we should not allow blocking insertion
+* if it is possible to block, then we should make allow blocking insertion as part of the language
+
+
+* right now you can interact with client-side web pages without sending any info back to the server
+* which is nice
+* you can do this because the page is loaded to your browser
+* and then you can unplug the internet
+* and still play around with functionality on the web page (as long as it is cached, and doesn't require external resources)
+
+* however, what you're basically doing, is leveraging a separate interpreter
+* the interpreter in your browser is not the same one as the one used by the server
+* but in Axis, the entire web (servers + clients) is supposed to work as a unified system, with a single interpreter
+* so while using a separate interpreter would allow you to block insertions
+	* also mentioned earlier when talking about overriding the combiner
+* it feels more like a hack, then a legitimate functionality we should have in our language
+* but if it's possible, achievable, then perhaps we should have it in our language?
+
+
+* overriding `#insert` doesn't work
+	* a method we were experimenting with in the section "Insertion as a Virtual Property"
+* first off, modeling insertion using the virtual tag #insert ignores the cases where we want private insertions
+	* aka a module that performs an insertion that isn't visible publically
+* this also explains why overriding `#insert` wouldn't work
+* because if the insertion is private, then it wouldn't (and shouldn't) be overriden
+
+* it seems like the only way to prevent insertion is to change the combiner
+* aka change the interpreter itself
+
+* but changing the interpreter doesn't always work
+* remember that downloaded programs can still have private behavior
+* and insertions can be hidden in private behavior
+* so the interpreter can't always decompile the program and "extract" these insertions out
+
+* even if you try to disconnect the internet
+* what if that private behavior starts by calling a private server to ensure it has internet connection
+* otherwise, if not, the private behavior breaks the entire program
+
+
+* while it is possible to model everything in functional
+* even insertion
+* after all, functional is turing complete
+* however, the key thing is that it isn't easy to represent insertion in functional
+* just like it isn't easy to represent type systems in assembly, so nobody uses assembly for type systems
+* insertion and modifiers are an intuitive way of thinking about the world
+* and so it's something that should be intuitive in the language as well
+
+* however, as shown, insertion cannot be prevented without preventing cloning as well
+* because insertion can be hidden inside private behavior
+
+### Firewalling ???
+
+private behavior can contain insertions
+so it's impossible to prevent insertions without preventing cloning as well
+however, it should theoretically be possible to "firewall" a program and block all insertions and cloning
+
+but syntactically, how would we do this?
+
+
+
+### template as arg object, extending templates
+
+
+doesn't work, because you can't access properties of a template
+so you can't read and copy over the behavior of a arguments object if it's a template
+
+
+
+what if you extend the template object, like `Client` in the chatroom example
+so that by default when you define a `Client`, it doesn't actually create one
+
+this can be confusing, because how can you tell if the object your using is a template or not
+that would determine whether you want to make your input a template or not
+
+
+
+### state vars and insertion
+
+we can implement state variables using insertion:
+
+	stateVar: state_var
+	ordered modifier:
+		stateVar := fn(someArgs, stateVar)
+
+is equivalent to
+
+	stateVar: collector(=> last)
+	modifier: _timestamp >>
+		stateVar[_timestamp]: fns(someArgs, stateVar.before(_timestamp))
+
+maybe we can also use `orderBy` to specify what variable to determine order (in this case its `_timestamp`, which should be default)
+or maybe `index` should be default, and events should by default set `index: _timestamp`
+
+##E Chatroom example revisited
+
+// TODO FINISH THIS
+
+	ChatroomServer: Server
+		chatpage: Client
+			html: HTML
+				input(username)
+				input(chatroom)
+				button(fn: enterRoom) "Enter"
+				div(class: 'conversation')
+					for message in conversation:
+						p message
+				input(messageDraft)
+				button(fn: enter) "Send Message"
+
+			username: HTMLInput()
+			chatroom: HTMLInput()
+			messageDraft: HTMLInput()
+
+			enterRoom:
+				capture1: capture(username)
+				capture2: capture(chatroom)
+				=>
+
+
+### neural nets, circuits, and scoped insertion  ??
+
+neural nets don't need insertion
+hard to model using circuits
+which is something we originally wanted
+find referenced section
+
+
+scoped insertion

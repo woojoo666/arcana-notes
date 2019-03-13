@@ -2429,7 +2429,7 @@ revisit 1/12/2019:
 
 ```js
 for keypresses.filter(value = "p"):
-    print("hello") // print hello every time the p key is pressed
+    print("hello"); // print hello every time the p key is pressed
 ```
 
 * it's simple an intuitive, and leverages list comprehension techniques
@@ -2438,7 +2438,7 @@ for keypresses.filter(value = "p"):
 
 ```js
 for keypresses.filter(index % 3 = 0):
-    print("hello") // print hello every 3 keypresses
+    print("hello"); // print hello every 3 keypresses
 ```
 
 * if you wanted to do this using event listeners or sequential blocks, you would need a counter
@@ -2451,7 +2451,7 @@ addEventListener('keypress', event => {
 		print("hello");
 		counter = 0;
 	}
-})
+});
 ```
 
 * which is clearly uglier
@@ -2469,7 +2469,7 @@ addEventListener('mouseMoved', event => {
 		runningAverage += lastThreeEvents[i].mouseX;
 	}
 	runningAverage /= 3;
-})
+});
 ```
 
 * whereas using list comprehensions, we can easily achieve this in one line
@@ -3924,9 +3924,11 @@ vvvv move this to philosophy section? vvvv
 	* body: behavior + properties, carried over during cloning, defined by expressions + property assignment
 	* section: "Anatomy of a Module"
 25. when you have access to a variable, assume direct communication (private and secure argument passing, insertion, etc)
-	* section:
+	* section: "Indirect Writes, and Pass-By-Reference Model"
 25. insertions are inherited during cloning
 	* section "Insertion and Cloning"
+25. `callee(arguments)` will automatically clone both the `callee` and the `arguments` object, and combine the two
+	* so be careful of both insertions in the `callee` and `arguments` object
 
 ### Implementation Rules
 
