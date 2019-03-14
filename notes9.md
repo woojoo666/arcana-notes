@@ -2952,6 +2952,52 @@ so this actually should work...right?
 
 * Axis parenthesis `(...)` actually acts more like imperative curly braces `{...}`
 
+### Defining Behavior That Should be Duplicated
+
+(continued from "Clones and Calls Declared Inside the Arguments")
+
+* ultimately it comes down to
+* when we declare or extend objects, we **define behavior that should be duplicated**
+
+* so notice the difference between this:
+
+		foo: bar(apiResult: playlist.addTrack('badBlood'))
+
+* and this:
+
+		temp: playlist.addTrack('badBlood')
+		foo: bar(apiResult: temp)
+
+* in the first example, calling `addTrack` is part of foo's behavior
+* so cloning `foo` will call `addTrack` again
+* in the second example, `addTrack` is called outside `foo`, and then the value is given to `foo`
+* so cloning `foo` would not call `addTrack` again
+
+* note that these two examples would be equivalent in imperative langs like javascript
+* doesn't matter if you call inside or outside a function, it will always just pass the result value into the function
+
+### exploring a template-based language
+
+* functional only has functions and calling
+* originally we only had objects and cloning
+
+* when we introduced insertion, we had to introduce templates
+* so now we have objects and cloning, and templates and calling
+* we can use calling to turn templates into objects,
+* and extend templates (eg `template(...someObject)`) to turn objects into templates
+
+* feels more complicated and ugly, but is it necessary?
+
+* note that we could make Axis a template based language
+* just make all declared objects default to templates
+* and if you want to "execute" them you have to call them
+* eg
+
+		foo: (a: 10, b: 20)   // foo is a template
+		bar: foo.()           // bar is a prototype
+
+* so it seems like whether or not to make templates default, or prototypes default, is rather arbitrary
+
 ### Empty Parenthesis `()` As Call Operator
 
 call operator syntax

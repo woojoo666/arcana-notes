@@ -3931,7 +3931,9 @@ vvvv move this to philosophy section? vvvv
 	* so be careful of both insertions in the `callee` and `arguments` object
 25. arguments object is a template, and behavior declared inside is deferred until the combiner returns the result
 	* this means that, insertions and cloning defined in the arguments, will not be evaluated if the callee is a template
-	* section: "Arguments as a Template", "Clones and Calls Declared Inside the Arguments"
+	* section: "Arguments as a Template", "Clones and Calls Declared Inside the Arguments", "Defining Behavior That Should be Duplicated"
+25. when we declare or extend objects, we define behavior that should be duplicated
+	* section: "Defining Behavior That Should be Duplicated"
 
 ### Implementation Rules
 
