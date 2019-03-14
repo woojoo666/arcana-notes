@@ -3929,6 +3929,9 @@ vvvv move this to philosophy section? vvvv
 	* section "Insertion and Cloning"
 25. `callee(arguments)` will automatically clone both the `callee` and the `arguments` object, and combine the two
 	* so be careful of both insertions in the `callee` and `arguments` object
+25. arguments object is a template, and behavior declared inside is deferred until the combiner returns the result
+	* this means that, insertions and cloning defined in the arguments, will not be evaluated if the callee is a template
+	* section: "Arguments as a Template", "Clones and Calls Declared Inside the Arguments"
 
 ### Implementation Rules
 
@@ -4022,6 +4025,10 @@ Muxes
 * `*` operator is for repeat
 * `[]` operator is for matchers
 	* `.` operator is shorthand for a string matcher
+
+use `list.filter(someCondition).any` or `list.any(someCondition)` to retrieve single item from list
+`is` is short for `... = true`, so you can say `if (node is #visited)` to say `if (node.#visited = true)`
+`not` is the opposite, short for `... = false`, so you can say `if (node not #visited)` to say `if (node.#visited = false)`
 
 capture blocks stay as three big dots ...
 spread operator is shrunk down to …

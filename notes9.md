@@ -2769,21 +2769,203 @@ but syntactically, how would we do this?
 
 
 
-### template as arg object, extending templates
+what if I have a program, like youtube-dl that interacts with Youtube
+retrieves my private playlists, so I have to give it my private password
+but I don't want it to leak the password
+it should be firewalled
+the system `(Axis standard library + youtube-dl + youtube)` should be firewalled
 
 
+### Setting the Arguments Object As A Template
+
+what if you passed a template as the arg object
+note that this is not the same as inputting as an argument, eg `foo(someTemplate)`
+	* which we already commonly use, eg in the `addTrackToFavorites` example (// TODO: FIND REFERENCED SECTION)
+the only way to explicitly set the arguments object is to either do something like
+
+	foo(...someTemplate) // using spread operator
+
+	foo.apply(someTemplate) // using apply()
+
+so what should happen?
 doesn't work, because you can't access properties of a template
 so you can't read and copy over the behavior of a arguments object if it's a template
 
+note: in the later section "Arguments as a Template", we conclude that the arguments object is by default a template
+so this actually should work...right?
+
+### Extending Templates
+
+* what if you extend the template object, like `Client` in the chatroom example
+* eg `Client: template(...)`
+* so that when you define a `Client`, eg `foo: Client(...)`, it doesn't actually run any of the code passed in
+* and waits for the browser to actually "call" the client object to create a "live" instance of the client
+
+* this can be confusing, because how can you tell if the object your using is a template or not
+* that would determine whether you want to make your input a template or not
+
+* maybe you can only do combiner(object,object), and combiner(template,template)
+* but not combiner(object,template) or combiner(template,object)
+* but...this is getting too ugly and weird
+
+* templates are starting to feel too "special", too distinct from objects
+* almost like imperative objects vs functions
+* in Axis, can we even model templates as an object?
+
+### Templates and Deferring Evaluation
+
+* maybe the way templates work is
+* it first sets all scope variables to `undefined`, so all insertions and clones and references are inert
+* however it also saves the scope
+* when you "call" the template, it runs the template using the scope
+
+* so in code, templates would be implemented like
+
+		template:
+			#scope: // somehow capture declaration scope
+			_call: this(#scope)
+
+* I guess it doesn't even really need to capture the declaration scope
+* the interpreter would just process all references made during the declaration of a new template
+* and instead of actually resolving the references, it defers it until you actually "call" the template
+
+* this means that templates are still objects
+* and you can still override their properties and such
+* just like normal objects
+
+* I guess to generalize the "scope capturing" we can say that,
+* templates are for deferring evaluation
+* **but deferring evaluation is also a behavior itself**
+* so this is why when you clone a template, it doesn't creates another template
+* and in order to actually "run" the template you have to call it
+* because cloning should replicate behavior
+* and in the case of cloning templates, it should replicate the behavior of deferring evaluation
+
+### why are templates so common with insertion?
+
+* hmmm even in the chatroom `Client` example
+* we need to declare the body as a template
+* because otherwise we would have premature insertion
+
+* it seems like the vast majority of cases where you have insertion
+* you would want to declare a template...
+
+* maybe we should force all insertions to be in the body of the `_return` or `=>` statement
+* that way you are forced to declare a template every time you want to do insertions
+
+* but why is insertion so closely intertwined with templates?
+* perhaps it's because insertions are like default outputs
+* but we don't have this problem with default inputs...
+
+* why are templates so incompatible with prototypal style?
+
+* well virtual properties use insertion, and they work well with prototypal style
+
+* prototypal style:
+* usually when somebody is defining some objects, they'll use variables and scopes and hierarchies to organize things
+* to break the object into parts for better organization and legibility
+* you can leverage that, and clone the object with different parameters, to suit your own needs
 
 
-what if you extend the template object, like `Client` in the chatroom example
-so that by default when you define a `Client`, it doesn't actually create one
-
-this can be confusing, because how can you tell if the object your using is a template or not
-that would determine whether you want to make your input a template or not
+* if you are making something for yourself, use prototype
+* if you are making something for others, use template
 
 
+* well usually insertions are for other people...
+
+### Arguments as a Template
+
+* actually, the arguments object is a template
+* note that there is a difference between `foo(x <: 10)` and `foo((x <: 10))`
+* the latter is no different from `bar: (x <: 10), foo(bar)`
+* whereas the former could not be reduced like such
+
+* objects referenced in the arguments object may be live, eg `bar: (x <: 10), foo(bar)`
+* but the arguments object itself, is not "live"
+* remember that properties of the arguments object override properties of the source
+* and those insertions are kinda like properties of the arguments object as well
+* those insertions don't override anything, but they are put inside the result object
+
+* when we declare insertions directly as an argument
+* we are saying that we want those insertions to be part of the result
+* and not that they should be active in the arguments object
+* we are not "running" the insertion, we are using it to define the result
+
+* I guess another way to think about it is, normally when you define an object, it goes
+
+		definition => interpreter => result
+
+* the same is true for cloning and overriding
+* everything inside the arguments object is part of the definition
+* the interpreter combines it with the source/callee, and then creates a result
+* and the result is "live"
+
+* but the result doesn't have to be live
+* if the source is a template, then we would have something like
+
+		someTemplate(someCollector <: someValue)
+
+* notice that here, the result is a template, so this would result in zero insertions
+* this is also what happens with the `Client` cloning in the Chatroom example
+
+* perhaps another way of thinking about it is, the arguments are an embedded part of the result
+* the combiner doesn't "clone the arguments object", as we thought in the section "Arguments Object Cloned during Cloning"
+* it takes the definition of the arguments object, merges it with the source definition, and then runs the result
+
+**the combiner merges definitions, not behaviors**
+
+* and I guess you could consider the arguments object as a template
+* means the same thing
+
+* note that functional doesn't have to worry about whether or not to clone the arguments object
+* because in functional, cloning extraneously doesn't have any side effects
+* whereas in Axis, we have to be careful how many times we clone
+
+### Clones and Calls Declared Inside the Arguments
+
+* wait but if the arguments object isn't considered "live"
+* and is considered a template
+* then what about clones performed inside the arguments object?
+* eg
+
+		foo(x: bar(10))
+
+* normally, even in imperative languages, we think of the arguments as "executed" first before being passed in
+* I guess in Axis, these would not be executed until they are part of the result object
+* so if the source is a template, these would not be run at all
+* basically, **the arguments object does not execute cloning**
+
+* so in imperative, where you might do something like
+
+		console.log("user name: " + user.get("name"))
+
+* and you would assume that `user.get("name")` is called first, then the value is passed to the string concatenator,
+	then the string is passed to `console.log`
+* but in Axis, this isn't the case
+* if `console.log` were a template, then `user.get` would not be called at all
+* it would actually act more like
+
+		console.log(=> "user name: " + user.get("name"))
+
+* I guess this is because in Axis, the stuff inside parenthesis `(...)` is for definitions
+* whereas in imperative, the stuff inside is for values and expressions
+
+* Axis parenthesis `(...)` actually acts more like imperative curly braces `{...}`
+
+### Empty Parenthesis `()` As Call Operator
+
+call operator syntax
+
+* maybe we should use `()` as call operator
+* so if you want to call a template with args, do `someTemplate(args)()`
+* this works because cloning with no arguments is useless
+* `()` with no arguments is like saying "use the call itself as an argument", which is kinda what calling is
+	* see section "in Imperative, the Call Itself is an Argument"
+* this is also nice because it shows that the arguments are passed in before the call
+* the clone happens before the call
+
+* how does it compare to the original syntax, `someTemplate.(args)`?
+* what if we had a list of calls: `( fn.(1), fn.(2), fn.(3) )` vs `( fn(1)(), fn(2)(), fn(3)() )`
 
 ### state vars and insertion
 
