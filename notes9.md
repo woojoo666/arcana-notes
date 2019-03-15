@@ -1689,7 +1689,7 @@ chatroom example:
 
 		chatpage: Client
 			route: '/'
-			layout: pugLayout // using [pugjs](https://pugjs.org/api/getting-started.html)			
+			layout: pugLayout // using [pugjs](https://pugjs.org)			
 				input.username
 				input.chatroom
 
@@ -2566,7 +2566,7 @@ hashmaps
 
 * but what if we do know? what if we only allow club members to drop things off at the chest
 * so we basically can statically bind the chest input to each club member,
-* 	so the chest is constantly "watched" the club members, and the club members alone
+	* so the chest is constantly "watching" the club members, and the club members alone
 
 * well then, using a for-loop or a foreach() to insert to the chest object
 * is like a club member, sending a helper elf to drop things off for them
@@ -3004,7 +3004,7 @@ call operator syntax
 
 * maybe we should use `()` as call operator
 * so if you want to call a template with args, do `someTemplate(args)()`
-* this works because cloning with no arguments is useless
+* this works because cloning a template with no arguments is useless
 * `()` with no arguments is like saying "use the call itself as an argument", which is kinda what calling is
 	* see section "in Imperative, the Call Itself is an Argument"
 * this is also nice because it shows that the arguments are passed in before the call
@@ -3012,6 +3012,22 @@ call operator syntax
 
 * how does it compare to the original syntax, `someTemplate.(args)`?
 * what if we had a list of calls: `( fn.(1), fn.(2), fn.(3) )` vs `( fn(1)(), fn(2)(), fn(3)() )`
+
+
+* note that cloning can sometimes use `()`, so it might get a lil confusing
+* eg if you clone `someModifierPrototype()` it might look like you're calling it
+* though there is still technically no ambiguity, because you would never do these empty clones for templates
+
+* the syntax can get a little ugly in cases like this
+
+		joe: Student("Joe", "Harvard", do console.log(this.greeting)())
+
+* what if we used an arrow?
+
+		joe: Student("Joe", "Harvard", do console.log(this.greeting)→)
+
+* once you type `->` it will automatically shrink to `→`
+* kinda like how `...foo` shrinks to `…foo`
 
 ### state vars and insertion
 
@@ -3030,7 +3046,51 @@ is equivalent to
 maybe we can also use `orderBy` to specify what variable to determine order (in this case its `_timestamp`, which should be default)
 or maybe `index` should be default, and events should by default set `index: _timestamp`
 
-##E Chatroom example revisited
+### neural nets, circuits, and scoped insertion  ??
+
+neural nets don't need insertion
+	each neuron is dependent on a static, specific set of other neurons
+insertion is also hard to model using circuits
+which is something we originally wanted
+// TODO: FIND REFERENCED SECTION
+
+
+perhaps scoped insertion, or firewalls, can help restrict the language enough
+to allow for extreme optimizations like neural nets or circuits
+
+
+### using bounds to restrict divergent feedback
+
+normally in imperative code, if we have a loop that is running infinitely for some reason
+we can easily add bounds, eg
+
+	iterations = 0
+	bounds = 1000
+	while(someCondition && iterations < bounds) {
+		...
+		iterations++
+	}
+
+this makes it easy for us to inspect and debug the program
+and to figure out why it's overflowing
+
+how would we do this in Axis, for cases of divergent feedback?
+for example, the test scores example
+what if we designed it to be divergent
+how would we "pause" it after a certain number runs, or updates?
+"pausing" it, using behavior defined in Axis, would require the feedback to have an execution order
+otherwise the state of the program after being "paused" would be non-deterministic
+
+as in, if the program (with feedback) doesn't define an execution order
+	which is often the case, it's up to the interpreter to determine how to propagate updates
+then if we pause the program, we don't know what state it will be in
+it's up to the way the interpreter is defined
+
+so it seems like in order to "pause" the program, we have to work at the interpreter level
+which is ugly and very low level
+
+
+### Chatroom example revisited
 
 // TODO FINISH THIS
 
@@ -3055,13 +3115,218 @@ or maybe `index` should be default, and events should by default set `index: _ti
 				capture2: capture(chatroom)
 				=>
 
+	ChatroomServer: Server
 
-### neural nets, circuits, and scoped insertion  ??
+		url: 'www.chatrooms.com:5000'
+		chatrooms: collector
 
-neural nets don't need insertion
-hard to model using circuits
-which is something we originally wanted
-find referenced section
+		chatpage: Client
+			route: '/'
+			layout: pugLayout // using [pugjs](https://pugjs.org)			
+				input.username
+				input.chatroom
+
+				div.conversations
+					for msg in currentRoom.conversation.orderBy('_timestamp')->:
+						p msg
+
+				textarea.message-draft
+				button(onclick = send)
+
+			username: html.find('input.username')->.value
+			chatroom: html.find('input.chatroom')->.value
+			messageDraft: html.find('textarea.message-draft')->.value
+
+			currentRoom: chatrooms[chatroom]
+
+			currentRoom.activeUsers <: username
+
+			send: _timestamp =>
+				currentRoom.conversation <: messageDraft.capture(_timestamp)->
 
 
-scoped insertion
+### Data Persistence - Chatroom Example Revisited
+
+(continued from the section "Chatroom Example - Databases and Automatic Caching")
+
+* why do we even need separate concept of database?
+* why not just store the whole server to a file
+* from a data standpoint, the server is just shared data amongst clients
+* so the database and server should be thought of as the same thing
+
+* actually, there is a problem with the database example
+* once you disconnect client, then the insertions disappear
+
+* problem is, most of the time we have data dependent on data
+* persistent as long as the source is still there
+* but in this case, we want the source to be able to disappear, but the data to persist
+
+* simple example: a program that records the number of times you click the mouse
+* first, start with transient memory
+	* new memory every program run
+* this would just look like a normal axis program, we can write it in a single module
+* then, what if we want persistent data?
+	* persistent across multiple runs
+* note that we could store all mouse clicks, or just store the output number, or store any of the data in between
+* any of these methods could be used to create the illusion of a "persistent" program
+
+### Data Persistence - Unpredictable Inputs
+
+* we need to be dependent on persistent data, data outside the lifetime of the program
+* that way if say, a client shuts down, the changes made by that client will still persist
+* perhaps we need a persistent timeline of all events, history
+* immutable as well
+* mentioned in the sections "Timeless" and "Block chain timestamps"
+
+* but that's not exactly it
+* events can be predictable
+* if we had initial conditions of universe, and all laws of physics
+* we wouldn't need this "persistent timeline of events", we could predict them all
+
+* simpler way to think about it
+* right now we are dependent on human actions, we need to store them
+* but if we were dependent on a robot's actions
+* and we could predict those robots actions from existing data
+* then we wouldn't need to store anything
+
+* so I guess what it is is
+* data that is independent and unpredictable from the program
+
+
+* another way to think about it is perhaps
+* bind the file data to human inputs/actions
+* program is just intermediate
+
+
+* input is events and data
+* output is data and actions
+* the order goes "user actions => program => file writes"
+
+* but that's ugly
+* low level
+* we need to treat the filesystem and OS as if they were modules in Axis
+* I guess this is what we were already doing when we did stuff like
+
+		chatrooms: File(allchathistory.axis)
+		Client:
+			chatrooms[chatroomindex].conversation <: message
+
+* the problem was that the messages disappear if the client disappears
+* not that the `chatrooms` data is disappearing
+* more that, the chatrooms data is dependent on the messages, so if the messages disappear, then so does the chatrooms data
+
+* so I guess we need to "capture" the events,
+* and decouple them from the client
+* so the client can disappear but the events won't
+
+### Data Persistence - Dependencies and Duplication
+
+* imagine if we modeled the entire universe, including the OS and filesystem, in Axis
+* now imagine we had a program, `foo`, that takes the contents of `fileA`,
+	* transforms it, puts the result in `fileB`, and then displays `fileB`
+* (note that this is similar to our chatroom example, which takes messages from client, stores it, then displays all messages)
+* we want the displayed output of the program to persist across multiple runs of the program
+* so we would want to "save" and store the contents of `fileB`, right?
+* wrong, because if the program runs multiple times, every time it can generate the contents of `fileB` again from `fileA`
+* we don't need to store anything from `fileB`, we can generate it every time
+* it's unnecessary to store both the contents of `fileA` and `fileB`, we only need `fileA`
+* and if we did store `fileB`, then when we run the program again, it transforms `fileA` again and adds it to `fileB`,
+* and we end up with duplicated data
+
+* though in the chatroom example, it is sort of like `fileA` is disappearing (the client and all its user inputs disappear)
+* but we need to make sure not to store too much data
+* or we may end up with duplicated data
+* for example, imagine if on the server side we stored all the messages from the client
+	* perhaps in a database file
+* and on the client side, we stored all the inputs and events (mouseclicks, keypresses, etc)
+	* perhaps in some sort of "persistent timeline", mentioned earlier
+* then if we ran the client again, it would re-process all the previous user inputs from the timeline,
+* and duplicate the data on the server
+
+* a module should never store data if any of it's dependencies are storing data
+* or if any of it's dependencies are "alive"
+* so `fileB` should not store data if `fileA` is still alive
+* if `fileA` gets deleted, then `fileB` should store data to act as if `fileA` was still alive
+* I guess this is only if `fileB` wanted to treat `fileA` as still alive
+* so I guess the condition is,
+* `fileB` should store data if all it's dependencies (aka `fileA`) are guaranteed to be gone forever,
+	* but it still wants to act as if they exist
+
+
+* message is dependent on keypresses, `message: createMessage(keypresses)`
+* all capture does is capture the message at a certain point,
+
+		capture: timestamp, message => createMessage(keypresses.filter(keypress.timestamp < timestamp))
+
+* so the "capture" function is just a function, that's it
+* not relevant to the discussion about when to store and what to store
+
+### Data Persistence - Garbage Collection
+
+(continued from previous section, "Data Persistence - Dependencies and Duplication")
+
+* closing a program and making data "disappear", is different from "switching away" from data
+* lost data is different from data that isn't currently being observed
+* for example, if we had something like
+
+		foo: if (condition) ? fileA else fileB
+
+* then if `condition` switches from `true` to `false`, `fileA` won't be observed anymore,
+* but that doesn't mean we should start storing its data to make it seem "persistent"
+* we will see `fileA` again if we simply switch `condition` back to `true`
+* so it seems like closing a program is some sort of special behavior
+* that guarantees we aren't going to see that data again
+* and I guess in this case the data is user inputs
+
+* user inputs that are registered by a client are lost forever once the client closes
+* how do we model this "client closing" behavior in Axis?
+
+* I guess what's more important is that when you "switch away" from an input,
+* you are saying that you don't want to use that input anymore
+* but when you close a program, you are saying that you still want to use the data
+	from that program, even though its closed
+
+* I guess you can think of it as super advanced garbage collection
+* when the user closes the chat client, it means they don't want to see the chat conversation anymore
+* but other users still have pointers/references to the messages that the user sent
+* so that data can't be deleted or garbage collected, while the rest of the program can be
+* you are closing the interface, the GUI, but you aren't trying to delete the data
+
+* at the same time though, when you close a program, you are also saying "I don't want to be responsible for storing this data"
+* so the low-level mechanism will switch to storing the data on the server, or some other user offering to store it
+* however, note that where the data is being stored shouldn't matter
+* in fact, often data should be stored in multiple places, just in case
+* but the point is that we now know why that data should be kept alive in the first place
+
+* programs are just transformations applied to user inputs
+* so in the chatroom example, the user inputs are keypresses
+* when you first open a chat client, only the chat client is listening and depending on your keypresses
+* but when you send the message to the server, now the server (and other users signed into the same chat room)
+	can see the result of those keypresses, and are dependent on them
+* so when the user closes their chat client, those keypresses are still "kept alive" by the server and by other users
+
+* this only works if the server is kept alive, when the client closes
+* but what if we close the server?
+* now nobody is listening to those past keypresses, those past user inputs
+* so they would get garbage collected
+* but we want them to persist across multiple server runs
+* so we basically have to do the same thing between database+server that we did with server+client
+* we store the `chatrooms` data on a file, which is persistent across multiple server runs
+* we declare this file as a module, outside our server module, and have our server module insert chat data to it
+* that way, if the server closes, the file module can see that future servers may still depend on the data
+* so the file module won't delete the data
+
+* note that all this implies that closing a program, won't remove its insertions
+* but that's not always true
+* recall in the chatrooms example, we want each chatroom to store `activeUsers`
+* that should depend on whether the client is open or not
+
+* so I guess it depends on the type of user input
+* keypresses are instantaneous events, so those don't depend on whether the client is open or closed
+* `active` is a state, and _is_ dependent on whether the client is open or closed
+
+* note that in this case, `active` is not just any state, is the client's state
+* so obviously it would depend on whether the client is open or closed
+* but what if we had a state input that was from outside the client
+* eg, `ClientKeyboardState`, which says if the client's keyboard is active or idle
+

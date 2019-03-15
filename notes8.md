@@ -1,4 +1,5 @@
-Block chain timestamps
+### Block chain timestamps
+
 * fourth method for resticting API calls
 * we have permanent events, with immutable timestamps
 * like mouseclicks and stuff
