@@ -809,7 +809,7 @@ like, imagine if you asked `reddit.com` for it's top link, and it returns it
 and then you send a post request to that link
 that's sort of how it's like
 
-notice that this also implies a **secure direct communication channel between caller and callee**
+notice that this also implies a **secure direct communication channel between caller and callee*
 which is what we are assuming anyways, and which is technically achievable using asymmetric keys
 	see section "Asymmetric Encryption and Secure Communication Between Caller and Callee"
 
@@ -3145,6 +3145,25 @@ which is ugly and very low level
 				currentRoom.conversation <: messageDraft.capture(_timestamp)->
 
 
+
+			username: var
+			chatroom: var
+			messageDraft: html.find('textarea.message-draft')->.value
+
+			enterRoom: _timestamp =>
+				username := html.find('input.username')->.value
+				chatroom := html.find('input.chatroom')->.value
+
+			currentRoom: chatrooms[chatroom]
+
+			if (running)
+				currentRoom.activeUsers <: username
+
+			send: _timestamp =>
+				currentRoom.conversation <: messageDraft.capture(_timestamp)->
+
+
+
 ### Data Persistence - Chatroom Example Revisited
 
 (continued from the section "Chatroom Example - Databases and Automatic Caching")
@@ -3316,6 +3335,8 @@ which is ugly and very low level
 * that way, if the server closes, the file module can see that future servers may still depend on the data
 * so the file module won't delete the data
 
+### Data Persistence - Triggered Events vs Latched States
+
 * note that all this implies that closing a program, won't remove its insertions
 * but that's not always true
 * recall in the chatrooms example, we want each chatroom to store `activeUsers`
@@ -3328,5 +3349,327 @@ which is ugly and very low level
 * note that in this case, `active` is not just any state, is the client's state
 * so obviously it would depend on whether the client is open or closed
 * but what if we had a state input that was from outside the client
-* eg, `ClientKeyboardState`, which says if the client's keyboard is active or idle
+* or maybe `ClientBrowserStatus`, can be "active" or "idle"
+* or maybe `ClientMicInput`, can be "built-in" or "external"
+* should this be dependent on if the client is open or closed? seems like it
 
+* what if you did want the client's insertions to disappear when the client closed
+* how would that look different?
+
+* latched inputs vs triggered inputs
+	* latch vs D flip-flop
+
+* perhaps it matters where the clone is initiated from
+* if the client creates the clone, then it seems to make more sense that when the client closes,
+	the clones get destroyed with it, and then the insertions would disappear
+* but if the server creates the clone (triggered by some signal from the client),
+	then even if the client sends a "close connection" signal, the server can choose to hold onto the insertions
+
+* same can be said for api calls
+* what if we had a program that added 3 tracks to our spotify playlist
+* we run the program, and after the program finishes, we still want those tracks to stay in the playlist
+* on the other hand, what if we had a toggle that "enables" the program
+* when we toggle it off, we want the tracks to to disappear
+
+### Program Runs as Triggered Events, Actions
+
+* if you add the tracks based on you running the program,
+	* then closing the program doesn't change the fact that you ran it
+	* the fact that it did run at some point in time
+* kinda like a D flip-flop, instead of a latch
+* if you add the tracks based on the existence of the program, then closing the program would matter
+
+* so it doesn't matter who initiates it
+* it matters how it was initiated
+
+* instead of thinking in terms of events
+* remember that events are just data
+* so theoretically, it should be the same as just having an input list of numbers
+
+		numClicks: collector
+		foo: clicks >>
+			for click in clicks:
+				numClicks <: 1
+
+		operatingSystem:
+			foo(clicks: (1 2 3))
+
+
+* maybe think in terms mapreduce instead of insertion
+* use a mapreduce to turn the input mouseclick actions, into a `numClicks` var
+* if the client creating the clicks disappears, then the mapreduce would adjust, and `numClicks` would reduce right?
+
+### Is a Program an Action or a State?
+
+* so it seems like the question is
+* are we treating the module as triggered runs (persistent even after the program closes)?
+* or are we treating the module as an enabled states (undefined after the program closes)
+
+* also note that garbage collection idea was wrong
+* because if program disappears, the values should disappear too
+
+* is the `Client` program considered more of an "action" or a "state"?
+
+* maybe every program has two parts to it
+* actions it can perform, which are persistent even after the program closes
+* and state, which exists only when the program is open
+
+* so when you create a new `Client` program, the `activeUser` insertion is state based
+* whereas the `sendMessage` is an action
+
+* what about state based actions
+* or action based states
+* remember that clicks is just a number
+
+
+* doesn't make sense to think of `Client` as purely just a state
+* because that means once it's gone, all of its impacts and changes on other objects, go away
+* if we thought of programs as just transient states, then any changes it makes disappears with it
+* we need programs to be like actions, to represent a permanent impact
+* when you run a program, you run a modification on a data set
+
+* on the other hand though, if we think of `Client` as an action, then the only way to model state-based behavior would be like
+
+		myClient: Client
+			if (this.isCurrentlyRunning)
+				myServer.activeUsers <: this.user
+
+* which seems pretty weird and ugly
+* to have to constantly reference `isCurrentlyRunning`
+
+### Programs as Timeless Actions
+
+* how would we tell the difference between a program that inserts an item permanently
+* and a program that only inserts an item while it's running
+	* aka when it stops running, the insertion would be removed
+* both of them would just look like
+
+		myProgram:
+			someCollector <: item
+
+* actually, it doesn't make sense to think about closing a program as deleting a module
+* if you think about how a program will be created in the first place
+
+		for click in openProgramButton.clicks:
+			program(click.arguments)
+
+* closing the program won't change the number of `clicks`
+
+* in event-based modeling in Axis, modules are often created, but rarely destroyed
+* this matches the "Timeless" idea of axis
+
+
+* but this is a weird pattern
+* you would expect for modules to match the UI
+* if windows and programs appear and disappear in the UI
+* you would expect the corresponding modules to match
+
+* but we need to think in terms of timelessness
+* when we declare/clone a new module, we aren't saying something like "this module was created at 12 oclock"
+* we are saying "at some point in time, this module existed"
+* and then we can specify for it "this module was `active` at 12 oclock, and then `closed` at 6 pm"
+
+
+* however, it's extremely intuitive to want to do something like this:
+		
+		onClick: click =>
+			if (this.currentlyRunning)
+				mycollector <: click
+
+* but this won't work
+* the insertions will disappear once the program stops running
+* so why does our intuition not match correct program structure?
+
+* we would actually need to do
+
+		onClick: click =>
+			if (click._timestamp within this.runtime)
+				mycollector <: click
+
+* which would actually look better if we just used state variables
+
+		runStateVar: state var    // state variable declaring the run state of the program
+		onClick: click, _timestamp =>
+			if (runStateVar.at(_timestamp))
+				mycollector <: click
+
+
+### syntax stuffs
+
+
+use `var` to declare state variables?
+use `tag` to declare tags or virtual properties?
+
+insertions and clones called in a `do` block, will automatically carry the `timestamp` (or the specified index) along with the clone/insertion
+so use insertion `<:` instead of `:=`?
+
+
+### private vars overriding hack
+
+	someScope:
+		#priv
+			a: 10
+			b: 20
+			foo:
+				#sum: a+b
+				=> #sum
+
+		publi: #priv.foo
+
+	...
+	...
+
+	bar: someScope.publi(a: 10)->
+
+even though `bar` can't see `a`, `b`, or `#sum`, he can still modify foo's behavior by guessing public variable names and overriding them
+this would not have been possible if `a` and `b` were private vars
+
+
+
+does it still make sense to use `#` for declaring private variables?
+
+
+### Creating State Vars From Other State Vars
+
+* take this snippet from the chatroom example
+
+		messageDraft: html.find('textarea.message-draft')->.value
+
+		send: _timestamp =>
+			currentRoom.conversation <: messageDraft.capture(_timestamp)->
+
+* is `<html element>.value` a value or a state variable?
+* maybe its a value, based on a state var
+* how does `capture` work?
+* if you had `foo: someFn(someStateVar)`, and you did `capture(foo, timestamp)`, would it recursively find all state var dependencies, and capture them?
+* would it work if you use a pseudo state variable implemented using collectors, eg `foo: someFn(pseudoStateVar.currentValue)`
+
+* you probably have to declare it as a state var as well
+* so `foo: var someFn(someStateVar)`
+* after all, not everything is going to be capturable
+* it's not like spotify will allow you to see the state of a playlist before a certain time
+* the module has to expose that functionality
+
+* basically all state variables have to have a public index or implement the api `before(index)`
+* maybe we should used `indexed` as the keyword then
+* `foo: indexed someFn(someStateVar)`
+* `indexed` is a bit technical though
+* but `var` is a bit vague
+
+### State Vars and Implicit Indices
+
+* maybe instead of `capture`, we simply use empty brackets `[]` to imply that it is pulling out the appropriate index
+* so instead of `messageDraft.capture(_timestamp)->`, we simply say `messageDraft[]`, and it's implied that it's finding the latest index based on `_timestamp`
+* it knows to use `_timestamp` by default, but if you specify a different `_index`, then it will use that when figuring out the implicit index
+
+* I believe we actually talked about this concept before, but perhaps with different syntax
+// TODO: FIND REFERENCED SECTION
+
+### Client Disconnects
+
+what happens if the client gets disconnected
+what happens to the insertions?
+
+* on one hand, normally the only way to remove insertions is for the thing generating the client, to stop generating it
+* eg if the client was produced from a `map()` function, and the number of input items changed, resulting in less generated clients
+* and so, if there is a disconnection, the server wouldn't receive any signal that the client was removed or un-generated
+* in essence, the client needs to destroy itself to remove the insertions
+* and since the server won't receive any signals, it won't proactively remove those insertions
+
+* on the other hand, insertions are like "persistent" bindings right
+* so if the client gets disconnected, won't server start receiving "undefined" on those bindings, those insertions?
+
+* what do we want?
+* for insertions like `sendMessage`, we want to keep them
+* for insertions like `activeUser`, we want to lose them
+
+
+* maybe we can specify a `if disconnected` block, where we set values/behavior for when a module (eg a web client) is disconnected
+* but this feels like ugly overhead
+* we should have default behavior that behaves as we expect
+* and at least for `sendMessage` and `activeUsers`, we do have some reasonable expectations
+* but how to we formally define these expecatations?
+
+### Client Disconnects - Immutability
+
+(continued from previous section, "Client Disconnects")
+
+* well maybe it's because
+* for `sendMessage`, once we send the message, we are sure that the sent message is not going to change
+* but for `activeUsers`, the `active` state we are sending to the server might change
+
+* so how can we tell whether something is going to change or not?
+* we start with events, and we assume that those are `immutable` and guaranteed not to change
+* eg, if a mouse click is registered, then we do not expect it to ever disappear
+* if a variable is based on an event, then after it is fully computed, it is also guaranteed not to change, `immutable`
+* eg, `sendMessage: capture(message, timestamp)`, which is basically a combination of all keypress events up to a certain timestamp
+* however, for something like `active`, it is a state, and so we don't know if it will change or not
+* it can be thought of as "not finished computing"
+* so if the server is dependent on that variable, then if it gets disconnected,
+	* the server can assume it as `undefined` because it was never fully evaluated
+* in fact, because the `active` state is based on user input,
+
+* but what about something like `numclicks`
+* `numclicks` is based on live streaming data, so if the client gets disconnected we won't know the correct number
+* eg, imagine if the client keeps clicking even after being disconnected, now the last `numclicks` data that the server saw is out of date
+* though at the same time, we would naturally expect for `numclicks` on the server side to reflect the last seen data
+* and when the client reconnects, it updates `numclicks` (if there were any clicks while disconnected)
+
+* also note that `sendMessage` is not just a simply combination of all keypress events, for which we can assume it is `immutable`
+* even though each keypress event may be assumed as immutable, we are assuming that we have aggregated all keypress events up to a certain timestamp
+* but what if some were "lost in transit", and then later on they arrived, in effect "rewriting history"
+* do we account for these keypresses?
+
+### Client Disconnects - Update Propagation
+
+(continued from previous section, "Client Disconnects - Immutability")
+
+* perhaps it would be better to just by default, use the last seen value
+* and if you want special behavior based on disconnect, you have to specify it
+
+		Client:
+			if (connected)
+				activeUsers <: this     // based on connection, so will default to undefined on disconnect
+
+			sendMessage: timestamp >>
+				chatroom <: capture(message, timestamp)   // not based on connection, so will retain value on disconnect
+
+* in fact, perhaps we can just **treat disconnects as really slow updates**
+* so just because we haven't received an update yet, doesn't mean we should set the value to `undefined`
+* each module receives updates, recomputes its behavior, and then sends out updates to other modules
+* there is no notion of "connected"
+* its just modules sending out updates, and they will continue retrying until the update is received
+* every module is an independent actor, sending "mail" to other modules
+
+### Client Disconnects - the `connected` property
+
+(continued from previous section, "Client Disconnects - Update Propagation")
+
+* note that `connected` has to be a special variable that will actually notify the server of updates, even when disconnected
+* while other variables in the Client are considered "part of the client", stored and running on the client machine,
+	* so on disconnect, they would not be able to send updates to the server
+
+* actually, we can think of the server and client as having a copy of the client module definition
+* on disconnect, the server recieves a single update, `connected = false`, and then updates any behavior accordingly
+* client does the same
+
+
+* notice that the `connected` var actually only makes sense for clients with a single "parent server"
+* traditional server-client model
+* but what if a client has multiple parent servers, that it sends info to
+	* eg, maybe it sends clicks to one server, and keypresses to another server
+* or what if we had an independent module, that doesn't have a "parent", just has a bunch of other modules that it sends data to
+
+* so `connected` is really just a property defined in the `Web.Client` module
+* as it only makes sense in the context of a web server and client
+* and it doesn't really have any special behavior, it's just a property that stores the current state of the client
+* the only special behavior is that it is the only variable that gets updated on the server side if the client disconnects
+
+### Connection, Update Propagation, and Transient Behavior
+
+(continued from previous section, "Client Disconnects - the `connected` property")
+
+* once we are concerning ourselves with "connection" and update propagation
+* then we have effectively left the usual realm of "steady state behavior"
+* and are entering the realm of "transient behavior"
+* we are starting to think about how the program should behave if not all updates have propagated yet
