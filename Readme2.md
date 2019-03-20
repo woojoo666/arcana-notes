@@ -23,6 +23,20 @@ web apps
 my final example, I show how Axis is able to blur the lines between dabatases, servers, and clients
 
 
+before delving into the mechanics, a short preview of what's possible
+
+	treeHeight: tree >>
+		tag #height.
+		for node in tree.nodes:
+			node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // height of left or right subtree + 1
+		=> tree.#height
+
+Notice how this would normally require recursion in any imperative/functional language, but in Axis we only need a simple for-loop. This is explored more deeply in the "Feedback" section.
+
+chatroom example
+
+
+
 Philosophy
 --------------
 
@@ -42,6 +56,9 @@ Because we are defining bindings, there is no execution order, like normal imper
 In addition, this allows Axis programs to define data structures and relationships, without worrying about how that data structure is evaluated. In Axis, we define _what_ the data structure is, not _how_ to create it. **Axis separates data from execution.** This makes programming more simple and intuitive.
 
 Everything in Axis is data. There is no execution, no instantaneous actions. All behavior is persistent and asynchronous.
+
+
+As mentioned in the philosophy section, Axis is about focusing on data relationships, and leaving all execution optimizations to the interpreter.
 
 
 Mechanics
@@ -123,37 +140,126 @@ An important way to think about defining or extending objects, is that **any beh
 
 notice that when we clone `joe` to create `bob`, the function `console.log(this.greeting)` will be called again. This might seem counter-intuitive, because in imperative languages, functions are called before they are passed as arguments. However, remember that we are not really calling a function here, we are extending an object, and defining new behavior. This distinction becomes extremely important in the later sections "Insertion" and "Templates", but don't worry, those sections explain this in more detail.
 
-### Insertion
+### Insertion and Collectors
 
-* 
+We can declare a `collector`, which allows us to insert values to it from anywhere, using the `<:` operator. For example
 
-Modifiers
+	foo: collector
 
-we come to a very important 
+	for num in (1 2 3)
+		foo <: num * num
 
-`do` keyword
+	console.log(foo)->       // will print "(1 4 9)"
 
-	joe: Student("Joe", "Harvard", do console.log(this.greeting)→)
+It's important to note that insertions are unordered. The collector acts on an unordered set of all items inserted. We can almost think of insertion as unordered assignments. Insertions make it easy to construct objects, without introducing any unnecessary order.
 
-### Templates
+Note that there are no restrictions to insertions. As long as you can see a variable, you can insert to it. However, by default, objects ignore insertions, so any insertions would not affect the object. In order for insertions to have an effect, the object has to either be a `collector` or any object that extends a `collector`. There are many useful ways we can declare a collector. For example:
 
-we introduce the syntax template is ....
+	sum: collector(+)     // collector(fn) will apply fn to all insertions and return the output
+
+	for num in (1 2 3)
+		foo <: num * num
+
+	console.log(sum)->       // will print 1+4+9, aka "13"
+
+By leveraging insertion, we can also define "methods", ways to modify an object in specific patterns.
+
+	Library:
+		songs: collector
+
+		artists: collector.noduplicates->
+		album: collector.noduplicates->
+
+		addSong: artist name album >>
+			songs <: (name artist album)
+			artists <: artist
+			albums <: album
+
+However, notice that `addSong` is an object, and because we are a prototypal language, that means it will be "executed". Because `artist`, `name`, and `album` are all `undefined` for this prototype, this initial call to `addSong` will cause these `undefined` values to be inserted.
+
+Instead, we want to somehow define a module without "executing" it...
+
+### Templates and Functions
+
+Templates are simply a way of defining modules without "executing" them. More specifically, a template will not perform any clones or insertions. In addition, accessing any property of a template will return `undefined`. The point of a template is to defer execution until it is "called" using the call operator `->`.
+
+So to tweak the example from before
+
+	Library:
+		songs: collector
+
+		artists: collector.noduplicates->
+		album: collector.noduplicates->
+
+		addSong: template
+			artist name album >>
+			songs <: (name artist album)
+			artists <: artist
+			albums <: album
+
+	myLib: Library()
+	myLib.addSong('smash mouth' 'all star' 'shrek')->
+
 remember how earlier (FIND SECTION) we mentioned that any container object can block all outgoing calls? Well that's exactly what template does
+
+
+extending templates:
+
 
 Functions
 
-* call operator
+* just templates with a special property
 
-Private Keys
+### Private Keys
 
 * not private vars
 
-### Tags / Virtual Properties
+### Conditionals and Loops
 
+Conditionals
+Conditionals are a way of "enabling" or "disabling" blocks of properties.
+Notice that they don't have `:` after them.
 
-Loops and Conditionals
+	if (someCondition)
+		foo: 10
+		bar: "hello"
+	else
+		foo: 20
+		bar: "world"
 
-Extra Syntax
+Loops are actually just `mapreduce` functions in disguise.
+You can use destructuring, just like you would for a function.
+
+### Tags
+
+Tags are actually just a syntax shorthand for defining and using hashmaps. To illustrate that:
+
+	// using a hashmap
+
+	isEcoFriendly: Hashmap()
+
+	for car in cars
+		isEcoFriendly.add(car, car.fuelEconomy > 30)     // cars over 30 miles/gallon are eco friendly
+
+	console.log(isEcoFriendly[prius])->         // will print "true". Assume "prius" is in the set "cars"
+
+	// using a tag
+
+	tag #isEcoFriendly.
+
+	for car in cars
+		car.#isEcoFriendly: car.fuelEconomy > 30)
+
+	console.log(prius.#isEcoFriendly)->         // will print "true". Assume "prius" is in the set "cars"
+
+as you can see, oftentimes hashmaps are used to define additional attributes and properties for objects, without modifying the original objects. Tag syntax makes it actually look and feel like you are working with properties, even though you aren't actually modifying/retrieving properties from the object. This is why tags can also be thought of as "virtual properties".
+
+### Errors
+
+In a data-centric language like Axis, it doesn't make sense to throw errors like imperative languages do. Instead, we use the data type `undefined` to indicate that an error occured.
+The `undefined` object may have an `#error` property attached, from which you can extract relevant error information.
+
+### Extra Syntax
 
 I recommend skipping this section and coming back to it, these are just syntax shorthands. The next sections on examples and use cases are much more interesting.
 
@@ -201,20 +307,15 @@ This is where you have to stop thinking in terms of execution, and instead think
 
 So let's explore how an interpreter _might_ go about computing this. When it reaches the `for` loop, it takes the first `score`, and inserts it into `sum`. `sum` notices the change, and updates accordingly. `average` notices the change in `sum`, and updates as well. Lastly, `score.#aboveAverage` notices the change in `average`, and updates accordingly. Now this is just for the first score. Then the interpreter moves onto the next score, and inserts it into `sum`. Again, `sum` gets updated, and then `average`, and then this update `#aboveAverage` for **both** the first score and the second score. Remember that bindings are persistent, so the first score is still listening for updates to `average`, even if the interpreter has moved onto the second score. This process will repeat until the interpreter has processed all scores.
 
-This might seem extremely inefficient, with these feedback loops going back and updating previous variables. However, note that the dependencies in this example actually form a DAG (directed acyclic graph). In other words, there is no feedback. The order we should compute the variables should be `all scores => sum => average => all #aboveAverage tags`. This way, nothing needs to be computed twice. And this optimization is exactly what the interpreter would leverage to achieve the same level of efficiency as imperative code, without sacrificing the elegance of Axis syntax.
+This might seem extremely inefficient, with these feedback loops going back and updating previous variables. However, note that the dependencies in this example actually form a DAG (directed acyclic graph). In other words, there is no feedback. The order we should compute the variables should be `all scores => sum => average => all #aboveAverage tags`. This way, nothing needs to be computed twice. And this optimization is exactly what the interpreter would leverage to achieve the same level of efficiency as imperative code, without sacrificing the elegance of Axis syntax. As mentioned in the philosophy section, Axis is about focusing on data relationships, and leaving all execution optimizations to the interpreter.
 
-However, there are times where we can introduce feedback, covered in the next section.
+However, there are times where the code _can_ introduce feedback, covered in the next section.
 
 (Note that to compute the total sum we could have just used `sum: Math.sum(...testScores)`, which is perhaps simpler, but the point of the example is to show the "timeless" nature of Axis)
 
-
-chatroom example
-
-
-
 ### Feedback - Convergent and Divergent
 
-Feedback is an extremely powerful tool that is only possible using dataflow languages like Axis. Although simpler forms are relatively common in imperative languages. For example, a cyclic data structure is just a feedback loop
+Feedback is an extremely powerful tool that is only possible using dataflow languages like Axis. Although simpler forms are relatively common in imperative languages. For example, a cyclic data structure:
 
 	Bob:
 		child: Alice
@@ -223,20 +324,39 @@ Feedback is an extremely powerful tool that is only possible using dataflow lang
 
 	console.log( Bob.child.parent.child.parent )->   // we can do this because of feedback
 
-however, this is just static feedback code. What if we did something like this?
+Here, we have two objects referencing eachother. However, this is a pretty boring example of feedback, it's just a static structure. There is no cloning or calling. But what if we did something like this?
 		
-	unit:
-	    km: m*1000
-	    m: km/1000 | cm*100 | mm*1000
-	    cm: m/100
-	    mm: m/1000
+	distance:
+		km: m*1000
+		m: km/1000 | cm*100 | mm*1000
+		cm: m/100
+		mm: m/1000
 
-* tree height
+	hikeDistance: distance(m: 1234)
+	mountainHeight: distance(km: 1)
 
+	console.log( "The hike is " +  hikeDistance.cm + " centimeters long" )->
+	console.log( "The mountain is " + mountainHeight.m + " meters high" )->
 
-distance
+Notice how you can initialize `distance` with any unit (km, m, cm, or mm), and the rest of the properties will automatically be computed. No need for getters.
 
-note that in order to actually compute `graph.nodes` we have to use some complex recursion
+The real power of feedback becomes apparent in more complicated cases. One example is actually the `treeHeight` example given in the introduction section. But let's go over an extremely similar but slightly more complex example. What if we wanted to get the shortest path distance from a start node to an end node in a given graph?
+
+	shortestDistance: graph start end >>
+		tag #distance: (default: infinity)
+		for node in graph.nodes:
+			if (node = start)
+				node.#distance: 0
+			else
+				node.#distance: node.neighbors[[#distance]].get(Math.min)-> + 1    // distance from the closest neighbor plus one
+
+		=> end.#distance
+
+Normally such an example would require recursion in any imperative/functional language. Not in Axis! We can use a simple for-loop to express the behavior. But how does this actually work?
+
+Think back to the `testScores` example in the "Timeless" section. We can analyze how the interpreter _might_ execute something like `shortestDistance`. First, all `#distance` values are by default set to infinity. Then, the first node to be updated will be the start node, whose `#distance` is set to 0. Then, the neighbors of the start node will be notified of the update, and each node will look for the closest neighbor, which should now be the start node, with a `#distance` of 0. Since the shortest distance for these neighbor nodes is 0, so the node will update its new `#distance` to be 1. This will in turn notify the neighbors of those nodes, and the cycle will repeat until all shortest distances are computed. Due to the way this function was defined, we know that eventually, every node `#distance` will reduce to some final value, and stop sending updates to other nodes. We call this type of feedback "convergent".
+
+Note that this method was only possible because we had a list of all graph nodes available through `graph.nodes`. This is provided in the `Graph` data structure, but let's look at how we might implement it ourselves. In order to do so, we have to fall back to using recursion:
 
 	nodes: breadthFirstSearch((), this.root)
 	breadthFirstSearch: visited, currentNodes >>
@@ -246,22 +366,58 @@ note that in order to actually compute `graph.nodes` we have to use some complex
 			nextNodes: currentNodes[['neighbors']].subtract(visited)     // get neighbors of current nodes, minus already visited nodes
 			=> breadthFirstSearch(visited, nextNodes)
 
-
-but imperative code requires similar complexity to retrieve all nodes from a graph (either using a loops or recursion). The difference is that in Axis, after we retrieve all the nodes, we can use them in a whole variety of use cases, like computing distances (as shown earlier) or finding connected pairs or filtering for certain nodes, etc. We only have to define this recursion once. But in imperative languages, in order to do stuff like computing distance or finding connected pairs, we would have to use recursion over and over again.
+Imperative code requires similar complexity to retrieve all nodes from a graph (either using loops or recursion). The difference is that in Axis, after we retrieve all the nodes, we can use them in a whole variety of use cases, like computing distances (as shown earlier) or finding connected pairs or filtering for certain nodes, etc. We only have to define this recursion once. But in imperative languages, in order to do stuff like computing distance or finding connected pairs, we would have to use recursion over and over again.
 
 This just demonstrates the power of abstracting data relationships away from implementation. We define the "implementation" once, to retrieve the data (in this case, using breadth first search to get all nodes). And then we can use the data without worrying about the implementation again. We maximize abstraction and minimize code duplication.
 
 
-
-divergent feedback is like infinite while loop
+Note that divergent feedback would be like, if we tried to compute `longestDistance` by replacing `Math.min` with `Math.max`, and setting the default distance to `0`. What would happen is that every node would increase its neighbors, who would in turn increase their neighbors, and the feedback would cause the distance for all nodes to steadly increase, continuously until infinity. This sort of feedback is called "divergent", and is something to watch out for, just like one might want to watch out for infinite loops in imperative languages.
 
 ### Web Technologies API Calls
 
 chatroom example
 
+Let's take the chatroom example from the introduction, and tweak it a bit.
+
+	chatrooms: load('chatroomData.axis')
+
+	ChatroomServer: Web.Server
+
+		port: '5000'
+
+		chatpage: Web.Client
+			route: '/'
+			layout: pugLayout // using [pugjs](https://pugjs.org)			
+				input.username
+				input.chatroom
+				button(onclick = enterRoom)
+
+				div.conversations
+					for (user, message) in currentRoom.conversation.orderBy('_timestamp')->:
+						p {{user}}: {{message}}
+
+				textarea.message-draft
+				button(onclick = send)
+
+			username: var
+			chatroom: var
+			messageDraft: $('.message-draft')->.value
+
+			enterRoom: =>
+				username := $('.username')->.@value
+				chatroom := $('.chatroom')->.@value
+
+			currentRoom: chatrooms[chatroom]
+
+			if (connected)
+				currentRoom.activeUsers <: username
+
+			send: =>
+				currentRoom.conversation <: (user: @username, message: @messageDraft)
+
+
 everything is asynchronous
 so no need to worry about javascript, synchronous vs callbacks vs promises vs async/await
-
 
 
 Encapsulation
@@ -276,6 +432,10 @@ everything is data
 you can view all calls and clones going into a module
 
 State Variables
+
+`do` keyword
+
+	joe: Student("Joe", "Harvard", do console.log(this.greeting)→)
 
 (subject to change)
 
