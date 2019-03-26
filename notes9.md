@@ -809,7 +809,7 @@ like, imagine if you asked `reddit.com` for it's top link, and it returns it
 and then you send a post request to that link
 that's sort of how it's like
 
-notice that this also implies a **secure direct communication channel between caller and callee*
+notice that this also implies a **secure direct communication channel between caller and callee**
 which is what we are assuming anyways, and which is technically achievable using asymmetric keys
 	see section "Asymmetric Encryption and Secure Communication Between Caller and Callee"
 
@@ -2825,6 +2825,10 @@ so this actually should work...right?
 			#scope: // somehow capture declaration scope
 			_call: this(#scope)
 
+* and likewise, calling a function would just extract the return value after: `_call: this(#scope)._return`
+* or perhaps, calling is always `_call: this(#scope)._return`, because recall that templates use `=> this` (aka `_return: this`)
+	* talked about in section "Argument Objects and Templates - Complications"
+
 * I guess it doesn't even really need to capture the declaration scope
 * the interpreter would just process all references made during the declaration of a new template
 * and instead of actually resolving the references, it defers it until you actually "call" the template
@@ -3195,7 +3199,7 @@ which is ugly and very low level
 * that way if say, a client shuts down, the changes made by that client will still persist
 * perhaps we need a persistent timeline of all events, history
 * immutable as well
-* mentioned in the sections "Timeless" and "Block chain timestamps"
+* mentioned in the sections "Timeless" and "Block chain timestamps" and "State Variables - Mechanics and Persistence"
 
 * but that's not exactly it
 * events can be predictable
@@ -3665,6 +3669,8 @@ what happens to the insertions?
 * and it doesn't really have any special behavior, it's just a property that stores the current state of the client
 * the only special behavior is that it is the only variable that gets updated on the server side if the client disconnects
 
+* this is really interesting because traditionally we think of "connection" as some inherent behavior of distributed systems
+
 ### Connection, Update Propagation, and Transient Behavior
 
 (continued from previous section, "Client Disconnects - the `connected` property")
@@ -3673,3 +3679,1263 @@ what happens to the insertions?
 * then we have effectively left the usual realm of "steady state behavior"
 * and are entering the realm of "transient behavior"
 * we are starting to think about how the program should behave if not all updates have propagated yet
+
+### defaults
+
+	tag itemCounts: (default: collector(+))
+	itemCounts: Hashmap(default: collector(+))
+
+	for item in listWithDuplicates:
+		itemCounts[item] <: 1
+
+vs 
+	
+	itemCounts: collector(items => items.keys)
+
+	for item in listWithDuplicates:
+		itemCounts <: item
+		itemCounts[item] <: 1
+
+
+note that it will clone the default, not just refer to the same one every time
+but what happens if the default is a modifier?
+does it pre-emptively call the modifier infinite times, or
+
+
+we also talked about this earlier
+how we can't just do `itemCount <: item: ()`, because it would create collisions
+	// TODO: FIND REFERENCED SECTION
+well we can't do that anymore anyways since you can't insert properties
+however, we can do what is shown above, which prevents collisions
+
+
+
+### web browser server and IDE
+
+
+combine web browser, server, and IDE
+
+browse the web
+modify programs and web pages
+serve data
+
+
+### State Variable Syntax and @-Blocks
+
+we can use `@someIndex` inside a block (or at the top of a block) to specify a default index to use when extracting states
+
+when `@` is used, it will automatically start extracting states from state variables
+but won't touch regular variables
+this might seem like mental overhead because you have to keep track of which variables are state vars and which aren't
+but you should be keeping track of the "types" of variables anyways
+
+when you use a `@` to "slice" all state variables at a certain index
+we call them @-blocks
+
+
+all state vars implement
+`set(index, value)` function, and `at(index)` function
+`:=` is shorthand for `set` function, `@` is shorthand for `at` function
+
+so something like 
+
+	incrementBy, someCollector >>
+
+	numClicks: var 0     // initialize state var to 0
+
+	onClick: @timestamp
+		numClicks := numClicks + incrementBy
+		someCollector <: numClicks
+
+is just shorthand for
+
+	incrementBy, someCollector >>
+
+	numClicks: stateVar(start: 0)    // initialize with 0
+
+	onClick:
+		numClicks.set(timestamp, numClicks.at(timestamp) + incrementBy)
+		someCollector <: numClicks
+
+
+actually note that the @-block syntax looks realllly similar to verilog sequential blocks
+	verilog even uses `@ (posedge clock)` syntax, which is basically "slicing" all data at the clock edge
+funny, because I was originally against verilog sequential blocks
+because they felt too distinct and separate from combinational logic
+and I wanted to "unify" sequential and combinational logic
+// TODO: FIND REFERENCED SECTION
+
+however, we were able to unify it in a sense
+you can reference normal, persistent variables in a @-block
+you can do both combinational or "sequential" logic in an @-block
+
+do we need `:=`?
+could use just use the insertion operator `<:`, but have it use `set` when applied to a state var inside a @-block?
+mmm might be confusing
+perhaps best to just use `:=`
+
+
+would it be better to just use `at index` instead of `@index` for declaring @-blocks?
+looks a little more readable
+
+also note that `.at(index)` will actually retrieve the closest state **before** the specified index
+not exactly at the specified index
+otherwise `stateVar := fn(stateVar)` would result in a feedback loop, retrieving the exact state that is being set
+
+### is Axis actor vs dataflow model
+
+Actor model is about treating a program as made up of independent actors sending messages to eachother
+which seems in line with how Axis treats modules
+actor model languages are for distributed concurrent systems, which is also what Axis is for
+
+but dataflow seems to also have these goals and concepts in mind
+so is there a difference between actor model and dataflow model?
+
+according to [this](https://stackoverflow.com/questions/18790385/dataflow-programming-vs-actor-model)
+it seems like the main difference is that actor model is for non-deterministic concurrency, while dataflow guarantees deterministic concurrency
+see [this](https://stackoverflow.com/questions/8582580/why-is-concurrent-haskell-non-deterministic-while-parallel-haskell-primitives-p)
+in dataflow languages, it doesn't matter how you parallelize or evaluate the program, it will always result in the same answer
+whereas in actor model, if you had two actors that printed to console, then it depends on which actor runs first
+
+
+in Axis, it seems to follow the actor model because it has side-effects from insertion
+however, it is deterministic
+the resulting answer will always be the same no matter how you evaluate it
+though perhaps we are abusing the definition a bit
+because Axis is "timeless", and will re-order actions if necessary
+for example, if you had two Axis that printed to console
+the print operations would have a timestamp attached
+so if the print operation with the earlier timestamp happened to come later
+the console should "insert" it before the other print statement, to make it look like it happened first
+so no matter which print statement actually executed first, the resulting console would look the same
+
+could feedback cause different answers?
+well for divergent feedback, no matter how it runs, it will just not halt, so that counts as the same answer
+not sure for convergent feedback, because maybe you could implement something like a J-K flip flop
+	and end up with different answers for different execution orders...
+
+
+the [wiki for dataflow](https://en.wikipedia.org/wiki/Dataflow_programming) says that:
+
+>An operation runs as soon as all of its inputs become valid
+
+this seems to imply an acyclic graph
+because if there was feedback, then how could "all inputs become valid", if each input is still waiting on its dependencies
+	in a sort of deadlocked loop
+
+but Axis has feedback, how does Axis know when to evaluate?
+we can just assume forward evaluation
+modules will evaluate whenever they receive updated inputs
+
+
+### J-K flipflops and determinism
+
+
+
+
+### do we need state vars?
+
+recall that state variables are just shorthand for `set` and `at`
+	see section "State Variable Syntax and @-Blocks"
+
+but we really only use it for event handling
+and even in event handling, we often don't need it
+for example, in the `numClicks` example in the section "State Variable Syntax and @-Blocks"
+we could have just done
+
+	numClicks: collector(+)
+	onClick:
+		numClicks <: 1
+
+and it is much simpler, and doesn't need all the new syntax that state variables introduce
+so I wonder if we can model other event-handler behavior using regular syntax
+
+for example, the chatroom example
+
+	username: var
+	roomName: var
+
+	enterRoom: => @timestamp
+		username := $('.username').value
+		roomName := $('.chatroom').value
+
+this seems like a good place to use state variables
+
+but really all we want is the `$('.username')` and `$('.chatroom')` values captured at the latest `enterRoom` call
+
+in addition, why specify @timestamp in every event block
+shouldn't all event blocks share the same index
+perhaps just use it on the uppermost block, Client
+does that cause any problems?
+
+maybe its like a virtual tag
+we should be able to fence out a scope where everything uses the same index
+indexes have scope, can be private
+
+optimization and abstraction
+why are there some cases where we have to go into interpreter to implrment optimizations
+if theysre abstracted well enough, cant u just change the function implementation
+
+for example, a realllly long list, eg all a user's photos
+you want to keep it simple, just generate a `img` object for every photo
+	`for photo in photos: html('img.user-photo(src="{{photo}}")`
+but you also want to optimize, so it only pre-loads the photos currently on the page (and some extras on top and bottom, in case user starts scrolling fast)
+
+
+
+
+how to capture non-state var
+for example, capturing/archiving a webpage
+
+
+username is a state variable, capturing username input on button press
+but we don't have to implement like that
+we could impelemnt username as a normal variable, and explicitly do all the capturing ourself
+that way anybody that sees username can't see all its states
+
+anyone outside of index scope
+should see the var as normal var
+
+
+however often it isn't intuitive where you should confine the scope
+for example, it might seem intuitive to confine the `$('.username')` and `$('.chatroom')` states to the `enterRoom` module
+so that anybody outside the `enterRoom` only sees the currently captured `username` and `chatroom`, and can't see previous states
+however, note that `sendMessage` actually does need to see the states of `username`
+because it should capture the username at the time the message was sent, not the current value of username
+
+the username inserted into `activeUsers` however, should just be the current value
+the server, and the `activeUsers` object, should not be able to see previous states
+
+also, the states of `$('.username')` and `$('.chatroom')` don't need to be visible outside `enterRoom`, only `username` needs to be visible
+
+
+### private sharing ?
+
+how would you declare a module `foo` such that `bar` can see some private vars, and `zed` can see others
+using encryption, one would encrypt some info using `bar`'s public key, and the other info using `zed`'s public key
+so we could just have `encrypt` and `decrypt` functions
+however, this isn't really adhering to the idea of private keys
+
+instead maybe we can do:
+
+	bar:
+		#privkey
+		getKey: #privkey
+	foo:
+		[bar.getKey]: "private info for bar"
+
+`bar.getKey` retrieves the public key for `bar`
+but when you do `[bar.getKey]: ...`, it encrypts it using the public key
+so that `bar` can just do `foo.#privkey` to retrieve it
+
+this is weird special behavior that we would have to add to the language though
+and it also implies that anybody could retrieve the data using `foo[bar.getKey]`
+
+
+### private key revisited ?
+
+private keys syntax vs tags
+if you want to tag external objects, use tags
+if you want to add private info to internal objects, use private keys
+
+but when would you ever want/need private keys?
+
+`_key` syntax
+
+private keys are bad?
+they allow people to define public modules with private behavior
+allowing people to create services that others can use, but they won't know how it works
+which is a bit anti-collaborative
+prevents people from improving on the product or competing against it
+
+the only time private data seems acceptable is
+if it is still under development, eg if a committee is trying to make a decision
+but in that case, there's no reason to make any behavior public, you can keep everything private
+its not the same thing as creating a public module with private behavior
+
+a public module with private behavior means:
+	* public properties dependent on private scope variables or private properties
+	* a module meant to be cloned and used, aka public inputs
+
+but why would a user want to clone/use your function, if you aren't telling them what it does exactly
+
+the only example I can think of are modifiers, public API functions meant for modifying your object
+for example, my public social profile might have a "sendMessage" api function that allows people to send messages to me
+but inside the function, it probably references a private collector where the message is inserted
+
+modifiers are a very specific example though, shouldn't we be able to find other use cases for private variables?
+
+maybe a club committee that approves club requests to become a "formal club"
+and then those clubs can see private info
+like the voting box
+
+	committee: approvedClubs >>      // note: approvedClubs is a list of club objects, manually provided by a committee member
+
+		#votingBox: collector
+
+		for club in approvedClubs:
+			club.onApproval(#votingBox)   // give all approved clubs a reference to the voting box
+
+	music_club:
+		#committeeVotingBox: collector(any)    // hopefully committee won't call this.onApproval multiple times, or we won't know which voting box to choose
+		onApproval: #votingBox >>
+			#committeeVotingBox <: #votingBox
+
+hmm this is really weird though
+we'll need to revisit this
+
+and what about private keys?
+
+perhaps private vars and keys are for flexible scoping
+scoping is an approximation after all
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	ChatroomServer: Web.Server
+
+		'/chat': Web.Client
+			layout: pugLayout    // using [pugjs](https://pugjs.org)			
+				input.username
+				input.chatroom
+				button(onclick=enterRoom)
+
+				p Room: #{roomName | "please enter a room name above."}
+
+				p users online:
+					for username in currentRoom.activeUsers
+						span username
+
+				div.conversations
+					for (user, message) in currentRoom.conversation.orderBy('_timestamp')->
+						p #{user}: #{message}
+
+				textarea.message-draft
+				button(onclick=send)
+
+			username: var
+			roomName: var
+
+			enterRoom: @timestamp =>
+				username := layout.findOne('.username').value
+				roomName := layout.findOne('.chatroom').value
+
+			currentRoom: chatrooms[roomName]
+
+			if (connected)
+				currentRoom.activeUsers <: username
+
+			send: @timestamp =>
+				currentRoom.conversation <: (time: timestamp, user: username, message: layout.findOne('.message-draft').value)
+
+
+
+
+
+
+	chatrooms: hashmap(default: (activeUsers: collector, conversation: collector), file: 'chatrooms.axis')   // a collection of chatrooms, saved to a file
+
+	ChatroomServer: Web.Server
+
+		'/chat': Web.Client
+
+			// assume we have some html page with input boxes for username and chatroom name,
+			// a box displaying all messages and users in the current room,
+			// and a text-area to send new messages to the current room
+			layout: html(file: 'mylayout.html')
+
+			username: var
+			roomName: var
+
+			enterRoom: => @timestamp
+				username := layout.find('input.username').value
+				roomName := layout.find('input.chatroom').value
+
+			currentRoom: chatrooms[roomName]
+
+			if (connected)
+				currentRoom.activeUsers <: username
+
+			send: => @timestamp
+				currentRoom.conversation <: (time: timestamp, user: username, message: layout.find('text-area.message-draft').value)
+
+
+
+
+html as a module
+also has inputs and outputs
+	inputs are the values that Axis gives to it
+	outputs are the values from input boxes or text areas, that it gives back to Axis
+
+
+
+
+note that files and databases pretty much always have to be collectors
+because they might have multiple server or programs writing to them at the same time
+
+
+
+
+actually when we make a single chatroom
+
+	messages: collector(file: 'messages.axis')   // all messages, saved to a file
+	activeUsers: collector
+
+	ChatServer: Web.Server
+		index: Web.Client
+			layout: JSX    // using jsx syntax
+				<input class="username"/>
+				for user in activeUsers
+					<span>{user}</span>
+				for message in messages.orderBy('time')->
+					<p>{message.text}</p>
+				<text-area class="message-draft"/>
+				<button onclick={send}>Send</button
+
+			username: layout.find('input.username').value
+			draft: layout.find('text-area.message-draft').value
+			
+			activeUsers <: username
+
+			send: => @timestamp
+				messages <: (time: timestamp, user: username, text: draft)
+
+it gives me an idea
+what if we just extend this to create a multi-chatroom?
+
+multiple ways to do this
+multi-route, each chatroom is a url
+
+	chatrooms: hashmap(default: collector, file: 'chatroomes.axis')
+	roomMembers: hashmap(default: collector)
+
+	ChatRoomServer: Web.Server
+		index: Web.Client
+			layout: JSX    // using jsx syntax
+				<input class="username"/>
+				<input class="chatroom"/>
+				<button onclick={enterRoom}>Enter Room</button
+
+			enterRoom: @timestamp =>
+				redirect to ChatroomServer[layout.find('input.chatroom').value, layout.find('input.username').value]
+
+			username: layout.find('input.username').value
+			draft: layout.find('text-area.message-draft').value
+		[room, username]: ChatServer.index
+			messages: chatrooms[room]
+			activeUsers: roomMembers[room]
+			username: username
+			layout:
+				remove username input
+				<p>room: {room}</p>
+
+or alternatively, single page
+
+	chatrooms: hashmap(default: collector, file: 'chatroomes.axis')
+	roomMembers: hashmap(default: collector)
+
+	ChatRoomServer: Web.Server
+		index: Web.Client
+			layout: JSX    // using jsx syntax
+				<input class="username"/>
+				<input class="chatroom"/>
+				<button onclick={enterRoom}>Enter Room</button
+
+			enterRoom: @timestamp =>
+
+				ChatServer(room: layout.find('input.chatroom').value, username: layout.find('input.username').value)
+
+			username: layout.find('input.username').value
+			draft: layout.find('text-area.message-draft').
+
+			messages: chatrooms[room]
+			activeUsers: roomMembers[room]
+			username: username
+			layout:
+				remove username input
+				<p>room: {room}</p>
+
+or alternatively
+
+	ChatRoomServer: Web.Server
+		[room]: entireChatServerModule()
+
+
+
+
+
+
+
+maybe I should make anonymous values anonymous keys instead
+that way it's easy to create objects whose properties are the same name as the key
+kinda like in javascript when you do `{foo, bar}`
+except it's especially hard in Axis because you can't do `(foo: foo, bar: bar)` because then its feedback
+also makes it easier to declare implicit inputs, because when you do `(foo bar)` and `foo` and `bar` don't exist in outer scope
+it's basically like declaring `(foo: undefined, bar: undefined)`
+
+
+or maybe use syntax `foo^, bar^` or `(foo::, bar::)` if we want to do `(foo: foo, bar: bar)`
+
+### One-Off vs Permanent Templates
+
+templates unintuitive
+because we naturally want to treat templates like normal objects
+but we have to remember to call them, not clone them
+before we said that the inert-ness of a template, is part of its behavior
+so it should get cloned as well
+but that isn't how we naturally think about templates
+when we think about the behavior of a template, we think of the object behavior, not the inertness
+we think of templates as this object that is currently inactive, just for that one instance
+
+if we want templates to be thought of as completely different from normal objects
+and to help us remember that they are meant to be called not cloned (the vast majority of the time)
+then we should use a special naming convention
+just like functions are named using verbs, `add` or `rotate`
+templates should also be named so that they capture the inert-ness, eg instead of `car` it would be `carTemplate`
+that way, when interacting with the object, we would remember that it's a template
+
+however, if we don't want to do this
+maybe we should just have templates become active when cloned
+	which is what we mainly use templates for anyways
+and if you want to keep it inert, then use another template, `foo: template someTemplate(10, 20)`
+	which is a rare and special use case, so using special syntax is natural
+
+functions however, should still stay inert until called
+which is a little weird
+
+`createPlaylist` vs `playlist`
+isnt `createPlaylist` already naturally a template
+so we know to call it, not clone it
+it's actually more of a function
+
+however, it's more natural to use an object
+follows prototypal mindset better
+
+but then what about `Web.Server` and `Web.Client`
+now you have to remember to use`template`
+
+
+before insertion, it was pretty simple
+you clone objects, that's it
+everything is "live" and "active"
+you assemble objects from other objects
+life was simple and all was gucci in the hucci
+
+however, everything changed when insertion attacked
+now, we can't just assemble objects from other objects
+objects can do "actions" now, modify other objects
+
+
+the reason why it's intuitive to have templates execute when cloned
+is because they should look the same as regular objects to an outside viewer
+aside from the fact that all properties return undefined
+but the behavior is still there
+
+it looks like any other object/module that contains behavior
+and thats how people should think of it
+so it shouldn't require a special operator
+
+from the inside (aka for the person that created it) it may look different, because it isn't actually doing anything
+but from the outside, it should look just like any other object
+
+
+
+from the outside, it isn't immediately obvious if `Web.Client` is an object or a template
+even if it's a template, we still think of it as a collection of properties and behavior
+	not as a function that generates those properties and behavior
+what is clear, is that we don't want to run the insertions that we are declaring when extending `Web.Client`
+so while it isn't obvious whether or not `Web.Client` is a template, it is clear that we do want a template
+
+if the behavior we think of, and the behavior we give it, is the behavior that is also in the result, then it should be clone
+if the behavior we give it is not the same as the result, then it's more a function
+
+one massive consequence is that we can have a function that treats a template and an object the same
+eg, if somebody creates a function that modifies `Web.Client`
+it can work on both the template, and an instantiated version
+does this make sense?
+
+yeah it does
+I guess the way we usually think of the difference between cloning and calling
+is that cloning acts on objects, and copies behavior
+calling is when we specify some behavior, and then extract a separate value
+so with templates, it doesn't _feel_ like we are extracting a separate value (even though we are)
+it feels like we are just copying an object, and we intuitively just ignore the fact that the old object was inert
+
+it sort of matches how in imperative, every time we want to defer behavior, define behavior without executing
+we have to remember to declare it as a function
+even if we are modifying a function, we still have to explicitly declare a `function`
+eg `modifiedFn = function () { doSomething(); originalFn() }`
+
+in fact, it makes it very clear when behavior isn't being executed
+an issue discussed in section "Clones and Calls Declared Inside the Arguments"
+before, with permanent templates, if we had something like this:
+
+	foo( console.log("test")-> )
+
+it might not be clear if anything is being printed, because we'd have to know if `foo` was a template
+however, with one-off templates, you'd have to do
+
+	foo(template console.log("test")-> )
+
+which is much more clear
+
+
+but can't we think of calling as like, another argument to be passed into the cloning?
+when cloning an object, you usually have to be aware of it's inputs and arguments anyways
+that's the bare minimum you need to know in order to interact with it
+so shouldn't you know that it's a template, and remember to call it?
+
+with templates, you can focus on two different things
+you can focus on what it's _supposed_ to do, aka the behavior defined in it
+or you can focus on what it's actually doing, that it's doing nothing, aka the fact that it's a template
+I think in most cases we focus on the former
+so it's more natural to expect it to be "alive" when we clone it
+
+it's just weird that what's intuitive is not what's mathematically elegant
+because these one-off templates go against some core principles of Axis
+which is, that behavior should be copied exactly when cloning
+permanent templates are more like syntactic sugar, they could be implemented using regular syntax
+you just capture the scope, and then define the return property as `=> this.apply(scope)` or something like that
+	see section "Templates and Deferring Evaluation"
+the object could be considered "alive", but all scope references would be pointing to `undefined`, until you call it and it overrides the scope with the real one
+	though this does require some special mechanisms, like capturing scope
+however, one-off templates would have to be implemented at a very core level
+because they are the only objects that change behavior simply by being cloned
+
+* note that we could still use `=> this` to define a permamanent template
+* mentioned in section "Templates and Deferring Evaluation"
+* it's just that now the `template` keyword stands for one-off templates, not permanent templates
+
+### verbs vs nouns
+
+we have to be careful about naming things
+if it's a function, we should use a verb
+eg if it's an object, we should use a noun
+that way we know when to call and when to clone
+
+maybe that's the difference between one-off templates and permanent templates
+one-off templates should still be named like objects, and treated like objects (aka cloned)
+permanent templates are the same as functions, they have to be called to return the actual result
+
+
+
+
+it does still feel a little unintuitive to have to use `Web.Client template` instead of just `Web.Client` when creating web clients
+you have to remember to add `template` because you don't want to perform any insertions
+I mean, you are extending the definition of `Web.Client`, so if `Web.Client` is a template, doesn't it make sense for the child object to be a template as well?
+
+I guess one nice thing about one-off templates though, is that it's obvious if an insertion is going to be performed or not
+it's right there in the object's definition, you can see in the definition if it declares `template` or not
+with the permament template model we used before
+you would have to know if the object's parent is a template, or if that parent's parent is a template, etc
+because if one of the ancestors happens to be a template, 
+
+
+can you convert an object into a function by extending it?
+what happens if you do:
+
+	someFn: someObject
+		=> this.someValue
+
+hmmm perhaps this shouldn't be allowed
+
+on one hand it makes sense to be able to override `_return` just like any other property
+on the other hand, functions are permanent templates and objects are not
+so would it change to a template or not?
+
+
+templates actually fundamentally change how things work
+because the scope becomes detached
+in a sense, it's saying "all the stuff I'm defining now, don't apply any of it until I explicitly call"
+even functional doesn't handle this well, because if we think of mapreduce instead of insertion
+if you declared a sort of `insert: ...` property that declared what you wanted to insert
+and maybe a `modifierCalls: ...` property declaring modifiers that you wanted to call
+templates would be like, saving those properties in a hidden object, and then when you call the object, it unwraps these saved properties into the "live behavior" of the object
+
+
+
+
+
+
+
+
+functional doesn't deal well once it comes to privacy
+can't guarantee secure and direct channels
+a "global" (or local) environment to interact with
+but what about monads? 
+
+
+if we prevent function to be an argument object
+then it prevents an object from turning into a function
+note that this doesn't make static typing though
+
+	foo: if (cond) someObject : someFunc
+
+it does however mean that if we want to determine if something is object or function, we only need to look at it's root ancestor
+
+
+
+another way to think about one-off templates
+in Axis, we define behaviors
+it is sort of a mix between functional (defining functions) and imperative (defining execution)
+when we declare a template, we are basically telling our own scope to ignore all insertions/clones coming from this specific object
+we can do this because it is our scope
+but anybody that clones the object, creates a new object, whose insertions/clones will not be ignored
+maybe we could use something like `foo: (if this != foo (someCollector <: 10) )` to implement this
+
+
+### commutativity
+
+normally the way we define templates is
+
+	template
+		definition
+		goes
+		here
+
+which is short for `template(definition goes here)`
+if we had some object, we could also "spread" it's definition and turn it into a template,
+eg `template(...someObject)`
+
+but then what about extending objects and creating a template?
+our current syntax is
+
+	someParent template
+		definition
+		goes
+		here
+
+i initially chose this because it felt cleaner than `template someParent(...)`
+but in fact they pretty much mean the same thing
+
+formally you would have to do
+
+	template
+		...someParent
+			foo: 10
+			bar: 20
+
+(note that we use the spread operator so that we are passing the definition of `someParent`, not just a reference to `someParent`)
+but this is actually equivalent to
+
+	someParent
+		...template
+			foo: 10
+			bar: 20
+
+in fact, this works for any two objects
+
+	A(...B(args)) = B(...A(args))
+
+as long as `A` and `B` have no colliding properties
+this is because we are basically just doing `combiner(A,B)`
+		with the args, it is `combiner( combiner(A,B), (args) )`
+notice that because the `combiner` is symmetric and commutative (if there are no colliding arguments)
+`combiner(A,B)` is the same as `combiner(B,A)`
+
+
+what does this mean for functions?
+
+maybe same for function as argument object
+`function(someObject => someObject.value)` is valid
+so maybe also `someObject(function => this.value)` also valid
+
+`=>` turns the containing object into a function, a permanent template
+and also declares the return value
+so while you can turn objects into functions by using `=>` in the arguments
+eg `someParent(foo: 10, => someParent.value)`
+it is ugly and not very clear
+and it is better to just do `(someParent(foo: 10) => someParent.value)`
+both are equivalent
+first one is `combiner(someParent, combiner(function(foo: 10, _return: someParent.value)))`
+second one is wait a minute second one isn't right
+
+ `combiner(function(_return: someParent.value), combiner(someParent, (foo: 10)))`
+
+
+
+flexible scoping and mixins
+
+move away from hierarchies
+this is why we use type as a property
+perhaps `template` should be a property too
+
+
+
+
+
+stratified complexity
+
+
+
+
+
+hmm it does seem more and more like Axis is just actor model, not dataflow
+important to note that actor model is nondeterministic
+apparently a large issue with the actor model, as discussed [here](https://en.wikipedia.org/wiki/Indeterminacy_in_concurrent_computation)
+
+so starting to make me think, perhaps Axis does have issues with feedback
+maybe it is possible for it feedback converge to different values depending on execution
+I originally thought it wouldn't be a problem because everything starts as `undefined`, so there is a set initial value
+but I haven't fully explored this yet
+
+can we come up with an example?
+
+	latch: input >>
+		output: input | output
+
+let's say `input` starts undefined
+then `output` will be undefined
+then let's say `input` switches to `1`
+output will switch to `1`
+then let's say `input` switches back to `undefined`
+output is now "latched" onto `1` still
+so the transient behavior has impacted the output!!
+
+similar to an S-R latch
+
+if we combine this with the fire nukes synchronization issue example from long ago
+	see OneNote page "Flo Syntax Brainstorm.one"
+
+	fireNukes: !input == input     // will always end up false, but may be true during transient behavior
+	latch: fireNukes >>
+		output: fireNukes | output
+
+we can see how this can cause problems
+`fireNukes` should always be false
+however, if `!input` takes more time to calculate than `input`
+then `fireNukes` will be true for an instant
+and if the latch registers it during that instant, then it will latch onto `true`
+even though at first glance, it seems like `latch` should never be `true`
+
+
+if something as simple as this created problems
+why is the graph `#distance` example fine?
+
+notice that if any of the `node.#distance` happens to jump to a negative number for an instant
+it's impact will ripple through the entire graph
+though when it goes back to `undefined` it will naturally correct itself...I think
+
+
+* reason we thought it was determinant was because depends solely on inputs
+* no "arbitary" picking like mentioned in wiki
+* however, there is arbitary picking, the order in which updates happen is random
+
+* maybe you have to localize feedback, declare a module as having `feedback` or interpreter will complain
+* that's assuming we can detect it in the first place
+
+* notice that, ignoring the initial `undefined` state, the final `#distance` value for all nodes won't actually have feedback
+* the dependency graph will be a DAG, acyclic graph
+
+* maybe every time we update a module, it invalidates all properties of a module
+* so for `latch` example earlier, when you change `input`, it also sets `output` back to undefined
+* before re-computing everything
+
+* but feedback isn't necessarily contained to a module
+* consider something like this
+
+		latch1: input >>
+			output: input | latch2.output
+		latch2:
+			output: latch1.output
+
+* or alternatively, a "triangle maximum", where each node in the triangle is equal to the maximum of the other two nodes
+
+		trifecta: input >>
+			node1: Math.max(node2, node3, input)
+			node2: Math.max(node1, node3)
+			node3: Math.max(node1, node2)
+
+* this get's even more hard to detect once you add insertion
+
+		trifecta:
+			node1: collector(Math.max)
+			node2: collector(Math.max)
+			node3: collector(Math.max)
+
+		someModule: input >>
+			trifecta.node1 <: trifecta.node2, trifecta.node3, input
+			trifecta.node2 <: trifecta.node1, trifecta.node3
+			trifecta.node3 <: trifecta.node1, trifecta.node2
+
+
+* we could try to have some global mechanism looking for feedback
+* but that doesn't seem to fit well with distributed systems
+
+
+
+
+notice that even though `#distance` example uses feedback, the result is never dependent on execution order
+this is because the result ultimately forms a DAG, regardless of transient behavior or initial values
+	mentioned earlier in the section
+in transient behavior, if one node's #distance is extremely negative, then it's neighbors will be that #distance + 1
+because all neighbors of the original node have #distance+1, then the minimum of those is also #distance+1, so now the original node gets updated to (#distane+1)+1
+in a sense, each node becomes a feedback loop `mynode.#distance: mynode.#distance + 2`
+this feedback will continue, and all the #distance of nodes will slowly rise
+the only node that is anchored is the start node, anchored at `#distance: 0`, so eventually it's neighbors will be anchored to `#distance: 1`,
+	which will then anchor their neighbors, etc
+until all nodes have stabilized, and there will be no more feedback
+so as you can see, in the transient behavior, we have this `mynode.#distance: mynode.#distance + 2` feedback
+however, something like this either goes away or diverges to infinity
+feedback like `output: input | output` can stabilize while maintaining feedback, creating a latch
+
+so maybe we need to detect when a memory address is directly dependent on itself
+and has to be directly dependent, something like `bar: (foo, bar, zed)` doesn't count
+only something like `bar: bar`
+and it probably has to be runtime, because detecting if `bar: if (cond) foo else bar` could potentially result in feedback, seems way too hard
+if it's detected in runtime, we just set the memory address to `undefined` with the error message `feedback`
+and whenever the feedback is broken it will start working again
+
+however, what about `bar: bar + 1 - 1`, we would have to detect that too
+what about fixed point functions, like `list: list.filter(evens)`
+or something like `sqrtGuess: sqrtGuess - ((sqrtGuess**2 - input) / (2*sqrtGuess))` (newton's method for guessing square root)
+
+
+how is feedback different from recursion
+`foo: sum(foo, 1)` vs `fn: n >> if (n = 0) 1 else n * apply(fn, n-1)`
+
+in recursion, if an input (to the root call) changes, then all recursive calls are discarded
+it allows for a "true reset", in a sense
+it doesn't preserve state like feedback does
+
+
+
+for now I think it is impossible to distinguish "good" feedback (eg `#distance` example) from "bad" feedback (aka latch example)
+I guess the only good part is that, bad feedback is exceedingly rare
+in regards to the latch example, if you really wanted an output that went back to `undefined` if input went back to `undefined`
+then just mirror the input, `output: input`
+by doing this weird `output: input | output`, you are basically explicitly declaring that you want some weird latching behavior
+in regards to the triangle maximum, "trifecta" example
+if you were to try to apply it to a practical scenario,
+eg lets say that given a graph of nodes, you want each node to report the maximum of it's neighbors using the tag `#maxNeighbor`
+notice that each `#maxNeighbor` tag would be based on neighboring node values, not neighboring `#maxNeighbor` values, so there is no feedback
+if a node value spikes up and then falls back down, the corresponding `#maxNeighbor` values would do the same
+they wouldn't latch onto the peak value, like the triangle maximum feedback example did
+so it seems like in most practical examples, feedback is not an issue
+
+
+### Axis vs Other Actor Based Languages
+
+most concurrent actor-model languages based on message passing. Axis is based on bindings.
+
+
+
+
+### Caching Functions and Clone Counting
+
+even though we have side effects
+we can actually cache functions
+because side effects are unordered
+all we really need to know, is how many times the function was called
+though this does need to happen recursively
+all function calls made inside the function, also have to have their clone-counter/call-counter incremented
+so this is almost like just running the function again
+although if the function makes no insertions, the clone-counter doesn't need to be updated
+	same can be said for imperative though, if the function makes no assignments out of scope, then it can be cached
+
+let's take a look at the fibonacci function
+
+	fibo: n >> if (n <= 1) 1 else fibo(n-1) + fibo(n-2)
+
+let's say sombody makes a _second_ call to `fibo(10)`
+`fibo(10).numClones` updates, which then updates `fibo(9).numClones` and `fibo(8).numClones`
+this in turn updates `fibo(8).numClones`, `fibo(7).numClones`, and `fibo(7).numClones`, `fibo(6).numClones`
+ultimately we end up with 2^n updates
+
+
+
+
+
+IO Monads
+
+one benefit of functional is that you can prevent calls
+which we talked about before
+// todo: find referenced sections
+i guess it makes sense actually
+you can physically prevent all communication between a module and the outside world
+if you want
+however, the module can choose not to give any information if it has no access to internet
+this is like, a functional function, that takes in IO, and if it doesn't get it, it will terminate all internal behavior
+
+
+
+
+actually note that we have to correct #distance a bit
+
+	shortestDistance: graph start end >>
+		tag #distance: (default: infinity)
+		for node in graph.nodes:
+			if (node = start)
+				node.#distance: 0
+			else
+				node.#distance: node.neighbors[[#distance]].get(Math.min)-> + 1    // distance from the closest neighbor plus one
+
+		=> end.#distance
+
+we can't have all distances start as `undefined`, because then `Math.min` will return undefined (even for neighbors of the start node)
+we have to start them at `infinity`
+so it does seem like initial value matters
+
+
+### Timeless - Feedback and Determinacy
+
+* note that feedback can be determinant relative to time
+* that is, if all events and inputs are state variables, indexed by time
+* then something like `fireNukes: !input == input` becomes determinant
+* because all updates will have a timestamp, based on the event that initiated the update
+* so if `input` changes, then even if `!input` takes more time to compute than `input`
+* then `fireNukes` will be true for an instant, but then the update will **override** the value of `fireNukes` at that timestamp
+* it will rewrite history
+* thus, when everything stabilizes, if you check the history of `fireNukes`, it will always be false
+* this is all pretty much a consequence of the concepts talked about in the section "Timeless"
+
+* so if we had a latch like `output: fireNukes | output`, then even though it will detect the instant where `fireNukes` is true
+* when `fireNukes` rewrites history and sends an update with the timestamp,
+* the latch will also rewrite history
+
+* note that there can still be feedback in a single instance of time
+* for example, take `n: n + input`
+* lets say `input` is initialized to `1` at `time = 0`
+* what should `n` be at `time = 0`?
+* well, intuitively, it seems like `n` should be at `infinity` due to the feedback loop
+* imagine an electrical circuit with similar feedback
+* it will only take a few nanoseconds for the feedback to send the output to infinity
+* and as expected, when we try to compute `n` at `time = 0`, it will keep updating itself, constantly climbing to infinity
+
+* this timeless model where all events and inputs are state variables
+* won't prevent divergent feedback from diverging (nor should it)
+* but it establishes concrete rules behind the execution of feedback
+* and makes it clear exactly _how_ it diverged
+* makes it clear how any feedback reached its current value
+
+* it seems like this new "timeless" model is all we need to prove determinacy
+* the value of the output at any instant of time is determined by:
+	1. the current value of inputs
+	2. the previous value of outputs (only important for establishing the initial conditions of feedback loops)
+	3. the definition of the program
+	4. the definition of the language
+		(includes how updates should be executed, discussed in the following sections // TODO: FIND REFERENCED SECTION)
+
+* so this does mean that transient behavior matters
+* but it isn't really "transient behavior" actually
+* every change in input, is also an input
+
+
+* makes it easier to debug
+* we can track all the intermediate states of the inputs
+* and see how a feedback loop reached its current value
+* for example, for a latch, `output: input | output`, if the current values are `input = undefined` and `output = 10`
+* we can look through the history of `input` and see that the previous value of `input` was `10`, which explains the current value of `output`
+
+
+* I think this is pretty much all we need to 
+
+
+### Timeless - Rewriting History and Synchronization
+
+if timeless allows for rewriting history
+then how do we ever know if a timestamp is "finished"?
+how can we trust that the information we are getting is correct, and won't just be rewritten later?
+
+
+
+maybe everything is a state var
+after all, it is possible for any module to keep track of the timestamps it is getting with every update
+	even though we said it's up to the source to give out that info
+	the listener can just keep track of it themself
+and even if the module doesn't get timestamps with updates, it can always register the time at which it received the update
+
+right now the only way for a module to independently keep track of the transient behavior of inputs
+is to use feedback, which is ugly
+but since it's possible for a module to do anyways
+maybe we should just expose a more user-friendly way of doing so
+
+this basically turns everything into a state var
+so another way of thinking about it is
+by default, in Axis, all variables are state variables, but we are only looking at the "tip", the last value
+
+in Axis, our functions don't just represent relationships between input
+they represent relationships between input streams
+kinda like erlang?
+
+you can use `capture` on any input, to capture it at a certain point of time
+
+and when we start using state variable syntax, it doesn't convert objects and scopes into a special state variable domain
+everything is already in the time-domain
+it takes us **out** of the time domain, so that we see these time-varying input streams as just lists
+
+
+monads
+recently re-learning the concept, from [here](https://medium.com/javascript-scene/javascript-monads-made-simple-7856be57bfe8)
+in a way, it seems like our state variables are similar
+we are taking functions that operate on values
+and making them work with time streams
+
+
+how does this fit into the idea that actor model is indeeterminant
+actor model languages like Pony use naive message passing
+but they might have behavior that depends on message arrival order
+eg receiving asynchronous print commands
+thus, the behavior of the program, is dependent on behavior not defined in the program
+	aka how the messages are being delivered, and in what order
+and thus is indeterminant
+
+Axis had a similar problem
+while we didn't have message passing, we had data binding
+and we assumed that the behavior of the program only depended on the current values of inputs
+which made it seem determinant
+however, feedback made the program behavior change based on how input changes were being propagated
+thus, we made all inputs into state variables, time streams
+and now, the program behavior is determinant, solely based on the definition of the program, interpreter, and inputs
+
+
+
+
+
+multiple ways we can define how our interpreter should handle feedback
+
+reset, invalidate previous values
+ignore previous values, assume initial value is `undefined` and go from there
+in this case the latch would go back to `undefined` if the input went back to `undefined`
+note that earlier we mentioned that this method was impossible
+	// TODO: FIND REFERENCED SECTION, where we talk about "invalidates all properties of a module"
+because if the feedback spans multiple modules, then how could we be sure the other modules are also invalidating their values?
+	this is also where we introduced the triangle maximum `trifecta` example
+however, now that transient behavior is well defined in the language behavior, everything is determinant
+we can assume that the other modules are also getting the input change + timestamp that we are getting
+and that they are following the language spec, and invalidating their previous value
+if they don't then they aren't following the language, and that's their problem
+
+another method is to not invalidate previous values and simply use them as the initial value
+this probably makes more sense because latches will work as expected
+
+but remember that even at a single instant of time, there can still be feedback between modules
+so in what order should we evaluate each module?
+for example, if we had a fixed point function for guessing square roots, `sqrtGuess: sqrtGuess - ((sqrtGuess**2 - input) / (2*sqrtGuess))`
+	mentioned earlier in the section // TODO: FIND REFERENCED SECTION
+then once the input changes, there will be a flurry of updates as feedback loop adjusts towards a new square root guess
+but does the order matter? it might for certain examples
+perhaps it should be like breadth-first-search, step by step?
+every module gets one update, and then after that, any modules that need to update again, get one more update, etc etc
+
+or perhaps, we should just set it to `undefined(error: feedback)` if any value needs to get updated more than once
+did we just figure out feedback detection??
+actually no, this doesn't work
+consider the example:
+
+	two_iteration_example:
+		foo: input + 1
+		bar: foo * input
+
+during update propagation, on the first iteration, `foo` will update, and `bar` will update from the old value of `foo`
+on the next iteration, `bar` will receive an update that `foo` just updated, and so it will need to do another update
+in total it will look like
+
+	start       |  input: 21
+	iteration 1 |  foo: 21 + 1 -> 22,   bar: undefined * 21 -> undefined
+	iteration 2 |  bar: 22 * 21 -> 462
+	
+if we had `zed: foo + bar + 1`, it would require yet another iteration to fully stabilize
+we have no idea if these updates are coming from feedback, or just other variables updating
+thus, we can't detect feedback using this method
+
+
+this step by step iteration breadth first traversal method
+might seem extremely inefficient, because we have to wait for all first-iteration updates to finish before moving on
+and requires a global awareness in order to enforce this step-by-step computation
+however, there is a distributed way of doing this
+simply add an index tag to each update!!
+so let's say `input` changes, then it would broadcast that update with index `0`
+variable `foo` would receive the update, and then recompute its value, then broadcast its own update with index `1`
+and variables updated from that, will in turn recompute and broadcast an update with index `2`
+etc
+
+so for the `two_iteration_example` shown earlier, the broadcasted updates would look like:
+
+	(var: input, value: 21,        update_index: 0)
+	(var: foo,   value: 22,        update_index: 1)
+	(var: bar,   value: undefined, update_index: 1)    // this actually might be unecessarily, because bar isn't changing value
+	(var: bar,   value: 462,       update_index: 2)
+
+
+note that, it's possible for a variable to get updates out of order
+	eg if they get an update with index `4`, and then later receive an update with index `2`
+that's fine, they'll just have to revise their value, and broadcast update "overrides"
+	eg, if `foo` gets an input update with index `4`, it will broadcast the update with index `5`,
+	but then if it later recieves an update with index `2`, it will have to correct it's value, broadcast the update with index `3`, and 
+		re-broadcast the update with index `5` (to override the previous broadcast sent out with index `5`)
+wait, but then if a variable gets two updates with the same index, how does it know which one to use...? which one came first?
+
+
+maybe we have a override index
+when a variable receives an out-of-order update, it corrects its update values, and then sends out corrections with override indices
+and when a variable receives multiple updates with the same index, it uses the one with the higher override index, and corrects all its update values
+so for example, let's say `foo` gets an input update with index `4`. It updates its value, and then broadcasts the update with index `5`
+later, `foo` receives an update with index `2`, then it corrects its values for index `2` and index `4`, and then sends out update corrections with index `3` and `5`, with override index `1`
+
+so in total every update message has: an update timestamp, an update index, and an override index
+the reason why we have to worry about out of order update indexes, but not for override indexes
+is that every update index matters
+eg, take the code
+
+	inc: inc+1
+
+the update propagation might look like
+
+	(var: inc, value: 10, update_index: 1) ==(sent to)=> inc
+	(var: inc, value: 11, update_index: 2) ==(sent to)=> inc
+	(var: inc, value: 12, update_index: 3) ==(sent to)=> inc
+	...
+
+notice that the value of `inc` will keep climbing with every update
+so every update matters
+however, with overrides, we only need to care about the latest override
+we can discard all the rest
+because we know that, when a variable has to correct it's updates, it will increement the override counter
+so only the highest override matters
+
+this is still really inefficient because we have to keep track of all updates with indexes
+so that if one arrives out of order, we can correct all intermediate updates
+
+this is not necessary with the synchronous breadth-first update system
+because once one iteration is done, we can move on to the next iteration, and discard the previous one
+we never have to worry about stuff happening out of order
+
+
+
+I think it's examples like this that show how important synchronization and centralization can be for optimization
+so for example, if a program runs on a single computer, it is far more optimal to interpret it using a single thread
+instead of using a bunch of asynchronous processes
+
+
+
+note that using a breadth-first traversal when computing updates is still rather arbitrary
+without feedback, we only need to ensure that if a variable is updated multiple times during re-evaluation,
+	it should let its listeners know which update happened last, so they know to use that final update and discard all intermediate updates
+the absolute ordering of updates doesn't matter, just the relative ordering
+however, when we have feedback, then it seems to matter
+for example, if we have two intersecting feedback loops
+
+	x: fn(x, y)
+	y: gn(x, y)
+
+one way to execute it would be breadth-first: update `x` and `y` at the same time, then update both of them again, and again, etc until convergence
+another could be to alternate, update `x` then update `y` then update `x`, etc
+another method could be to update `x` five times, then update `y` once, then update `x` five times again, then `y` once, etc until convergence
+
+it seems like all of these methods could result in different values
+but can we find a concrete example of this?
+
+and if they do, then choosing an arbitrary method like breadt-first traversal, might help make the language deterministic
+but it also means that the programmer has to learn, and keep in mind, these rules when dealing with feedback
