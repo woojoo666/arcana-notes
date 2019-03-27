@@ -1,37 +1,7 @@
-basic syntax
-
-
-execution vs bindings (ordered vs unordered)
-
-binary tree height example
-
-distributed web asynchronous
-
-
-
 Axis Programming Language
 ==========================
 
-A reactive programming language for designing distributed systems, information networks, and web applications. Actor model
-
-
-Axis programs are composed of objects. Every object is an "actor". Think of them as independent organisms, like cells in a body, or servers in a network. 
-
-
-
-Every object defines a set of properties. And every object can interact with other objects in three ways: access properties, insert items, or clone the object.
-
-
-mapreduce
-server herds
-social networks
-web apps
-
-
-simple and intuitive language for describing high level distributed applications
-
-most concurrent actor-model languages based on message passing. Axis is based on bindings.
-
+Axis is a simple and intuitive language for describing distributed applications. Axis follows the [actor model](https://en.wikipedia.org/wiki/Actor_model), which basically means that every object is independent, like cells in a body, or servers in a network. This allows for programs to be fast, flexible, and scalable. However, while most actor-model languages rely on message passing, Axis is [reactive](https://en.wikipedia.org/wiki/Reactive_programming), meaning that objects and values are bound to each other, so that a change in one will ripple through the network and update the rest. This allows for the programmer to focus on defining data relationships instead of message passing, keeping the language high-level and easy to use while maintaining highly concurrent execution.
 
 before delving into the mechanics, here's a brief taste of what's possible. These should be relatively understandable if you know javascript, 
 
@@ -47,54 +17,29 @@ before delving into the mechanics, here's a brief taste of what's possible. Thes
 
 Notice how this would normally require recursion in any imperative/functional language, but in Axis we only need a simple for-loop. It doesn't matter in what "order" the nodes are being traversed in the for-loop, the result will always be the same. This is a core idea: in Axis, we don't specify order. With recursion, we would need to specify the traversal order, eg "first find the height of the left and right subtree, and then find the height of the parent". In Axis, we simply define the relationships between data, and the answer works itself out. This is explored more deeply in the "Feedback" section, where we give more examples showing how algorithms in Axis can be cleaner and simpler than their functional or imperative counterparts.
 
-In addition, because everything is unordered, everything can execute independently and concurrently. This is perfect for defining web services and applications. 
+In addition, because everything is unordered, everything can execute independently and concurrently. This makes Axis is perfect for defining web services and applications. A lot of the complications attributed to web programming, like routing, HTTP requests, and asynchronous callbacks, completely disappear when using Axis.
 
-my final example, I show how Axis is able to blur the lines between dabatases, servers, and clients
+For example, we can host a chat server using the following (don't worry the syntax is explained in the "Mechanics" sections, )
 
-	messages: collector(file: 'messages.axis')   // all messages, saved to a file
+	messages: collector(file: 'messages.axis')   // all messages, saved to permanent storage
 	activeUsers: collector
 
 	ChatServer: Web.Server
-		index: Web.Client template  // main page
+		index: Web.Client template    // main page, a template for the client browser to instantiate
 
 			layout: JSX(file: 'layout.jsx')
 
+			// retrieve values from HTML elements
 			username: layout.find('input.username').value
 			draft: layout.find('text-area.message-draft').value
 			
 			activeUsers <: username    // insert user into list of active users
 
+			// inserts message into the list of messages
 			send: => @timestamp
-				messages <: (time: timestamp, user: username, text: draft)      // insert message into the list of messages
+				messages <: (time: timestamp, user: username, text: draft)
 
-
-
-
-Philosophy
---------------
-
-* reactive
-* unordered
-* separate data structure from execution
-* what the data structure vs how it is created
-
-Axis is a dataflow/reactive language, which means that we define programs through data bindings, not execution statements. For example, if we had something like
-
-	sum: a+b
-
-this is saying that the variable `sum` is bound to the sum of `a` and `b`. If the values of `a` or `b` change, then `sum` will automatically update to reflect that. Whereas in imperative, a statement like this is executed once. You can think of these "bindings" as continuously evaluated statements. You may have seen similar concepts if you have worked with AngularJS or ReactJS.
-
-Because we are defining bindings, there is no execution order, like normal imperative languages. All bindings can be thought of as asynchronous and continuously evaluated. It does not matter in what order you defined bindings, they all "exist" at the same time. This makes Axis ideal for distributed applications, where everything is asynchronous.
-
-In addition, this allows Axis programs to define data structures and relationships, without worrying about how that data structure is evaluated. In Axis, we define _what_ the data structure is, not _how_ to create it. **Axis separates data from execution.** This makes programming more elegant and intuitive.
-
-Everything in Axis is data. There is no execution, no instantaneous actions. All behavior is persistent and asynchronous.
-
-
-As mentioned in the philosophy section, Axis is about focusing on data relationships, and leaving all execution optimizations to the interpreter.
-
-typing, can't change arbitrarily like with assignment. Restricting modifications to insertion means that the "type" of the object always stays the same. You can always refer back to the object definition to see how it should behave.
-
+This is all we need for Axis to spin up a database, run the server, and generate the client-side javascript to make it all work. In the later section "Web Applications", we explain in depth about how Axis streamlines web development, and starts to blur the lines between dabatases, servers, and clients.
 
 Mechanics
 -----------------
@@ -359,26 +304,6 @@ This is what it looks like using tags
 
 as you can see, often times hashmaps are used to define additional attributes and properties for objects, without modifying the original objects. They are extremely common for data processing. Tag syntax makes it actually look and feel like you are working with properties, even though you aren't actually modifying/retrieving properties from the object. This is why tags can also be thought of as "virtual properties".
 
-### Errors
-
-check the end of the "Basic Syntax" section for overlap
-
-In a data-centric language like Axis, it doesn't make sense to throw errors like imperative languages do. Instead, we use the data type `undefined` to indicate that an error occured.
-The `undefined` object may have an `#error` property attached, from which you can extract relevant error information.
-
-* everything is data
-* errors are data, represented using `undefined`
-* represents undefined behavior
-* can have properties that store more info
-
-* use `undefined` as a default, and build from there
-* it allows you to create "incomplete" programs
-* which is fast
-* so you don't have to _define_ every case, which can be impractical for large programs
-	* especially in an un-typed system, where you have to handle all kinds of input, like corrupt data or invalid types or wrong number of inputs, etc
-* it's much more practical to have cases where you just throw `undefined` to indicate that those cases aren't accounted for
-	* declaring the program behavior is literally `undefined`
-
 ### State Variables
 
 State variables are also just syntactic shorthand, useful in event handlers. State variables are just objects that represent an ordered list of states.
@@ -388,12 +313,18 @@ State variables are also just syntactic shorthand, useful in event handlers. Sta
 	onClick: @timestamp
 		numClicks := numClicks + 1
 
+is just shorthand for
+
+	numClicks: hashmap(0: 0)      // use a hashmap to store the value of numClicks at each timestamp. Initial state is 0 at time 0
+
+	onClick: timestamp >>
+		numClicks.add(timestamp, numClicks.before(timestamp) + 1)     // take the previous value of numClicks, and add 1, and store that as the current value of numClicks
 
 ### Extra Syntax
 
 I recommend skipping this section and coming back to it, these are just syntax shorthands. The next sections on examples and use cases are much more interesting.
 
-* deconstruction: `(a, b): someObj` = `a: someObj.a, b: someObj.b`
+* object deconstruction: `(a, b): someObj` = `a: someObj.a, b: someObj.b`
 * statements: `someProp.` = `someProp: true` = `someProp: ()`
 * spread operator: `...object`
 	
@@ -417,25 +348,6 @@ I recommend skipping this section and coming back to it, these are just syntax s
 		[key]: key*key
 
 * matchers: `[matcher]: val`
-
-```js
-
-
-fn:
-	for str in ("fda" "kekw" "jkdfie"):
-		[str]: true
-
-
-// infinite streams and matchers
-
-evens:
-	[key => key % 2 = 0].     // 
-
-evens = (0. 2. 4. 6. 8. 10. ...)
-
-```
-
-* set deconstruction, matchers
 
 Examples and Concepts
 ------------------------
@@ -543,15 +455,13 @@ Note that while feedback is very powerful, we do have to take care in using it. 
 
 ### Web Technologies API Calls
 
-chatroom example
-
 Let's take the chatroom example from the introduction, and this time include the layout:
 
 	messages: collector(file: 'messages.axis')   // all messages, saved to a file
 	activeUsers: collector
 
 	ChatServer: Web.Server
-		'/chat': Web.Client template
+		index: Web.Client template
 
 			layout: JSX    // using jsx syntax
 				<input class="username"/>
@@ -570,36 +480,32 @@ Let's take the chatroom example from the introduction, and this time include the
 			send: => @timestamp
 				messages <: (time: timestamp, user: username, text: draft)
 
+One of the difficulties when writing full-stack web applications is, often it can be ambiguous whether or not to put behavior in the server or in the client. For example, imagine if we wanted a web app that displayed all of a user's photos, potentially thousands of photos. On one hand, we could load the photos dynamically as the user scrolls through the album, but if the user has a slow internet connection, they would have to wait for photos to load every time they scrolled. On the other hand, we could proactively cache all photos on the client side so that the user can scroll smoothly, but then that would require a lot of memory on the client side. The best solution would probably be to do a mix of the two, caching only a few photos ahead of time, but this makes for a complicated dynamic caching mechanism. And while there's nothing wrong with complex optimizations like this, the problem is that current imperative languages force us to mix our business logic with our optimizations, so every optimization we make sacrifices flexibility and readability.
 
-everything is asynchronous
-so no need to worry about javascript, synchronous vs callbacks vs promises vs async/await
+Also, current web applications have a very strict separation between the server and client, with all communication handled through clunky HTTP requests or web sockets. Not only do they add lots of overhead, but they also make it difficult to migrate behavior between the server and client when we want to make changes. We are also forced to use HTTP requests when calling 3rd party APIs, which often leads to a complicated mess of callbacks, promises, or `async/await` patterns.
 
-keep things simple, optimizations in backgrond
-don't need to specify where caching happens
-for example, loading a long list of user photos
-caching all of them on user side requires a lot of memory
-loading them all dynamically is slow, requires high bandwidth
-complicated caching mechanism should not sacrifice the readability of the code
+With Axis, everything is kept clean and simple. From the chat server example above, we can clearly see the distinction between database, server, and client, and more importantly, what each component means: the server is simply for data shared across clients, and the database is simply data shared across servers (or multiple runs of a server). In fact, notice that there is not a single line of code specific to the server, everything is either in the client or the global scope. This will actually be true for many web applications, and just goes to show how much of the server code we write today is just optimization or overhead.
 
+In addition, not only is the communication between server and client seamless, but Axis also makes it easy to communicate with 3rd party APIs. Other servers on the internet can be treated like any other object, so programs and access properties, clone behavior, or insert data without worrying about callbacks or promises.
 
-this lets the interpreter make decisions about where to execute
+This high level of abstraction allows the Axis interpreter to make decisions on how to execute the code and manage the memory, so we don't have to worry about it. But we can also specify custom optimizations if we want. However, we can define those optimizations separately using annotations and metaprogramming. Instead of manually reconfiguring our code, we use functions and metaprograms to programmatically reconfigure out code. For example, for the photo library example talked about in the previous paragraphs, we might do something like
 
-Encapsulation
+	PhotoLibraryOptimized: PhotoLibraryServer
+		index: cacheOptimization
+			target: PhotoLibraryServer.index
+			range: 10      // how many photos ahead and behind that we should cache
+			cache: target.photos.slice(target.currentPhoto - range, target.currentPhoto + range)
 
-you can't modify variables out of scope
-you can insert
-but 
+From this, the interpreter will know how to cache the photos, and might also reconfigure other behavior to fit with this optimization. The key thing to notice here is that the optimization is separate from the application logic. This means that we can read and alter the web application, without worrying about the optimizations. And this also means that we can apply this optimization to many different web applications.
 
-Testing and Mocking
-
-everything is data
-you can view all calls and clones going into a module
-
-
-Firewalling
+## Testing and Mocking
 
 coming soon!
 
-Meta-programming
+## Firewalling
+
+coming soon!
+
+## Meta-programming
 
 coming soon!
