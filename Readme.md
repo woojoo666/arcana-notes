@@ -1,25 +1,24 @@
 Axis Programming Language
 ==========================
 
-Axis is a simple and intuitive language for describing distributed applications. Axis follows the [actor model](https://en.wikipedia.org/wiki/Actor_model), which basically means that every object is independent, like cells in a body, or servers in a network. This allows for programs to be fast, flexible, and scalable. However, while most actor-model languages rely on message passing, Axis is [reactive](https://en.wikipedia.org/wiki/Reactive_programming), meaning that objects and values are bound to each other, so that a change in one will ripple through the network and update the rest. This allows for the programmer to focus on defining data relationships instead of message passing, keeping the language high-level and easy to use while maintaining highly concurrent execution.
+Axis is a simple and intuitive language for describing distributed applications. Axis follows the [actor model](https://en.wikipedia.org/wiki/Actor_model), meaning that every object is independent, like cells in a body or servers in a network. This allows for programs to be fast, flexible, and scalable. However, while most actor-model languages rely on message passing, Axis is [reactive](https://en.wikipedia.org/wiki/Reactive_programming), meaning that objects and values are bound to each other, so that a change in one will ripple through the network and update the rest. This allows for the programmer to focus on defining data relationships instead of message passing, keeping the language high-level and easy to use while maintaining highly concurrent execution.
 
-before delving into the mechanics, here's a brief taste of what's possible. These should be relatively understandable if you know javascript, 
+before delving into the mechanics, here's a brief taste of what's possible. Here's how to return the [height of a binary tree](https://stackoverflow.com/a/2603707/1852456). The syntax should be relatively understandable if you know python or javascript
 
-	// returns the height of a binary tree
 	binaryTreeHeight: tree >>
 		tag #height.
 
 		// calculate height of all nodes
 		for node in tree.nodes:
-			node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // return height of left or right subtree + 1
+			node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // define our height as the height of our left or right subtree + 1
 
 		=> tree.#height   // return height of root node
 
-Notice how this would normally require recursion in any imperative/functional language, but in Axis we only need a simple for-loop. It doesn't matter in what "order" the nodes are being traversed in the for-loop, the result will always be the same. This is a core idea: in Axis, we don't specify order. With recursion, we would need to specify the traversal order, eg "first find the height of the left and right subtree, and then find the height of the parent". In Axis, we simply define the relationships between data, and the answer works itself out. This is explored more deeply in the "Feedback" section, where we give more examples showing how algorithms in Axis can be cleaner and simpler than their functional or imperative counterparts.
+Notice how this would normally require recursion in any imperative/functional language, but in Axis we only need a simple for-loop. It doesn't matter in what "order" the for-loop traverses the nodes, the result is always the same. This is a core idea: in Axis, we don't specify order. With recursion, we would need to specify the traversal order, eg "first find the height of the left and right subtree, and then find the height of the parent". In Axis, we simply define the relationships between data, and the answer works itself out. This is explored more deeply in the "Feedback" section, where we give more examples showing how algorithms in Axis can be cleaner and simpler than their functional or imperative counterparts.
 
-In addition, because everything is unordered, everything can execute independently and concurrently. This makes Axis is perfect for defining web services and applications. A lot of the complications attributed to web programming, like routing, HTTP requests, and asynchronous callbacks, completely disappear when using Axis.
+In addition, because everything is unordered, everything can execute independently and concurrently. This makes Axis perfect for defining web services and applications. A lot of the complications attributed to web programming, like routing, HTTP requests, and asynchronous callbacks, completely disappear when using Axis.
 
-For example, we can host a chat server using the following (don't worry the syntax is explained in the "Mechanics" sections, )
+For example, we can host a chat server using the following (syntax will be explained in later sections)
 
 	messages: collector(file: 'messages.axis')   // all messages, saved to permanent storage
 	activeUsers: collector
@@ -27,9 +26,9 @@ For example, we can host a chat server using the following (don't worry the synt
 	ChatServer: Web.Server
 		index: Web.Client template    // main page, a template for the client browser to instantiate
 
-			layout: JSX(file: 'layout.jsx')
+			layout: JSX(file: 'layout.jsx')    // page layout, imported from a JSX file
 
-			// retrieve values from HTML elements
+			// get user inputs from the page
 			username: layout.find('input.username').value
 			draft: layout.find('text-area.message-draft').value
 			
@@ -66,34 +65,37 @@ Everything in Axis is an "object", which is just a collection of properties.
 	console.log("hello world")->         // this prints "hello world" to the console. This syntax actually uses both "cloning" and "function calling", explained in later sections
 
 
-	console.log( if (someObject.age > 18) "adult" else "child" )->     // conditionals use if...else, so this will print "adult"
+	if (someObject.age > 18) "adult" else "child"     // conditionals use if...else, so this will return "adult"
 
-	if (someObject) console.log( "someObject is defined" )->           // if you use an object as a condition, it is considered "truthy" unless it is undefined
+	if (someObject) "someObject is defined"           // if you use an object as a condition, it is considered "truthy" unless it is undefined
 
-	console.log( otherObject | "otherObject is not defined" )->        // short-circuit evaluation
+	otherObject | "otherObject is not defined"        // short-circuit evaluation, so since otherObject is undefined, this returns the string "otherObject is not defined"
 
-Instead of defining objects using `()`, we can also just use indented blocks. In fact, an indented block acts like a set of parenthesis. So the above definition of `someObject` can also be rewritten like so:
-
-	someObject:
-		name: "Joe"
-		age: 20
-
-We can do the same with `someList`:
-
-	someList:
-		1
-		2
-		3
-
-Indented blocks also allow for scoping
+We can use indented blocks to define objects and lists as well
 
 	Bob:
 		_age: 25               // define private properties using the `_` prefix
-		isAdult: _age > 25     // same scope as _age, so we can reference it
+		isAdult: _age > 25     // we are in same scope as _age, so we can reference it
+		
+		// nested object
+		name:
+			initials: first[0] + "." +last[0] + "."    // notice that order doesn't matter, we can reference `first` and `last` even though they are defined after
+			first: "Bob"
+			last: "Smith"
 
-	isAdult       // not the same scope as isAdult, so this will return "undefined"
-	Bob.isAdult   // however, "Bob" is in our scope, so this will work, returns "true"
-	Bob._age      // _age is private, so this won't work, returns "undefined"
+	console.log( Bob )->          // Bob is in scope, so this will print out the object Bob
+	console.log( isAdult )->      // isAdult is not in scope, so this will prints "undefined"
+	console.log( Bob._age )->     // _age is private, so this won't work, prints "undefined"
+
+We can use loops to define repeated behaviors
+
+	joe: (name: "Joe", age: 20) 
+
+	for key, val in joe:
+		console.log(key + ": " + val)->    // will print "name: Joe" and "age: 20"
+
+	for key in joe.keys:
+		console.log(key)->                 // will print "name" and "age"
 
 Lastly, the keyword `undefined` basically means that we are trying to access a value that hasn't been defined. For example, if we try to access `someObject.height`, it will return `undefined`.
 
@@ -101,64 +103,67 @@ Because everything in Axis is data, there are no "errors" like traditional imper
 
 ### Cloning and Implicit Parameters
 
-Axis is a prototypal language. So any object can be "cloned", allowing we to specify new properties and overwrite old ones. This is extremely similar to the concept of "extending classes" in object-oriented languages. For example, let's start with a simple object called `division`
+Axis is a prototypal language. So any object can be "cloned" to create a new object, where we can specify new properties and overwrite old ones, while inheriting the rest. This is extremely similar to the concept of "extending classes" in object-oriented languages. For example:
 
-	// define an object
-	division:
+	division: p, q >>      // declare two "parameters", p and q
 		quotient: p / q
 		remainder: p % q
 
-	division.p           // returns undefined
-	division.remainder   // returns undefined
+`division` is an object, so we can access its properties. However, since `p` and `q` are undefined, it's pretty useless.
+
+	division.p             // returns undefined
+	division.remainder     // returns undefined
+
+However, we can clone `division` and provide values for `p` and `q`.
 
 	result: division(p: 16, q: 7)   // clone the object, overriding p and q
+	result.remainder                // returns 16 modulo 7, aka 2
 
-	result.remainder     // returns 16 modulo 7, aka 2
+Unnamed arguments are mapped to the parameters in the order they were declared.
+	
+	result2: division(10, 2)    // 10 gets mapped to p, 3 gets mapped to q
+	result2.quotient            // returns 5
 
-Let's break this down. First, notice that in the `division` object, `p` and `q` are not defined yet. This is actually valid syntax, and just means that `quotient` and `remainder` will be undefined as well. Note that if we wanted to, we could explicitly declare parameters using `>>` like so
+Declaring parameters is actually optional. If we referenced variables that are not defined in the scope, we are implicitly declaring parameters. The order in which these variables are referenced, determines the parameter order (when mapping unnamed arguments). For example, we could have also defined `division` like this:
 
-	division: p, q >>
-		quotient: p / q
+	division:
+		quotient: p / q        // since `p` and `q` aren't in scope, they are implicit parameters
 		remainder: p % q
 
-However, this is not necessary. By referencing variables that are not defined in the scope, we are implicitly declaring parameters. Then, when we "clone" the object, we can provide values for these parameters. Which is exactly what we did for `result`, providing values for `p` and `q`, and we can see that `quotient` and `remainder` automatically adjusted to use those new values.
+	result: division(10, 2)    // 10 gets mapped to p, 3 gets mapped to q
+	result.quotient            // returns 5
 
-We also don't need to provide names for the arguments we pass in. For example, we could have done `division(16, 7)`. These arguments would automatically map to the implicit paramters, in the order that the parameters show up in the object definition (so since `p` shows up first in `division`, then `p` is the first parameter, and will be mapped to the value `16`). Though if we want, we can use `>>` to explicitly declare the parameter order.
-
-Cloning can do much more than just provide values for parameters, though. We can also use cloning to overwrite existing properties, and define new properties and behavior. All of this is done within the "arguments" of the clone operation, `someObject(<arguments>)`. Here is another example that is reminiscent of classical object-oriented inheritance
+Cloning can do much more than just provide values for parameters. We can also use cloning to overwrite existing properties, and define new properties and behavior. All of this is done within the arguments of the clone operation.
 
 	Person:
-		>> name
-		greeting: "hello my name is " + name + "."
+		name >>
+		greeting: "hello my name is " + name
 
 	Student: Person
-		>> name, school
-		greeting: Person.greeting(name) + " I go to " + school + "."
+		name, school >>
+		greeting: Person.greeting(name) + ". I go to " + school
 
+	alice: Student("Alice", "Harvard", console.log(this.greeting)->)    // create a new student, and automatically print her greeting to console
+	bob: joe(name: "Bob")                                               // creates a student with the same behavior as alice, so he also logs his own greeting
 
-An important way to think about defining or extending objects, is that **any behavior defined inside the braces will be duplicated during cloning**. So for example, if we have
-
-	joe: Student("Joe", "Harvard", console.log(this.greeting)->)    // create a new student, and automatically print his greeting to console
-	bob: joe(name: "bob")                                           // creates a new student and also log his greeting
-
-notice that when we clone `joe` to create `bob`, the function `console.log(this.greeting)->` will be called again. This might seem counter-intuitive, because in imperative languages, function calls are executed before they are passed as arguments. However, remember that this is not a function call, we are extending an object, and defining new behavior. This distinction becomes extremely important in the later sections "Insertion" and "Templates", but don't worry, those sections explain this in more detail.
+Notice that when we clone `alice` to create `bob`, the function `console.log(this.greeting)->` will be called again. This might seem counter-intuitive, because in imperative languages, function calls are executed before they are passed as arguments. However, remember that this is not a function call, we are extending an object, and defining new behavior.
 
 ### Insertion and Collectors
 
-We can declare a `collector`, which allows us to insert values to it from anywhere using the `<:` operator. For example
+We can declare a `collector`, which allows us to insert values to it from anywhere using the `<:` operator. For example:
 
 	foo: collector
 
-	for num in (1 2 3)
-		foo <: num * num
+	foo <: 1
+	foo <: 2
 
-	console.log(foo)->       // will print "(1 4 9)"
+	console.log(foo)->       // insertions are unordered, so this could print "(1 2)" or "(2 1)"
 
-It's important to note that insertions are unordered. The collector acts on an unordered set of all items inserted. Insertions make it easy to construct objects, without introducing any unnecessary order.
+Collectors make it easy to "construct" objects like we would in imperative languages. It's also important to remember that insertions are unordered, just like object properties and pretty much everything else in Axis.
 
-Note that you can insert to any object, no restrictions. However, by default, objects ignore insertions, so any insertions would not affect the object. In order for insertions to have an effect, the object has to either be a `collector` or any object that extends a `collector`. There are many useful ways we can declare a collector. For example:
+We can insert to any object, no restrictions. However, by default, objects ignore insertions. In order for insertions to have an effect, the object has to be a `collector` or any object that extends a `collector`. There are many useful ways we can declare a collector. For example:
 
-	sum: collector(+)     // collector(fn) will apply fn to all insertions and return the output
+	sum: collector(+)     // collector(<some function>) will apply the function to all insertions
 
 	for num in (1 2 3)
 		foo <: num * num
@@ -170,16 +175,15 @@ By leveraging insertion, we can also define object methods (like class methods i
 	Library:
 		songs: hashset     // hashsets are simply collectors that filter out duplicates
 		artists: hashset
-		album: hashset
 
-		song: artist name album >>
-			songs <: (name, artist, album)
+		song: name, artist >>
+			songs <: (name, artist)
 			artists <: artist
-			albums <: album
+			console.log("song added")->
 
-	song1: Library.song('Never Gonna Give You Up', 'Rick Astley', 'Whenever You Need Somebody')
+	song1: Library.song('Never Gonna Give You Up', 'Rick Astley')
 
-There is a small issue with this code. When we clone `song` to create new songs, it automatically inserts the song to our library. But since Axis is a prototypal language, that means the `song` declaration itself will also insert a song into our library. Because `artist`, `name`, and `album` are all `undefined` for this prototype, this initial `song` object will insert these `undefined` values. Definitely not something we want.
+There is a small issue with this code. When we clone `song` to create new songs, it automatically inserts the song to our library and prints "song added". But since Axis is a prototypal language, that means the `song` object itself will also insert a song and print "song added". Because `artist` and `name` are undefined for this prototype, this initial `song` object will insert these `undefined` values. Definitely not something we want.
 
 Instead, we want to somehow define a module without actually "executing" it...
 
@@ -190,97 +194,32 @@ Templates are simply a way of defining modules without "executing" them. More sp
 So to tweak the example from before, we simply change `song` to a template:
 
 		song: template
-			artist name album >>
-			songs <: (name, artist, album)
+			name, artist >>
+			songs <: (name, artist)
 			artists <: artist
-			albums <: album
+			console.log("song added")->
 
-	Library.song('Never Gonna Give You Up', 'Rick Astley', 'Whenever You Need Somebody')
+	song1: Library.song('Never Gonna Give You Up', 'Rick Astley')
 
-this is useful for interacting with web apis and extending objects. For example, imagine if the Spotify API had a template for creating playlists, `playlist(name, description)`. What if we wanted to create a wrapper around this function, `datedPlaylist(name)` that automatically uses the current date in the description
+This way, the initial `song` object won't insert anything, and won't print "song added".
 
-	datedPlaylist: playlist template      // extend the playlist object without executing it
-		name, timestamp >>
-		description: "playlist created on " + Date.from(timestamp))
-		console.log(description)->
-
-	myPlaylist: datedPlaylist(name: 'my playlist', timestamp: Date.now())
-
-Remember that when you clone an object, any behavior you pass in becomes part of the clone. Thus, if the clone is an object, then the behavior will be "executed". If the clone is a template, then it won't be executed. So in this example, `myPlaylist` is a regular object, it is "alive", so the `console.log` statement will be executed. On the other hand, `datedPlaylist` is a template, it is "inert", nothing will be printed to console.
-
-We can declare templates inline, too:
-
-	foo: playlist(template console.log("new playlist")->)
-
-**Functions**
-
-There is another special kind of object called a "function". The purpose of a function is to represent an action. The easiest way to explain it is through an example
+There is another special kind of object called a "function". The purpose of a function is to represent an action. We define the output of the action (called the "return value") using `=>`, and then call the function using `->` to get the output. For example:
 
 	add: a b >>
-		val: a+b
-		=> val
+		console.log("adding numbers")->
+		=> a+b
 
 	add(10, 7)->     // returns 17
 
-To create a function, we define a return value using the `=>`. It works like defining a property, in fact, in the background we are just defining the `_return` property. In order to use a function, we use the "call" operator `->`, which just returns the return value. So here, `add(10, 7)` clones the `add` function with `a: 10, b: 7`, and returns the return value of `17`.
+At first glance, it may seem like functions are just a bunch of syntax shorthands. We have a special property defined via `=>`, and then accessed via `->`. However, functions have one major other function: they act like "persistent" templates. If there are any insertions/clones defined in the function, they are not run until the function is **called**. In fact, the function can be cloned any amount of times without executing these insertions and clones. The function will wait until being _called_ before executing. This allows for something similar to currying, eg:
 
-At first glance, it may seem like functions are just a bunch of syntax shorthands. We have a return property defined via `=>`, and then extracted via `->`. However, functions have one major other function: they act like "persistent" templates. If there are any insertions/clones defined in the function, they are not run until the function is **called**. In fact, the function can be cloned any amount of times without executing these insertions and clones. The function will wait until being _called_ before executing. This allows for something similar to currying, eg:
-
-	step1: add(a: 10)
+	step1: add(a: 10)    // set value for "a" without executing the function
 	step2: step1(b: 7)
-	result: step2->
+	result: step2->      // execute the function, which prints "adding numbers"
 
 Because of this subtle difference between functions and templates, it is important to be mindful while naming them. Functions should be named using verbs, while objects and templates should use noun. For example, `createPlaylist` would be a function, while `playlist` would be an object or template.
 
-A small note: if we did something like
-
-	createPlaylist: playlist
-		name, timestamp >>
-		description: "playlist created on " + Date.from(timestamp))
-		console.log(description)->
-		=> this
-
-Notice what is happening. We are creating a function from `playlist`, so it inherits all properties and behaviors from `playlist`, but doesn't execute. In addition, it won't execute when cloned. Only when we call it, will it return `this`, aka a "live" active version of the playlist. Using `=> this` syntax is a way to create "permanent" templates, aka templates that stay inert when cloned, and are only active when called using `->`.
-
 Notice that in many ways, Axis functions work pretty much the same as the functions we are used to in functional and imperative. The only difference is that Axis functions allow us to modify the internal behavior of a function via cloning.
-
-### Private Variables and Keys
-
-using prefix `_`, `_privateKey` syntax
-you can also use them as keys
-
-### Conditionals and Loops
-
-Conditionals are a way of "enabling" or "disabling" blocks of properties.
-Notice that they don't have `:` after them.
-
-	if (someCondition)
-		foo: 10
-		bar: "hello"
-	else
-		foo: 20
-		bar: "world"
-
-you can also put it on same line
-
-	pet: if (introvert) cat else dog
-
-Like javascript, Axis can coerce objects to booleans. Objects are "truthy" if they are not `undefined`. Likewise, any variable that is `undefined` resolves to `false` in conditionals.
-
-Axis also uses short-circuit evaluation
-
-	foo: undefined
-	console.log(foo | "foo is not defined")->    // prints out "foo is not defined"
-
-Loops are actually just `mapreduce` functions in disguise.
-You can use destructuring, just like you would for a function.
-
-	for key, val in mHashmap:
-		console.log(key + ": " + val)->
-
-is the same as
-
-	mHashmap.map(key val => console.log(key + ": " + val)->)
 
 ### Tags
 
@@ -306,7 +245,7 @@ as you can see, often times hashmaps are used to define additional attributes an
 
 ### State Variables
 
-State variables are also just syntactic shorthand, useful in event handlers. State variables are just objects that represent an ordered list of states.
+State variables are also just syntactic shorthand, useful in event handlers. State variables are just objects that represent an ordered list of states. Because most things in Axis are unordered, we have to explicitly declare order when we want it, and state variables are great for doing so. For example:
 
 	numClicks: var 0      // state variable starting at "0"
 
@@ -362,14 +301,9 @@ one of the biggest things understand, is that because everything in Axis is unor
 
 then we can treat this data as persistent and always up to date. Which allows us to do something like this:
 
-	lightBulb: allClicks.length % 2 = 1   // mouse clicks will toggle lightBulb
+	lightBulb: allClicks.length % 2 = 1   // lightBulb is true if there are an odd number of mouse clicks. So every click will toggle lightBulb
 
-
-for example, let's say we were given a set of student test scores, and we wanted to find every test score that was above average. In imperative, this would take two steps, one for-loop to compute the average, and then another for-loop to find the test scores that are above average.
-
-In Axis, it would look like this:
-
-	testScores >>
+Let's try another example. Given a set of student test scores, we want to find every test score that is above average. In imperative, this would take two steps, one for-loop to compute the average, and then another for-loop to find the test scores that are above average. In Axis, it would look like this:
 
 	tag #aboveAverage.
 	
@@ -382,17 +316,17 @@ In Axis, it would look like this:
 
 This might seem a little weird. Remember that in imperative code, we would need two loops, one to compute the average, and one to see if each test score is above average. So how are we doing this in one loop? In the first "iteration" of the `for` loop, how can we set `score.#aboveAverage` if we haven't finished computing `average` yet?
 
-This is where you have to stop thinking in terms of execution, and instead think in terms of data relationships. All we are telling the interpeter, is that `sum` is the sum of all scores, `average` is the sum divided by the number of scores, and a score is `#aboveAverage` if it is bigger than `average`. That is all we need to specify, and the interpreter figures out the rest.
+This is we have to think in terms of data relationships, not execution. All we are telling the interpeter, is that `sum` is the sum of all scores, `average` is the sum divided by the number of scores, and a score is `#aboveAverage` if it is bigger than `average`. That is all we need to specify, and the interpreter figures out the rest.
 
-So let's explore how an interpreter _might_ go about computing this. When it reaches the `for` loop, it takes the first `score`, and inserts it into `sum`. `sum` notices the change, and updates accordingly. `average` notices the change in `sum`, and updates as well. Lastly, `score.#aboveAverage` notices the change in `average`, and updates accordingly. Now this is just for the first score. Then the interpreter moves onto the next score, and inserts it into `sum`. Again, `sum` gets updated, and then `average`, and then this update `#aboveAverage` for **both** the first score and the second score. Remember that bindings are persistent, so the first score is still listening for updates to `average`, even if the interpreter has moved onto the second score. This process will repeat until the interpreter has processed all scores.
+To get a better idea, let's explore how an interpreter _might_ go about computing this. When it reaches the `for` loop, it takes the first `score`, and inserts it into `sum`. `sum` notices the change, and updates accordingly. `average` notices the change in `sum`, and updates as well. Lastly, `score.#aboveAverage` notices the change in `average`, and updates accordingly. Now this is just for the first score. Then the interpreter moves onto the next score, and inserts it into `sum`. Again, `sum` gets updated, and then `average`, and then this updates `#aboveAverage` for **both** the first score and the second score. Remember that bindings are persistent, so the first score is still listening for updates to `average`, even if the interpreter has moved onto the second score. This process will repeat until the interpreter has processed all scores.
 
-This might seem extremely inefficient, with these feedback loops going back and updating previous variables. However, note that the dependencies in this example actually form a DAG (directed acyclic graph). In other words, there is no feedback. The order we should compute the variables should be `all scores => sum => average => all #aboveAverage tags`. This way, nothing needs to be computed twice. And this optimization is exactly what the interpreter would leverage to achieve the same level of efficiency as imperative code, without sacrificing the elegance of Axis syntax. As mentioned in the philosophy section, Axis is about focusing on data relationships, and leaving all execution optimizations to the interpreter.
+This might seem extremely inefficient, with these feedback loops going back and updating previous variables. However, note that the dependencies in this example actually form a DAG (directed acyclic graph). In other words, there is no feedback. The order we should compute the variables should be `all scores => sum => average => all #aboveAverage tags`. This way, nothing needs to be computed twice. And this optimization is exactly what the interpreter would leverage to achieve the same level of efficiency as imperative code, without sacrificing the elegance of Axis syntax. As mentioned in the philosophy section, Axis is about focusing on data relationships, and leaves all execution optimizations to the interpreter.
 
 However, there are times where the code _can_ introduce feedback, covered in the next section.
 
 (Note that to compute the total sum we could have just used `sum: Math.sum(...testScores)`, which is perhaps simpler, but the point of the example is to show the "timeless" nature of Axis)
 
-### Feedback - Convergent and Divergent
+### Feedback
 
 Feedback is an extremely powerful tool that is only possible using Actor-model languages like Axis. Although simpler forms are relatively common in imperative languages. For example, a cyclic data structure:
 
@@ -403,23 +337,9 @@ Feedback is an extremely powerful tool that is only possible using Actor-model l
 
 	console.log( Bob.child.parent.child.parent )->   // we can do this because of feedback
 
-Here, we have two objects referencing eachother. However, this is a pretty boring example of feedback, it's just a static structure. There is no cloning or calling. But what if we did something like this?
-		
-	distance:
-		km: m*1000
-		m: km/1000 | cm*100 | mm*1000
-		cm: m/100
-		mm: m/1000
+Here, we have two objects referencing eachother. However, this is a pretty boring example of feedback, it's just a static structure.
 
-	hikeDistance: distance(m: 1234)
-	mountainHeight: distance(km: 1)
-
-	console.log( "The hike is " +  hikeDistance.cm + " centimeters long" )->
-	console.log( "The mountain is " + mountainHeight.m + " meters high" )->
-
-Notice how you can initialize `distance` with any unit (km, m, cm, or mm), and the rest of the properties will automatically be computed. No need for getters.
-
-The real power of feedback becomes apparent in more complicated cases. One example is actually the `treeHeight` example given in the introduction section. But let's go over an extremely similar but slightly more complex example. What if we wanted to get the shortest path distance from a start node to an end node in a given graph?
+The real power of feedback becomes apparent in more complicated cases. One example is actually the `binaryTreeHeight` example given in the introduction section. But let's go over a similar but slightly more complex example. What if we wanted to get the [shortest path distance](https://www.geeksforgeeks.org/shortest-path-unweighted-graph/) from a start node to an end node in a given graph?
 
 	shortestDistance: graph start end >>
 		tag #distance: (default: infinity)      // stores each node's distance from the start node. Default value is infinity
@@ -434,7 +354,7 @@ The real power of feedback becomes apparent in more complicated cases. One examp
 
 In an imperative or functional language, such an example would require recursion and keeping track of visited nodes throughout the traversal. Not in Axis! We can use a simple for-loop to express the behavior. But how does this actually work?
 
-Think back to the `testScores` example in the "Timeless" section. We can analyze how the interpreter _might_ execute something like `shortestDistance`. First, all `#distance` values are by default set to infinity. Then, the first node to be updated will be the start node, whose `#distance` is set to 0. Then, the neighbors of the start node will be notified of the update, and each node will look for the closest neighbor, which should now be the start node, with a `#distance` of 0. Since the shortest distance for these neighbor nodes is 0, so the node will update its new `#distance` to be 1. This will in turn notify the neighbors of those nodes, and the cycle will repeat until all shortest distances are computed. Due to the way this function was defined, we know that eventually, every node `#distance` will reduce to some final value, and stop sending updates to other nodes. We call this type of feedback "convergent".
+Think back to the `testScores` example in the "Timeless" section. We can analyze how the interpreter _might_ execute something like `shortestDistance`. First, all `#distance` values are by default set to infinity. Then, the first node to be updated will be the start node, whose `#distance` is set to 0. Then, the neighbors of the start node will be notified of the update, and each node will look for the neighbor with the shortest distance,in this case the start node with a `#distance` of 0. Since the shortest distance is 0, each of these nodes will update their `#distance` to be 1. This will in turn notify the neighbors of these nodes, and the cycle will repeat until all shortest distances are computed. Due to the way this function was defined, we know that eventually, every node `#distance` will reduce to some final value, and stop sending updates to other nodes. We call this type of feedback "convergent".
 
 Note that this method was only possible because we had a list of all graph nodes available through `graph.nodes`. This is provided in the `Graph` data structure, but let's look at how we might implement it ourselves. In order to do so, we have to fall back to using recursion:
 
@@ -446,14 +366,14 @@ Note that this method was only possible because we had a list of all graph nodes
 			nextNodes: currentNodes[['neighbors']].subtract(visited)     // get neighbors of current nodes, minus already visited nodes
 			=> breadthFirstSearch(visited, nextNodes)
 
-Imperative code requires similar complexity to retrieve all nodes from a graph (either using loops or recursion). The difference is that in Axis, after we retrieve all the nodes, we can use them in a whole variety of use cases, like computing distances (as shown earlier) or finding connected pairs or filtering for certain nodes, etc. We only have to define this recursion once. But in imperative languages, in order to do stuff like computing distance or finding connected pairs, we would have to use recursion over and over again.
+Imperative code requires similar complexity to retrieve all nodes from a graph (either using loops or recursion). The difference is that in Axis, after we retrieve all the nodes, we can use them in a whole variety of use cases, like computing distances (as shown earlier), finding connected pairs, filtering for certain nodes, etc. We only have to define this recursion once. But in imperative languages, in order to do stuff like computing distance or finding connected pairs, we would have to use recursion over and over again.
 
 This just demonstrates the power of abstracting data relationships away from implementation. We define the "implementation" once to retrieve the data (in this case, using breadth first search to get all nodes). Then we can use the data without worrying about the implementation again. We maximize abstraction and reduce code duplication.
 
 
 Note that while feedback is very powerful, we do have to take care in using it. For example, if we did something like `x: x+1`, this would be a feedback loop that would constantly increment `x` until it reached infinity. Likewise, we would run into similar problems if we tried to modify our `shortestDistance` example to instead look for `longestDistance`. Intuitively, we know this wouldn't work, because imagine trying to find the longest distance in real life. We could just run around in circles before reaching the destination to make the path as long as we wanted. And this is exactly what would happen here with `shortestDistance` if we tried calculating longest distance by replacing `Math.min` with `Math.max` and setting the default distance to `0`. When the `#distance` of any node increases, the `#distance` of all of its neighbors will increase too, and the feedback would cause the distance for all nodes to steadly increase until infinity. This sort of feedback is called "divergent", and is something to watch out for, just like one might want to watch out for infinite loops in imperative languages.
 
-### Web Technologies API Calls
+### Web Applications
 
 Let's take the chatroom example from the introduction, and this time include the layout:
 
@@ -466,11 +386,11 @@ Let's take the chatroom example from the introduction, and this time include the
 			layout: JSX    // using jsx syntax
 				<input class="username"/>
 				for user in activeUsers
-					<span>{user}</span>
+					<span> {user} </span>
 				for message in messages.orderBy('time')->
-					<p>{message.text}</p>
+					<p> {message.text} </p>
 				<text-area class="message-draft"/>
-				<button onclick={send}>Send</button
+				<button onclick={send}> Send </button>
 
 			username: layout.find('input.username').value
 			draft: layout.find('text-area.message-draft').value
@@ -480,7 +400,7 @@ Let's take the chatroom example from the introduction, and this time include the
 			send: => @timestamp
 				messages <: (time: timestamp, user: username, text: draft)
 
-One of the difficulties when writing full-stack web applications is, often it can be ambiguous whether or not to put behavior in the server or in the client. For example, imagine if we wanted a web app that displayed all of a user's photos, potentially thousands of photos. On one hand, we could load the photos dynamically as the user scrolls through the album, but if the user has a slow internet connection, they would have to wait for photos to load every time they scrolled. On the other hand, we could proactively cache all photos on the client side so that the user can scroll smoothly, but then that would require a lot of memory on the client side. The best solution would probably be to do a mix of the two, caching only a few photos ahead of time, but this makes for a complicated dynamic caching mechanism. And while there's nothing wrong with complex optimizations like this, the problem is that current imperative languages force us to mix our business logic with our optimizations, so every optimization we make sacrifices flexibility and readability.
+One of the difficulties when writing full-stack web applications is, often it can be ambiguous whether or not to put behavior in the server or in the client. For example, imagine if we wanted a web app that displayed all of a user's photos, potentially thousands of photos. On one hand, we could load the photos dynamically as the user scrolls through the album, but if the user has a slow internet connection, they would have to wait for photos to load every time they scrolled. On the other hand, we could proactively cache all photos on the client side so that the user can scroll smoothly, but then that would require a lot of memory on the client side. The best solution would probably be to do a mix of the two, caching only a few photos ahead of time, but this makes for a complicated dynamic caching mechanism. And while there's nothing wrong with complex optimizations like this, the problem is that current imperative languages force us to mix our business logic with our optimizations, so every optimization we make sacrifices flexibility and readability, and reduces code reuse.
 
 Also, current web applications have a very strict separation between the server and client, with all communication handled through clunky HTTP requests or web sockets. Not only do they add lots of overhead, but they also make it difficult to migrate behavior between the server and client when we want to make changes. We are also forced to use HTTP requests when calling 3rd party APIs, which often leads to a complicated mess of callbacks, promises, or `async/await` patterns.
 
@@ -488,15 +408,15 @@ With Axis, everything is kept clean and simple. From the chat server example abo
 
 In addition, not only is the communication between server and client seamless, but Axis also makes it easy to communicate with 3rd party APIs. Other servers on the internet can be treated like any other object, so programs and access properties, clone behavior, or insert data without worrying about callbacks or promises.
 
-This high level of abstraction allows the Axis interpreter to make decisions on how to execute the code and manage the memory, so we don't have to worry about it. But we can also specify custom optimizations if we want. However, we can define those optimizations separately using annotations and metaprogramming. Instead of manually reconfiguring our code, we use functions and metaprograms to programmatically reconfigure out code. For example, for the photo library example talked about in the previous paragraphs, we might do something like
+This high level of abstraction allows the Axis interpreter to make decisions on how to execute the code and manage the memory, so we don't have to worry about it. But we can also specify custom optimizations if we want. However, we can define those optimizations separately using meta-programming. We don't need to manually rewriting our code like we do for imperative languages. By treating execution the same as data, we can dynamically reconfigure and optimize our code. For example, for the photo library example talked about in the previous paragraphs, we might do something like
 
 	PhotoLibraryOptimized: PhotoLibraryServer
-		index: cacheOptimization
+		index: cacheOptimization template
 			target: PhotoLibraryServer.index
 			range: 10      // how many photos ahead and behind that we should cache
-			cache: target.photos.slice(target.currentPhoto - range, target.currentPhoto + range)
+			cache: target.photos.slice(target.currentPhoto - range, target.currentPhoto + range)   // give a reference to all data that should be cached
 
-From this, the interpreter will know how to cache the photos, and might also reconfigure other behavior to fit with this optimization. The key thing to notice here is that the optimization is separate from the application logic. This means that we can read and alter the web application, without worrying about the optimizations. And this also means that we can apply this optimization to many different web applications.
+From this, the interpreter will know what photos to cache, and might also reconfigure other behavior to fit with this optimization. The key thing to notice here is that the optimization is separate from the application logic. This means that we can read and alter the web application, without worrying about the optimizations. And this also means that we can apply this optimization to many different web applications. In fact, developers can upload their optimizations to public repositories. Then, other developers can import them and see if they help. Optimizations become like any other object, easy to import and tweak for one's own use.
 
 ## Testing and Mocking
 
