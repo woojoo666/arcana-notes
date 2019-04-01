@@ -62,7 +62,7 @@ Everything in Axis is an "object", which is just a collection of properties. The
 	someObject.name                      // use "." to access properties, so this will return "Joe"
 	someObject.age = 20                  // "=" is the equality operator, so this will return true
 
-	console.log("hello world")->         // this prints "hello world" to the console. This syntax actually uses both "cloning" and "function calling", explained in later sections
+	console.log("hello world")         // this prints "hello world" to the console. This syntax actually uses both "cloning" and "function calling", explained in later sections
 
 
 	if (someObject.age > 18) "adult" else "child"     // conditionals use if...else, so this will return "adult"
@@ -83,19 +83,19 @@ We can use indented blocks to define objects and lists as well
 			first: "Bob"
 			last: "Smith"
 
-	console.log( Bob )->          // Bob is in scope, so this will print out the object Bob
-	console.log( isAdult )->      // isAdult is not in scope, so this will prints "undefined"
-	console.log( Bob._age )->     // _age is private, so this won't work, prints "undefined"
+	console.log( Bob )          // Bob is in scope, so this will print out the object Bob
+	console.log( isAdult )      // isAdult is not in scope, so this will prints "undefined"
+	console.log( Bob._age )     // _age is private, so this won't work, prints "undefined"
 
 We can use loops to define repeated behaviors
 
 	joe: (name: "Joe", age: 20) 
 
 	for key, val in joe:
-		console.log(key + ": " + val)->    // will print "name: Joe" and "age: 20"
+		console.log(key + ": " + val)    // will print "name: Joe" and "age: 20"
 
 	for key in joe.keys:
-		console.log(key)->                 // will print "name" and "age"
+		console.log(key)                 // will print "name" and "age"
 
 Lastly, the keyword `undefined` basically means that we are trying to access a value that hasn't been defined. For example, if we try to access `someObject.height`, it will return `undefined`.
 
@@ -143,10 +143,10 @@ Cloning can do much more than just provide values for parameters. We can also us
 		name, school >>
 		greeting: Person.greeting(name) + ". I go to " + school
 
-	alice: Student("Alice", "Harvard", console.log(this.greeting)->)    // create a new student, and automatically print her greeting to console
+	alice: Student("Alice", "Harvard", console.log(this.greeting))    // create a new student, and automatically print her greeting to console
 	bob: joe(name: "Bob")                                               // creates a student with the same behavior as alice, so he also logs his own greeting
 
-Notice that when we clone `alice` to create `bob`, the function `console.log(this.greeting)->` will be called again. This might seem counter-intuitive, because in imperative languages, function calls are executed before they are passed as arguments. However, remember that this is not a function call, we are extending an object, and defining new behavior.
+Notice that when we clone `alice` to create `bob`, the function `console.log(this.greeting)` will be called again. This might seem counter-intuitive, because in imperative languages, function calls are executed before they are passed as arguments. However, remember that this is not a function call, we are extending an object, and defining new behavior.
 
 ### Insertion and Collectors
 
@@ -157,7 +157,7 @@ We can declare a `collector`, which allows us to insert values to it from anywhe
 	foo <: 1
 	foo <: 2
 
-	console.log(foo)->       // insertions are unordered, so this could print "(1 2)" or "(2 1)"
+	console.log(foo)       // insertions are unordered, so this could print "(1 2)" or "(2 1)"
 
 Collectors make it easy to "construct" objects like we would in imperative languages. It's also important to remember that insertions are unordered, just like object properties and pretty much everything else in Axis.
 
@@ -168,7 +168,7 @@ We can insert to any object, no restrictions. However, by default, objects ignor
 	for num in (1 2 3)
 		foo <: num * num
 
-	console.log(sum)->       // will print 1+4+9, aka "13"
+	console.log(sum)       // will print 1+4+9, aka "13"
 
 By leveraging insertion, we can also define object methods (like class methods in Python/Java)
 
@@ -179,7 +179,7 @@ By leveraging insertion, we can also define object methods (like class methods i
 		song: name, artist >>
 			songs <: (name, artist)
 			artists <: artist
-			console.log("song added")->
+			console.log("song added")
 
 	song1: Library.song('Never Gonna Give You Up', 'Rick Astley')
 
@@ -197,7 +197,7 @@ So to tweak the example from before, we simply change `song` to a template:
 			name, artist >>
 			songs <: (name, artist)
 			artists <: artist
-			console.log("song added")->
+			console.log("song added")
 
 	song1: Library.song('Never Gonna Give You Up', 'Rick Astley')
 
@@ -206,7 +206,7 @@ This way, the initial `song` object won't insert anything, and won't print "song
 There is another special kind of object called a "function". The purpose of a function is to represent an action. We define the output of the action (called the "return value") using `=>`, and then call the function using `->` to get the output. For example:
 
 	add: a b >>
-		console.log("adding numbers")->
+		console.log("adding numbers")
 		=> a+b
 
 	add(10, 7)->     // returns 17
@@ -232,7 +232,7 @@ Tags are actually just a syntax shorthand for defining and using hashmaps. To il
 	for car in cars
 		isEcoFriendly.add(car, car.fuelEconomy > 30)     // cars over 30 miles/gallon are eco friendly
 
-	console.log(isEcoFriendly[prius])->         // will print "true". Assume "prius" is in the set "cars"
+	console.log(isEcoFriendly[prius])         // will print "true". Assume "prius" is in the set "cars"
 
 This is what it looks like using tags
 
@@ -241,7 +241,7 @@ This is what it looks like using tags
 	for car in cars
 		car.#isEcoFriendly: car.fuelEconomy > 30
 
-	console.log(prius.#isEcoFriendly)->         // will print "true" (assume "prius" is somewhere in the set "cars")
+	console.log(prius.#isEcoFriendly)         // will print "true" (assume "prius" is somewhere in the set "cars")
 
 as you can see, often times hashmaps are used to define additional attributes and properties for objects, without modifying the original objects. They are extremely common for data processing. Tag syntax makes it actually look and feel like you are working with properties, even though you aren't actually modifying/retrieving properties from the object. This is why tags can also be thought of as "virtual properties".
 
@@ -329,7 +329,7 @@ Feedback is an extremely powerful tool that is only possible using Actor-model l
 	Alice:
 		parent: Bob
 
-	console.log( Bob.child.parent.child.parent )->   // we can do this because of feedback
+	console.log( Bob.child.parent.child.parent )   // we can do this because of feedback
 
 Here, we have two objects referencing eachother. However, this is a pretty boring example of feedback, it's just a static structure.
 
