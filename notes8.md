@@ -3869,7 +3869,7 @@ Leaving a perspective is like entering a perspective with negative properties
 
 
 
-### separating virtual properties from private properties ???
+### Separating Virtual Properties From Private Properties
 
 while we can combine them, by changing behavior based on where it was created
 problem is, the point of virtual properties is to allow any object to be modified
@@ -4030,7 +4030,7 @@ let's consider a hashmap declared outside the scope
 and calling the hashmap.add function
 (unfinished)
 
-### 
+### virtual properties vs hashmaps vs wrappers vs cloning
 
 We talked earlier about how virtual properties are carried during cloning
 And that can be useful for generating a bunch of objects with an attached dynamic property
@@ -4107,21 +4107,21 @@ so we can use private properties for this instead
 
 StoreOrder example
 
-StoreOrder:
-    cart:
-        item1: count1
-        item2: count2
-    total: cart.properties.map(...).apply(Math.sum)
-        item, count => item.price * count
+	StoreOrder:
+	    cart:
+	        item1: count1
+	        item2: count2
+	    total: cart.properties.map(...).apply(Math.sum)
+	        item, count => item.price * count
 
 now we live in a SuperTax country that adds a tax
 
-foo: storeOrder >>
-    for item, count in storeOrder.cart
-        storeOrder <: #tax(item)
+	foo: storeOrder >>
+	    for item, count in storeOrder.cart
+	        storeOrder <: #tax(item)
 
 Keys are rarely referenced individually, more useful as groups
-Like "for k in object.keys"
+Like `for k in object.keys`
 
 Hashmaps are just objects with add/remove
 But virtual properties are used to *declare keys*
@@ -4132,15 +4132,15 @@ Private vars are just virtual properties at the object scope?
 Virtual properties work just like normal properties within scope?
 But we only use virtual properties on objects out of scope, thats the whole point
 
-Note that StoreOrder.cart is actually a hashmap because the keys are objects
+Note that `StoreOrder.cart` is actually a hashmap because the keys are objects
 And even though the keys are objects we want them to be public
 
-We still could have implemented StoreOrder.cart using virtual properties
-Basically generate a #cart tag for the given user, and tag the items that are in their cart
+We still could have implemented `StoreOrder.cart` using virtual properties
+Basically generate a `#cart` tag for the given user, and tag the items that are in their cart
 But here, it seems more intuitive to use a hashmap
 
 So in some cases you do want a hashmap
-Are we just adding more ambiguity by adding vietual properties?
+Are we just adding more ambiguity by adding virtual properties?
 Now the user has to decide if he wants to use a hashmap or a virtual property
 
 Though for a hashmap, it seems like we want object keys to be public by default
@@ -4149,14 +4149,15 @@ For virtual properties, we would want object keys to be private
 Because you don't iterate through the tag directly, you check objects to see if they have the property/tag
 
 Though sometimes you do want all objects that have a certain tag...
+	talked about in the section "Revisiting Core Concepts - Tagging and Labeling"
 
-I just realized that allowing <: for in scope variables
+I just realized that allowing `<:` for in scope variables
 Is allowing one-level deep modification
 when we do
 
-foo:
-    bar.
-    bar <: x: 10
+	foo:
+	    bar.
+	    bar <: x: 10
 
 We are modifying bar's internal properties from foo's scope
 
@@ -4165,8 +4166,10 @@ So we never need to use virtual properties for public properties
 Because all objects are in public scope, no object is created outside of public scope and imported in
 All objects have access to public tags
 
+### Virtual Properties is just Property Access Syntax for Hashmaps
+
 Virtual properties are just a way of bringing property access syntax to hashmaps
-Eg the "with" syntax
+Eg the `with` syntax
 And that's good enough for now I think
 
 
@@ -4331,16 +4334,16 @@ class Main {
 
 
 
-
+### Virtual Properties and Plugins
 
 You can use virtual properties to extend and attach plugins to objects
 For example, if you wanted to extend all arrays with matrix functions, you can do
 
-let #matrix: import Math.matrix
-for list in input
-    list <: #matrix
+	let #matrix: import Math.matrix
+	for list in input
+	    list <: #matrix
 
-input.foo.#matrix.invert()
+	input.foo.#matrix.invert()
 
 
 

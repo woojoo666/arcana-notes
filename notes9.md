@@ -4670,6 +4670,7 @@ this is like, a functional function, that takes in IO, and if it doesn't get it,
 
 
 
+### Shortest Distance Example - Default Value of Infinity
 
 actually note that we have to correct #distance a bit
 
@@ -4939,3 +4940,697 @@ but can we find a concrete example of this?
 
 and if they do, then choosing an arbitrary method like breadt-first traversal, might help make the language deterministic
 but it also means that the programmer has to learn, and keep in mind, these rules when dealing with feedback
+
+
+
+### Are Functions Necessary? Are Permanent Templates Necessary?
+
+* before, when we just used list items as outputs, it made it easy to declare functions with multiple outputs
+* and it integrated nicely with `map` and `for`
+* now, if we want to have our original `for` functionality where you can define multiple items to be inserted into the map
+* we have to have two `map` functions, one that takes in a function like `add: a b => a+b` (because many behaviors will be defined as functions),
+	* and one that takes in a list like `returnTwoItems: a b >> (a+b, a*b)`
+
+* are permanent templates really necessary?
+* doing builder pattern like `addSong2: template addSong(10)(x: 20)(y: 30)` is more clear anyways
+
+* maybe `->` is used for getting the first list item
+* we won't need it if we are just executing an action, eg `console.log("hello world")`
+
+* note that now that functions are templates, it's impossible to access list items anyways, so why not leverage them for function output
+
+* how would something like `Square.rotate` work?
+* and would `addCard` simply look like `card` now? wouldn't it be confusing just saying `Deck.card(10)` and expecting insertion to the deck? isn't `Deck.addCard(10)` more intuitive?
+
+
+### State Variables and Defining Time-Varying Values
+
+* when we want to say "send a message if the client is connected", it is intuitive to do as follows
+
+		if (connected)
+			send: @timestamp
+				messages <: message
+
+* however, this is incorrect (the correct method is shown in the `ChatServer` example)
+* but why is the incorrect answer so natural and intuitive?
+
+* it feels like you want to enable the message handler only when connected
+* but when you use `if (connected)`, it is a timeless state, it only depends on the current value of `connected`
+* so everything inside will either be all on, or all off
+* when the client disconnects, all messages will disappear
+* what you really want, is for `send` to work sometimes, while not at other times
+* aka time-specific
+* that means you have to have time as a parameter
+
+* eg
+
+		send: @timestamp
+			if (connected[timestamp])
+				messages <: message
+
+* one of the cool things about doing something like
+
+		send: @timestamp
+			messages <: message
+
+* is that, because you aren't dependent on the client being connected
+* you can still "send" messages while disconnected
+* they will be queued
+* but once you reconnect, all those messages will be sent
+
+
+### Functions and Transformations - Compatibility between Objects and Permanent Templates
+
+* if you wanted to apply a bunch of modifications/transformations to a function
+* that are usually meant for objects
+* something like `tweak(reconfigure(invert(fn)))`
+* how would you do that
+* well actually you can just do `newFn: template tweak(reconfigure(invert(fn)))`
+* in fact, if an object is supposed to take in an object
+* it will specify so by accessing properties
+* and in that case, passing in a function won't work anyways
+
+* but it does feel like functions are treated differently from objects
+* like if you make functions templates
+* it doesn't seem to make sense that they would activate when cloned
+* they should either be permament templates, or not a template at all
+
+
+### Compatibility - One-Off Templates and Permanent Templates
+
+* can you replicate permanent templates with one-off templates?
+* not really...with permanent templates you can do `myTemplate->` and run the template
+* but if we made functions just objects with a special property, `->` would just be property access
+* and property access is a read-only operation, doesn't make any changes
+
+
+* notice that if you had a some transformations that treated the input as an object, not a template
+* then you can't pass in a permanent template
+* because the transformation would be cloning the object and then accessing properties
+* likewise, if you had a transformation that treated the input as a function/permanent template
+* you can't pass in an object
+* because it might be calling the input, and you can't call objects
+* one-off templates and permament templates are incompatible
+* and they increase ambiguity
+	* you would constantly wonder: should I use a one-off template here? or a permanent template here?
+* and every transformation you make, you would have to choose whether to tailor it for one-off or permanent templates
+
+
+### Detecting Feedback
+
+* we talked previously about how we shouldn't prevent feedback
+* because its a mechanism that can arise naturally from independent actors
+* and we don't want to restrict the behavior/freedom of our actors
+* however, note that we can detect feedback in local systems
+* if we use the breadth-first-search traversal of stepping through updates
+* if one update pass has the same number of updates as the previous update pass
+* there must be feedback
+* because in acyclic graph, there will be nodes that have no dependencies
+* and those will be fully resolved by the next update
+* actually the number of nodes isn't enough,
+	* because an update pass might resolve 10 nodes, but also introduce 10 new nodes that need updating
+* we need to keep track of the exact nodes that need updating at each pass
+
+_if the nodes that need updating ever stays constant between passes, we know there is feedback_
+
+* while we can't prevent feedback across programs
+* we can use feedback detection to warn the programmer of feedback within a single program
+* and it can be used to catch bugs
+
+
+### One-Off Templates vs Permanent Templates - Transform and Run
+
+* one-off templates and permanent templates are two sides of the same coin
+* for any template, you can do two things: modify/transform the template, or run the template
+* one-off templates:
+	* transform by creating a new template, `oldTemplate(template ...transformations)`
+	* run using cloning
+* permament template:
+	* transform via cloning
+	* run via calling
+* whenever you "use" a template, you can choose to do either thing
+* and it is a conscious choice
+* only difference is, whether the default behavior for cloning should be to transform or run the template
+
+* but this also means that we should only use one
+* either one-off templates or default templates
+* because if we had a function that takes in one-off templates `fn`, and another that takes in permanent templates `gn`
+* then we can't pass in permanent templates into `fn` or one-off templates into `gn`
+* unnecessary incompatibility
+
+### Cloning Objects or Calling Functions inside @-Blocks
+
+* when in a @-blocks, all clones/calls should also add the index as an argument
+* eg
+
+		onClick: @timestamp
+			Deck.addCard()
+			numClicks := numClicks + 1
+
+* is the same as
+
+		onClick: timestamp >>
+			Deck.addCard(timestamp:^)
+			numClicks.set(timestamp:^, value: numClicks.at(timestamp) + 1)
+
+* this way, you can easily call handlers from inside a handler
+
+
+### Multi-Variable / Composite-Index State Variables
+
+* multivariable state variables
+* what if you wanted to order it by `(timestamp, index)`
+
+* maybe just create a new index that combines the two
+
+		composite_index: timestamp + "," + index
+
+* this composite is a string, so if we sort by lexicographical order,
+* timestamp will have precedence, but if two indexes have the same timestamp, it will be ordered by `index` instead
+
+### State Variables - Indexes and Comparators
+
+* index doesn't have to be a number
+* as long as it extends the comparison function
+* because all a state variable needs to do for `set` and `at` to work properly
+* is to order the entries
+* so that you can insert and retrieve entries by index
+* so the `set` and `at` functions just use `>` and `<` and `=` when figuring out where to insert/retrieve an entry
+* so as long as your index supports those comparators, it should work
+
+* numbers obviously support those comparators
+* strings also do, using lexicographic ordering
+* but you could create a custom comparable object
+
+		my_comparable_object:
+			_self: this
+			_bigger_than: other >>
+				if (someFn(_self, other)) => true
+				else => false
+
+* and then use this comparable object as an index for state variables
+
+		someStateVar.set(my_comparable_object, "some value")
+
+* note that the "less than" `<` operator will just flip the inputs and leverage the `_bigger_than` comparator
+
+### Scoped Variables, Flexible Overriding, and Escaping
+
+* when you reference a var, you are implicitly doing `_scope.<variable name>`
+* eg `x: y+1` is short for `x: scope.y + 1`
+* if you want to explicitly bind to a specific variable
+* add some preceding parents, eg instead of `x` do `some.path.to.x`
+* though note that this is still just short for `_scope.some.path.to.x`
+
+* this makes it flexible
+* ensures that you can "override at any leveL"
+* discussed in a previous section (see section "Implicit Inputs/Functions and Bounding Scope II")
+
+		foo:
+			bar:
+				x: y+1
+
+		foo(y: 10)        // this will change the value of `x`
+		foo.bar(y: 10)    // this also changes the value of `x`
+
+* but then, how do we do `foo: foo` but make it so it references the outer scope's `foo` (no feedback)
+* without specifying an explicit path, like `foo: some.path.to.foo`
+
+
+* this is why the "escape" operator `^` is useful
+* mentioned in a previous section
+	// TODO: FIND REFERENCED SECTION
+
+
+* this flexible overriding could be a cause for security concern
+* if you can guess what variables a module is using
+* you can override it
+* even if they try to specify a path like `some.path.to.foo`
+* if you can guess the path root (in this case `some`), you can override that instead
+
+* the only way to guard against these hacks
+* is to use a private var as the path root, `_some.path.to.foo`
+* but that would require using private variables everywhere in your parent scopes
+* just to guard against these attacks
+
+
+### Functions as One-Off Templates
+
+(continued from "One-Off Templates vs Permanent Templates - Transform and Run")
+
+* in previous section, we talked about how we shouldn't have both one-off and permanent templates
+	* see section "One-Off Templates vs Permanent Templates - Transform and Run"
+* because they are two sides of the same coin
+* and having both would create unnecessary incompatibility
+
+* one-off templates seem like the most intuitive
+* and the most in-line with our prototypal mindset
+
+* so how should functions work?
+* maybe functions should just be one-off templates
+* when you use `=>` you automatically make it a one-off template as well
+* so if you clone a function, eg `fn()`, it will "activate" the template
+
+* and if you want to transform a function, you have to either use the `template` keyword
+
+		newFn: someFn template
+			x: 10
+
+* or override `=>`
+
+		newFn: someFn
+			=> x*x     // override return value, which also makes this a template
+
+* however, we should still use the `->` syntax if you want to extract the return value
+* because otherwise, if we made `fn(...args)` automatically return the return value, it could look confusing
+	* see section "Call Operator and Catching Mistakes"
+* note that this means, even if you call with no arguments, you have to use `->`, eg `fn()->`
+
+* actually we can make a special case
+* if you have `someFn->` with no parenthesis, it automatically clones `someFn` before extracting return output
+* because otherwise `someFn->` would always just be `undefined` anyways
+
+
+* or maybe we _can_ make it so functions automatically return the output when called?
+	* that way you could just do `fn(args)` instead of `fn(args)->`
+* after all, we should be using verbs for functions and nouns for objects
+	* see section "verbs vs nouns"
+* so it should be clear if it's a function or an object
+
+* though it still feels really ugly to have cloning syntax, eg `someObj(args)`, do different things based on if it's an object or a function
+
+* we want to make syntax explicit and consistent
+
+* however note that templates seems to be the only exception
+* with templates, you don't know from the object name, whether it's a template or not
+* so you won't know if you can "use" the object (aka access it's properties)
+* but for some reason, one-off templates still ended up being the most intuitive mechanism for templates
+
+
+### Compatibility - Objects and One-Off Templates
+
+* recall that earlier we discussed how functions that handled one-off templates wouldn't work with permanent templates
+	* see section "Compatibility - One-Off Templates and Permanent Templates"
+* and vice versa
+* which is a problem because, due to dynamic typing, it's always unclear what "type" an object is
+* so we want to make our functions as universally compatible as possible
+* so that we don't have to worry about "oh if I make this function take in one-off templates, then it won't work with permanent templates"
+
+* so this was one of the reason why we got rid of permanent templates in favor of one-off templates
+* prevents re-usabilitiy
+* but this same sort of issue happens between one-off templates and regular objects
+
+* templates are the only case where, we have to know if the object is a template or not
+* if we want to use the object (aka access it's properties)
+* does this create cases where you might have a function that works with objects, but not templates?
+* and that was one of the reasons why we chose not to 
+
+
+example:
+
+	transform1: input >>
+		a: input.x
+		b: input.y
+
+	transform2: input >>
+		input.a
+		input.b
+
+	foo: template transform2(transform1(bar))
+
+
+* seems like you should defer usage of `template` as late as possible
+* so when defining transformations, don't use `template`
+
+* this seems like functional
+* where, if you want to "apply" the modifications and side-effects of a function
+* you have to manually pull them out and apply them
+* our language is like the opposite, if you _don't_ want to apply the modifications, use `template`
+
+* the main difference is that, in functional, you can get function results without applying the side-effects
+* in our language, the side-effects are bound to the result
+* if you want the result, you have to apply the side-effects
+
+
+* actually, there might be problems
+* what if you wanted to do
+
+		megatransform: input >>
+			temp: transform2(transform1(bar))
+
+			first: transform3(temp)
+			second: transform4(temp)
+			=> (first, second)
+
+* technically, if you pass in a modifier, eg `console.log`, then the transformation should only result in 2 modifiers
+* but will `temp` also result in a third modifier?
+
+* what we want is to be able to pass in something like `console.log` and get two result templates, eg `log1` and `log2`
+* and then we can do `log1("hello")` or `log2("hello")` to actually execute the behavior
+* but is that possible with this code?
+* this would be possible with permanent templates, but what about one-off templates?
+
+another example
+
+	fiveflavors: input >>
+		flavor1: input(console.log("flavor1"))
+		flavor2: input(console.log("flavor2"))
+		flavor3: input(console.log("flavor3"))
+		flavor4: input(console.log("flavor4"))
+		flavor5: input(console.log("flavor5"))
+
+	obj:
+		name: "obj"
+		console.log("obj run")
+
+	temp: fiveflavors(obj)  // somehow we want to prevent it from running here
+	temp.flavor3()          // but we want it to run here
+
+* notice that we can't just make `temp` a template, because then we can't access `temp.flavor3`
+* this would work if we made `obj` a permanent template, and then just called it with `temp.flavor3()->`
+* but we want to get rid of permanent templates
+
+* we could write another version of `fiveflavors` to use templates, but that would ruin the point of reusability
+* we want `fiveflavors` to work for both objects and templates
+
+* if we truly want to get rid of permanent templates, we have to show that everything that can be done permanent templates,
+* can also be done with one-off templates
+
+* it does seem like we can do this with one-off templates, in a weird way
+* instead of passing in `obj`, pass in an empty object to "gather" and aggregate all the definitions and transformations
+* and then apply the aggregated transformations once on `obj`
+* like so:
+
+		temp: fiveflavors( () )
+		obj(temp.flavor3)
+
+* notice that we do `obj(temp.flavor3)`, not `temp.flavor3(obj)`, because we want the transformations to take precedence over existing properties in `obj`
+
+* there is still one major difference between this method and using permanent templates
+* in this method, the call `fiveflavors( () )` will log "flavor1", "flavor2", etc, to the console
+* whereas with permanent templates, `fiveflavors( permanentTemplate )` will not log any of these to console
+* note that if `fiveflavors` had some other logging hidden in private behavior, eg
+
+		fiveflavors: input >>
+			flavor1: input(console.log("flavor1"))
+			...
+
+			_hidden:
+				console.log("hidden")
+
+* there is no way to prevent this from being logged
+* we need to clone and run `fiveflavors` in order to extract `flavor3` in the next step
+* however, the log statements for "flavor1", "flavor2", etc, are different
+* the statements aren't really part of the running behavior of `fiveflavors`
+* it's more like definitions that are being passed into the `input`
+
+* it seems like a lot of this weirdness stems from the fact that templates change how cloning works
+* and cloning is such a fundamental operation that isn't affected by pretty much anything else
+
+
+* it seems like the difference is
+* permanent templates, the caller controls what happens (if the output is a template or not)
+* with one-off templates, the callee controls if the output is a template or not
+
+
+* this sort of makes sense
+* if you wanted `fiveflavors` to be like, a template-making factory
+* then you would explicitly say so
+* eg
+
+		fiveflavors: input >>
+			flavor1: template input(console.log("flavor1"))
+			...
+
+* and then the user can select which template they want
+
+		fiveflavors(obj).flavor3()
+
+
+### Cloning and Reference Transfer
+
+* since functions are objects, we end up with some complications using the `this` keyword
+
+		foo: bar
+			console.log(this.name)   // this will actually print `console.log.name`, not `foo.name`
+
+* notice that if we used `this`, then since we are cloning `console.log`, the `this` will actually refer to `console.log`, not `foo`
+
+* maybe we should just reference by variable name
+
+		foo: bar
+			console.log(foo.name)
+
+* note that if `foo` is cloned, then the clone's `foo.name` reference will be bound to the clone, not `foo`
+* if you wanted it to always bind to `foo`, you would have to use the parent of `foo`
+* eg
+
+		parent:
+			foo: bar
+				name: "original"
+				console.log(parent.foo.name)
+
+		parent.foo(name: "clone") // the clone will still reference foo's original name, so this will print "original"
+
+* this is important, and I'm not sure if we have mentioned it before
+* basically, when cloning an object, any references to variables inside the object,
+	_including references to the the object itself_, will point to the clone instead of the object
+* the references are "transferred" to the clone
+
+
+* note that this also means we have to be careful about anonymous objects,
+
+		fn(10, 20, someObject(...))
+			console.log( ???.name )
+
+* there is no way to refer to the clone we are making of `someObject`
+* instead, we would either have to give it a name:
+
+		temp: someObject
+			console.log( temp.name )
+		fn(10, 20, temp)
+
+* or create a `_self` variable:
+
+		fn(10, 20, someObject(...))
+			_self: this
+			console.log( _self.name )
+
+* this is similar to how [`that` is used in javascript](https://stackoverflow.com/questions/14871757/use-of-that-keyword-in-javascript)
+
+
+### Virtual Properties and Plugins II
+
+(this was actually sort of explored in the section "Virtual Properties and Plugins")
+
+* notice that often for functions
+* eg `shortestDistance` or `treeHeight`
+* it makes more sense for them to be properties
+* for example, instead of
+
+		binaryTreeHeight: tree >>
+			tag #height.
+
+			// calculate height of all nodes
+			for node in tree.nodes:
+				node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // define our height as the height of our left or right subtree + 1
+
+			=> tree.#height   // return height of root node
+
+* instead we can define `height` as a property of some library
+
+		someLibrary: tree >>
+			height:
+				...
+
+* and then use it like so:
+
+		extendedTree: someLibrary(tree)
+		extendedTree.height
+
+* another way we can use it
+
+		tree.apply(someLibrary).height
+
+(recall that `x.apply(fn)` is the same as `fn(x)`)
+
+* another way to do this could be using tags
+
+		tag #someLib:
+			[someTree]: someLibrary(someTree)
+
+		tree.#someLib.height
+
+* this should work, because of object-key inversion, `tree.#someLib.height` is the same as `#someLib[tree].height`
+
+* perhaps another method
+
+		tag #someLib: (default: someTree => someLibrary(someTree))
+
+		tree.#someLib.height
+
+
+### Tag Syntax - Indirect Modification Syntax instead of Insertion
+
+* I've been considering using indirect modification syntax, eg `someObj.#tag: value`, for tag syntax / virtual property syntax
+* I was already doing this in the updated Readme, but I've decided to stick with it
+
+* when using tags, instead of doing
+
+		foo <: #tag: value
+
+* we do
+
+		foo.#tag: value
+
+* it's simpler and cleaner
+
+* also note that referencing around the tag directly, will pass around the hashmap
+* eg
+
+		for obj in #color:  // get all objects tagged with #color
+			...
+
+* or
+
+		// create a clone of the spotify recomendation engine, passing in my personal likes
+		myRecommendations: spotifyRecommendationEngine(#mylikes)
+
+(note that this spotify recommendation engine example was previously mentioned in section "Separating Virtual Properties From Private Properties")
+
+
+### Firewalls - Tools vs Services
+
+* one of the imporant ideas mentioned in Cono
+* is that we want to push for tools, not services
+* instead of giving our information and data to companies, so that they can give us useful data like recommendations
+* the companies should instead provide tools that we can run on our data ourselves, so we don't have to give our data away
+	* and note that we aren't actually running the tool on the data ourselves, that would take forever for stuff like recommendation engines
+	* instead, it is run on a distributed network of servers, but using garbled circuits and other encryption methods to ensure privacy
+
+* we want to promote this mindset in our language as well
+* notice the spotify recommendation engine example in the previous section, "Tag Syntax - Indirect Modification Syntax instead of Insertion"
+* we don't want to give away our personal likes, `#mylikes` to spotify
+* one solution is to force spotify to open source their engine so we can do a surface copy, a pseudo-clone (ensures no side effects)
+* but spotify also shouldn't have to expose how the engine works
+
+* this is where firewalls become useful
+* just firewall the engine clone, so that it can't send any outgoing data
+* this will encourage companies to make "self-contained" tools
+* tools that can work without making any requests to outside servers
+
+### Virtual Properties and Cloning II
+
+(continued from "Virtual Properties and Cloning" and "Separating Virtual Properties From Private Properties")
+
+* currently I'm thinking about tags and virtual properties, as just syntax shorthand for hashmaps
+* but in the section "Virtual Properties and Cloning" we mentioned that tags should be carried for clones that happen within tag scope
+* do we still want that?
+
+* what if we have something like
+
+		#tag.
+		coll: collector
+
+		for x in nums:
+			x.#tag: x*x
+			coll <: x()   // clone x, does this carry over tags?
+
+* notice that since `for` is short for `forEach`, the `forEach` function is the one performing all the clones
+* so is that "outside" the tag scope? would the `#tag` tags be carried over?
+
+* actually, even though the cloning is happening outside the tag scope
+* the cloning operation was defined inside tag scope
+* so when we did:
+
+		coll <: x()   // clone x, does this carry over tags?
+
+* it could actually be short for
+
+		temp: x()
+		temp.#tag: temp*temp
+		coll <: temp
+
+* so we can make it so that tags are carried over, even if they are performed outside the tag scope
+* as long as the operation is defined within the tag scope
+
+
+### Tags - Default Values vs Manual Assignment
+
+* let's look back at the tree height example
+
+		binaryTreeHeight: tree >>
+			tag #height.
+
+			// calculate height of all nodes
+			for node in tree.nodes:
+				node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // define our height as the height of our left or right subtree + 1
+
+			=> tree.#height   // return height of root node
+
+* notice that we have this function for calculating a node's height based on the height of its subtrees
+* but that means that we have to apply the function (aka attach the tag) to every subtree as well
+
+* there is another way to do tree height
+
+		binaryTreeHeight: tree >>
+			tag #height:
+				[node]: Math.max(node.left.#height | 0, node.right.#height | 0) + 1      // define our height as the height of our left or right subtree + 1
+
+			=> tree.#height   // return height of root node
+
+* using dynamic tags inside the tag definition, is one way to set a "default" value for a tag
+* this way we don't manually apply the tag to every node
+
+* this is pretty much like functional now
+* `height` is just a function we are applying to the root node, that recursively will apply itself to child nodes
+
+* though we can also use this default-value method for `shortestDistance` example
+* 	(from section "Shortest Distance Example - Default Value of Infinity")
+* and it will be different from recursion:
+
+		shortestDistance: graph start end >>
+			tag #distance:
+				[node]: ...
+					if (node = start)
+						node.#distance: 0
+					else
+						node.neighbors.map(n => n.#distance | infinity).get(Math.min)-> + 1    // find neighbor closest to start (aka shortest #distance), and add one to its distance
+
+			=> end.#distance
+
+* notice that we don't have a `visited` variable
+* with recursion, we would need to maintain a `visited` set to make sure the recursion doesn't go on infinitely
+* but because we use feedback instead of recursion, we don't need `visited`
+
+* notice that the default value block looks very similar to the manual value block in our original `shortestDistance` example
+* this is because default values are basically like doing
+
+		for object in allObjects:
+			object.#tag: <default value>
+
+* this is why sometimes we would want to manually tag
+* if we want to build things in a "constructional" way
+
+		for object in someSet:
+			if (condition)
+				object.#tag: someValue
+
+		for object in anotherSet
+			...etc etc
+
+
+### Tag Mechanics Summarized
+
+"Virtual Properties and Cloning"
+"Separating Virtual Properties From Private Properties"
+"Virtual Properties is just Property Access Syntax for Hashmaps"
+
+"Tag / Virtual Property Syntax - Indirect Modification Syntax instead of Insertion"
+
+
+object-key inversion mentioned in sections:
+	first mention in "Private IDEs and Browsing Contexts II", but also mentioned in "Implementing Hashmaps and Property Insertion"
+
+
+

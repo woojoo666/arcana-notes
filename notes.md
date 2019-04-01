@@ -3941,6 +3941,8 @@ vvvv move this to philosophy section? vvvv
 2. Bindings are based on memory location
 3. Iteration is done using dynamic binds, in a linked-list fashion (see "Collection Binding/Iteration Using Linked-List Dynamic Bindings")
 
+see section "Cloning and Reference Transfer"
+
 ### Implementation Assumptions
 
 1. Value updates happen more than dynamic bind updates
