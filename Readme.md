@@ -1,12 +1,12 @@
 Axis Programming Language
 ==========================
 
-Axis is a simple and intuitive language for describing distributed applications. Axis follows the [actor model](https://en.wikipedia.org/wiki/Actor_model), meaning that every object is independent, like cells in a body or servers in a network. This allows for programs to be fast, flexible, and scalable. However, while most actor-model languages rely on message passing, Axis is [reactive](https://en.wikipedia.org/wiki/Reactive_programming), meaning that objects and values are bound to each other, so that a change in one will ripple through the network and update the rest. This allows for the programmer to focus on defining data relationships instead of message passing, keeping the language high-level and easy to use while maintaining highly concurrent execution.
+Axis is a simple and intuitive language for describing distributed applications. Axis follows the [actor model](https://en.wikipedia.org/wiki/Actor_model), meaning that every object is independent, like cells in a body or servers in a network. This allows for programs to be fast, flexible, and scalable. However, while most actor-model languages rely on message passing between actors, Axis is [reactive](https://en.wikipedia.org/wiki/Reactive_programming), meaning that all actors are bound to each other, so that a change in one will automatically update the rest. This allows for the programmer to focus on defining data relationships instead of message passing, keeping the language high-level and easy to use while maintaining highly concurrent execution.
 
-before delving into the mechanics, here's a brief taste of what's possible. Here's how to return the [height of a binary tree](https://stackoverflow.com/a/2603707/1852456). The syntax should be relatively understandable if you know python or javascript
+Before delving into the mechanics, here's a brief taste of what's possible. Here's how to return the [height of a binary tree](https://stackoverflow.com/a/2603707/1852456). The syntax should be relatively understandable if you know python or javascript
 
 	binaryTreeHeight: tree >>
-		tag #height.
+		tag #height.           // declare a tag, which can be used to attach attributes to objects
 
 		// calculate height of all nodes
 		for node in tree.nodes:
@@ -14,7 +14,7 @@ before delving into the mechanics, here's a brief taste of what's possible. Here
 
 		=> tree.#height   // return height of root node
 
-Notice how this would normally require recursion in any imperative/functional language, but in Axis we only need a simple for-loop. It doesn't matter in what "order" the for-loop traverses the nodes, the result is always the same. This is a core idea: in Axis, we don't specify order. With recursion, we would need to specify the traversal order, eg "first find the height of the left and right subtree, and then find the height of the parent". In Axis, we simply define the relationships between data, and the answer works itself out. This is explored more deeply in the "Feedback" section, where we give more examples showing how algorithms in Axis can be cleaner and simpler than their functional or imperative counterparts.
+Notice how we use a simple `for`-loop to define the height of each node based on the heights of its left and right child nodes. This would not work in most languages, because if the for-loop traverses the nodes in the wrong order, we would get the wrong answer. In most languages, we would have to use recursion to specify the exact traversal order, eg "first find the height of the left and right nodes, before finding the height of the parent". However, Axis doesn't need to do this. We don't specify order. Instead, we simply define the relationships between data, and the answer works itself out. One way to think about it is, instead of defining the height of each node one by one, _Axis defines the heights of all nodes at the same time_. This is explored more deeply in the "Feedback" section, where we give more examples showing how algorithms in Axis can be cleaner and simpler than their functional or imperative counterparts.
 
 In addition, because everything is unordered, everything can execute independently and concurrently. This makes Axis perfect for defining web services and applications. A lot of the complications attributed to web programming, like routing, HTTP requests, and asynchronous callbacks, completely disappear when using Axis.
 
@@ -53,7 +53,7 @@ The basic syntax is rather intuitive, and looks similar to javascript objects de
 	someString: "hello world"
 	someBoolean: true
 
-Everything in Axis is an "object", which is just a collection of properties.
+Everything in Axis is an "object", which is just a collection of properties. The language is dynamically-typed, which makes it easy to define and use objects.
 
 	someObject: (name: "Joe", age: 20)      // define an object using parenthesis
 	someList: (10, 20, 30)                  // lists are ordered collections of values, but they are also just objects. This list is equivalent to (0: 10, 1: 20, 2: 30)
@@ -211,13 +211,15 @@ There is another special kind of object called a "function". The purpose of a fu
 
 	add(10, 7)->     // returns 17
 
-At first glance, it may seem like functions are just a bunch of syntax shorthands. We have a special property defined via `=>`, and then accessed via `->`. However, functions have one major other function: they act like "persistent" templates. If there are any insertions/clones defined in the function, they are not run until the function is **called**. In fact, the function can be cloned any amount of times without executing these insertions and clones. The function will wait until being _called_ before executing. This allows for something similar to currying, eg:
+Functions are also templates. One way to think about it is, functions are just templates with a special property defined via `=>`, and then accessed via `->`. This allows for the familiar arrow syntax we have in Java or Javascript
 
-	step1: add(a: 10)    // set value for "a" without executing the function
-	step2: step1(b: 7)
-	result: step2->      // execute the function, which prints "adding numbers"
+	someList.forEach(elem => console.log(elem))
 
-Because of this subtle difference between functions and templates, it is important to be mindful while naming them. Functions should be named using verbs, while objects and templates should use noun. For example, `createPlaylist` would be a function, while `playlist` would be an object or template.
+Some additional notes about functions:
+
+* like any other template, we only need to clone a function to execute it. We don't necessarily need to access the return value.
+* if you want to call a function without specifying arguments, instead of `fn()->` you can just do `fn->`
+* declaring an object as a `template` is the same as declaring a function with the return value `=> this`
 
 Notice that in many ways, Axis functions work pretty much the same as the functions we are used to in functional and imperative. The only difference is that Axis functions allow us to modify the internal behavior of a function via cloning.
 
@@ -254,7 +256,7 @@ State variables are also just syntactic shorthand, useful in event handlers. Sta
 
 is just shorthand for
 
-	numClicks: hashmap(0: 0)      // use a hashmap to store the value of numClicks at each timestamp. Initial state is 0 at time 0
+	numClicks: hashmap(0: 0)      // use a hashmap to store the value of numClicks at each timestamp. Initialized with value 0 at timestamp 0
 
 	onClick: timestamp >>
 		numClicks.add(timestamp, numClicks.before(timestamp) + 1)     // take the previous value of numClicks, and add 1, and store that as the current value of numClicks
@@ -293,17 +295,9 @@ Examples and Concepts
 
 ### Timeless
 
-one of the biggest things understand, is that because everything in Axis is unordered and asynchronous, the language also doesn't have the concept of discrete execution steps, like imperative. Instead, we think of data as persistent and "timeless", and assume that every variable is constantly re-evaluated to keep the value up to date. To drive this point home, let's say we defined an event-handler to collect all mouseclicks:
+One of the biggest things to understand is that since everything in Axis is unordered and asynchronous, there is no concept of ordered execution, like in imperative languages. Instead, we think of data as persistent and "timeless", and assume that every variable is constantly re-evaluated to keep the value up to date. To drive this point home, let's look at an example.
 
-	allClicks: collector
-
-	onclick( click => allClicks <: click )
-
-then we can treat this data as persistent and always up to date. Which allows us to do something like this:
-
-	lightBulb: allClicks.length % 2 = 1   // lightBulb is true if there are an odd number of mouse clicks. So every click will toggle lightBulb
-
-Let's try another example. Given a set of student test scores, we want to find every test score that is above average. In imperative, this would take two steps, one for-loop to compute the average, and then another for-loop to find the test scores that are above average. In Axis, it would look like this:
+Let's say given a set of student test scores, we want to find every test score that is above average. In imperative, this would take two steps, one for-loop to compute the average, and then another for-loop to find the test scores that are above average. In Axis, it would look like this:
 
 	tag #aboveAverage.
 	
@@ -316,7 +310,7 @@ Let's try another example. Given a set of student test scores, we want to find e
 
 This might seem a little weird. Remember that in imperative code, we would need two loops, one to compute the average, and one to see if each test score is above average. So how are we doing this in one loop? In the first "iteration" of the `for` loop, how can we set `score.#aboveAverage` if we haven't finished computing `average` yet?
 
-This is we have to think in terms of data relationships, not execution. All we are telling the interpeter, is that `sum` is the sum of all scores, `average` is the sum divided by the number of scores, and a score is `#aboveAverage` if it is bigger than `average`. That is all we need to specify, and the interpreter figures out the rest.
+This is why we have to think in terms of data relationships, not execution. All we are telling the interpeter, is that `sum` is the sum of all scores, `average` is the sum divided by the number of scores, and a score is `#aboveAverage` if it is bigger than `average`. That is all we need to specify, and the interpreter figures out the rest.
 
 To get a better idea, let's explore how an interpreter _might_ go about computing this. When it reaches the `for` loop, it takes the first `score`, and inserts it into `sum`. `sum` notices the change, and updates accordingly. `average` notices the change in `sum`, and updates as well. Lastly, `score.#aboveAverage` notices the change in `average`, and updates accordingly. Now this is just for the first score. Then the interpreter moves onto the next score, and inserts it into `sum`. Again, `sum` gets updated, and then `average`, and then this updates `#aboveAverage` for **both** the first score and the second score. Remember that bindings are persistent, so the first score is still listening for updates to `average`, even if the interpreter has moved onto the second score. This process will repeat until the interpreter has processed all scores.
 
@@ -418,14 +412,22 @@ This high level of abstraction allows the Axis interpreter to make decisions on 
 
 From this, the interpreter will know what photos to cache, and might also reconfigure other behavior to fit with this optimization. The key thing to notice here is that the optimization is separate from the application logic. This means that we can read and alter the web application, without worrying about the optimizations. And this also means that we can apply this optimization to many different web applications. In fact, developers can upload their optimizations to public repositories. Then, other developers can import them and see if they help. Optimizations become like any other object, easy to import and tweak for one's own use.
 
-## Testing and Mocking
+### Testing and Mocking
 
 coming soon!
 
-## Firewalling
+### Firewalling
 
 coming soon!
 
-## Meta-programming
+### Meta-programming
 
 coming soon!
+
+
+Acknowledgements
+--------------------
+
+Special thanks to @veggero, @vincesiu, and @vishvanand for all the help and advice in designing the language. A lot of the syntax was heavily inspired by @veggero's language [Nylo](https://github.com/veggero/nylo), which is a different language entirely and definitely worth checking out!
+
+Other inspirations from: Javascript, AngularJS, functional programming (Lisp, Ocaml, Haskell), Python, Verilog, Prolog
