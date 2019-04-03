@@ -2047,7 +2047,7 @@ foo:
 
 * in the section "Null is Evil?" I also talk about how compiler errors are the same as `undefined`
 * that isn't necessarily the case
-* first off, Arcana can throw parse errors too (though modules that don't parse evaluate to undefined, when running in a network of programs)
+* first off, Arcana can throw parse errors too (though modules that don't parse or have syntax errors simply evaluate to undefined, when running in a network of programs)
 * but also, compiler errors can also be represented using a defined type
 * like a `Compiler` class, that takes in a `Program` class, and spits out a `CompilerResult` class, which can be an error or the compiled program
 

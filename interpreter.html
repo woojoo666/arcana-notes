@@ -1,0 +1,76 @@
+<html>
+<body>
+<script>
+
+
+// every block should be parsed independently
+// keep track of the blockLevel to determine what object we are defining
+
+
+// Rough Grammar:
+
+// creation -- ( Block )
+// cloning -- Object( Block )
+// properties -- Block => Key: Expression, Block
+// list items -- Block => Item, Block
+// property access -- Object.PropName | Object[Expression]
+// operators -- Expression => Expression Op Expression
+// insertion -- Object <: Expression
+// templates -- template Object
+// tag declaration -- tag Tag: Expression
+// tag usage -- Object.Tag: Expression
+// keywords (like template, tag) -- Keyword Expression
+// conditionals -- if (Expression) Expression else Expression
+// for-loop -- for Key,Key in Expression: Block
+
+// first: split into blocks, global and stateless, so we can localize syntax errors
+// then parse each block from left-to-right, top-to-bottom using a state machine
+
+
+// some empty lines with spaces and tabs in them
+var emptyLinesTest = `
+	    
+	test
+ 
+`;
+
+var test1 = `
+a: 10
+b: 20
+c: (x: a, y: b)
+d:
+	foo: 1
+	bar: 2
+`;
+
+function parse(program) {
+
+	var lines = splitIntoLines(program);
+	
+
+}
+
+function splitIntoLines(program) {
+	return program.split('\n').filter(str => ! /^\s*$/.test(str));   // split into lines and filter out empty lines
+}
+
+function findBlocks (lines) {
+	var counter = 0;
+
+	if (lines.length <= 0) return;
+
+	var indentationLevel = lines[0];
+
+	for (let i = 0; i < lines.length; i++) {
+		let line = lines[i];
+
+		// TODO: FINISH THIS
+	}
+}
+
+console.log(splitIntoLines(emptyLinesTest));
+console.log(parse(test1));
+
+</script>
+</body>
+</html>

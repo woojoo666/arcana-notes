@@ -5634,3 +5634,409 @@ object-key inversion mentioned in sections:
 
 
 
+
+
+
+
+
+nondeterminism and Constraints Programming
+
+can we build a sudoku solver?
+what about powerset example?
+take a look at previous secion "Prolog Language"
+
+
+
+
+### Comparison With Other Reactive or Actor Model Languages
+
+commparison with other reactive or actor langs
+reactive langs are supposed to be functional
+	ours is not
+problems with multiple update
+	we just use synchronization
+reactive usually have mechanisms preventing feedback
+in my opinion feedback is unavoidable, how do you prevent independent parties from setting up a feedback loop
+I could set up a feedback loop with the spotify API if i wanted
+we want to model what is possible, don't want to restrict the programmer
+also the "delay" solution is ugly
+could also be impossible to detect
+in private behavior spread across two modules, each which can't see the behavior of eachother
+
+
+
+
+no insertion directly from dynamic keys
+otherwise you end up with infinite insertions
+
+
+
+
+name change?
+
+want to capture the "emergence" idea
+and "axis" sounds too generic and centralized
+
+poieta (based on poiesis)
+emergence
+gaia
+hive
+swarm
+biota
+spore
+stasis
+slime mold
+
+evolve - highlights how data and behaviors change over time
+threads
+
+
+
+### Multi-line Braced-Blocks
+
+sometimes you do want to break up a braced block into multiple lines, eg in an `if (...) else` statement
+even python, which is indent-sensitive, supports this
+talked about in [this SO discussion](https://stackoverflow.com/questions/181530/styling-multi-line-conditions-in-if-statements)
+
+maybe the way it should work is
+if you start a braced block using parenthesis `()` or brackets `[]`
+all indentation and newlines will be ignored until the end of the braced block
+
+this allows for stuff like
+
+	if    (cond1 == 'val1' & cond2 == 'val2' & 
+	       cond3 == 'val3' & cond4 == 'val4')
+	    some_expression
+
+notice that if you wanted nested cloning you would have to do it like so:
+
+	foo: firstObject(10, 20, secondObject(
+			prop1: 'hello',
+			prop2: 'world',
+		))
+
+notice that we have to specify the `(` after `secondObject`, because the indented block won't be treated as implicit paranthesis
+in addition we have to add commas after every property because newlines will be ignored
+
+
+though what if we could make it so newlines are still recognized, but binary operators like `&` will ignore any following newlines
+but note that [PEP8 discourages breaking after operators](https://www.python.org/dev/peps/pep-0008/#should-a-line-break-before-or-after-a-binary-operator), and instead recommends something like this:
+
+	income = (gross_wages
+				+ taxable_interest
+				+ (dividends - qualified_dividends)
+				- ira_deduction
+				- student_loan_interest)
+
+while this does look cleaner, it makes it harder for us to figure out when to ignore newlines and when to use them
+maybe binary operators will ignore preceding and following newlines
+
+so something like
+
+	income = (gross_wages
+				+ taxable_interest
+				+ (dividends - qualified_dividends)
+				
+				something_else
+			)
+
+stands for
+
+	income = ( gross_wages + taxable_interest + (dividends - qualified_dividends), something_else )
+
+it still feels a lot cleaner to have the comma, eg
+
+	income = (gross_wages
+				+ taxable_interest
+				+ (dividends - qualified_dividends),
+				
+				something_else
+			)
+
+so I think we should still make braced-blocks ignore newlines
+we are forced to use commas between properties, but it makes it clearer, now that indentation is ignored
+
+
+
+### Parsing - Localizing Syntax Errors
+
+One of the ideas explored in a previous section, "Why Undefined?"
+is that we can even treat code with syntax errors, as just an `undefined` block
+this way, the rest of the program can still run and display their output
+
+this is called "localizing syntax errors"
+and is an important goal we are trying to achieve without our parser
+
+### Parsing - Indented Blocks and Localizing Syntax Errors
+
+with indented blocks, whenever indentation leave and comes back to a certain block level, it immediately terminates the block
+this happens even with multi-line braced blocks
+eg
+
+	foo: someObject(
+			// some code here
+		))  // oops, extra bracket
+
+	bar: 10
+
+but since we can immediately terminate the `foo` block because the indentation of `bar` is at the same level or higher
+then `bar` will still be display even though `foo` is undefined
+
+this way we can localize syntax errors
+it invalidates the block, not the entire program
+
+### Parsing - Exploring Invalid Braced Expressions
+
+(continued from "Parsing - Indented Blocks and Localizing Syntax Errors")
+
+in the previous section we talked about how to handle indented blocks in order to localize syntax errors
+but can we do the same with braces?
+it is a lot more complicated
+
+say we had
+
+	block1: (block2: (block3: (() ) )
+
+notice that we added an extra open paren `(` on the inside
+
+there are two ways to handle this
+we can go left-to-right, and that would mean there is a missing brace on the right-most block, `block1`
+or we can go outside-in, and that means there is a missing brace on the innermost block, the one inside `block3`
+
+left-to-right seems the most natural, and also since we type left-to-right, often we will end up with opening braces that we haven't closed yet
+
+but note that whenever we have these mismatched braces, left-to-right will always break the outermost block (`block1` in this case)
+
+whereas outside-in minimizes the damage / localizes the error, and only breaks the innermost block
+
+exploring examples:
+
+	block1: (block2: (10 20 30), (block3: )
+
+notice that in the above example, left-to-right will warn of a missing parenthesis on the right, whereas outside-in will warn of an unclosed parenthesis before `block3`
+
+
+	(  ( a b )  ( c d )    e f )  )
+
+notice that there are multiple ways for outside-in to evaluate the above example
+let's assume that we first consume the outer two parenthesis on both sides, so we are two levels deep on both sides
+we use `[` and `]` to show how many levels deep we are on each side
+
+	[[   a b )  ( c d )    e f   ]]
+
+From here, we could move from the left side, consuming a close paren and going back to 1 level deep, then consuming an open paren to get back to 2 levels deep, leaving us with:
+
+	[[   c d )   e f   ]]
+
+then it will warn of an extra parenthesis between `d` and `e`
+
+However, instead of moving from the left side, we could have moved from the right side,
+	consuming a close paren and going up to 3 levels deep, then consuming a open paren to get back to 2 levels deep, leaving us with:
+
+	[[   a b)   ]]
+
+this will warn us of an extra parenthesis after `b`
+
+note that if we had even more nested expressions, eg
+
+	( ()   ()   ()   ()   ()    )   ()   ()   ()   ()   ())
+
+then there are many different ways for us to progress inwards, each resulting in a different warning
+this ambiguity leads me to believe left-to-right is the right way to parse braced expressions
+
+notice that for the below expression,
+
+	(  ( a b )  ( c d )    e f )  ( g h ) )
+
+if we follow left-to-right traveral, we would end up with one extra parenthesis at the end
+even though our intuition tells us that there is a missing parenthesis before `e`
+
+
+one way we can actually think about this is
+if we model parenthesis using slopes
+let `(` correspond to an upward slope `/`, and `)` correspond to a downward slope `\`
+then something like
+
+	(  ()   ()   )  )
+
+becomes
+
+	 /\/\
+	/    \
+	      \
+
+and we can see that, since the graph dipped below the start point, we have too many closed parenthesis
+
+but we can delete any one of these closed parenthesis to fix the issue
+for example if we deleted the leftmost one, we would be left with
+
+	  /\
+	 /  \
+	/    \
+
+and now it is balanced
+
+likewise, if we had too many open parenthesis, ending up with a graph like so:
+
+	  /\    /\
+	 /  \  /  \
+	/    \/
+
+actually in this case, we can't add a closed brace anywhere we want, if we add it to the middle we would end up with
+
+	  /\
+	 /  \    /\
+	/    \  /  \
+	      \/
+
+while it does end at the same level that it starts, in the middle it dips below the starting level
+which is invalid
+
+perhaps we could come up with some smart algorithm that minimizes then number of changes needed to make it valid
+
+related leetcode discussions [here](https://leetcode.com/problems/remove-invalid-parentheses/description/) and [here](https://leetcode.com/articles/minimum-add-to-make-parentheses-valid/)
+
+actually note that adding parenthesis to the beginning or end is always optimal (though sometimes there are multiple optimal methods)
+because when you add to the beginning or end, you "shift" the graph upwards, pulling large dips out
+the amount you need to add is simply: how low the graph goes relative to the left side, and how low the graph goes relative to the right side, added together
+eg:
+
+	\
+	 \
+	  \  /
+	   \/
+
+relative to the left side, graph dips -4
+relative to the right side, graph dips -2
+so in total we need to add 4 to the left side, and 2 to the right side
+
+
+also notice that another reason why adding parenthesis is better is because if you have an expression like
+
+	( a b ) c d ) e
+
+you can't just remove the parenthesis after `d` because that would merge `c d` and `e`
+adding parenthesis to the left doesn't change the structure, only shifts it
+
+adding braces to the very left or very right, doesn't help in terms of localizing the error though...
+
+### Parsing - Braced Blocks and Localizing Syntax Errors
+
+(continued from "Parsing - Exploring Invalid Braced Expressions")
+
+earlier we talked about how the outside-in method can localize the error
+which is a property we are trying to bring to braced blocks
+
+however, with invalid parenthesis expressions
+there are often multiple ways to remove a parenthesis to make it valid, discussed [here](https://leetcode.com/problems/remove-invalid-parentheses/description/)
+
+one way to think about it is if we had an expression like
+
+	( a ( b ( c ) d ) e ) f )
+
+we can remove any one of the `)` brackets to make it valid
+
+even in an expression like
+
+	( a b ) c d )
+
+we might be tempted to immediately mark the left side `( a b )` as valid, and only invalidate the right side
+but it's possible that we left out a brace on the left side, and the expression we were really going for was
+
+	( ( a b ) c d )
+
+the reason why we can localize errors for indented blocks, is that when you indent a block, you implicitly add _both_ opening and closing braces
+
+whereas for something like
+	
+	( a ( b ( c ) d ) e )
+
+if the user accidentally removed a parenthesis, eg like so:
+
+	( a ( b ( c ) d e )
+
+it is immediately unclear to the interpreter, where the error is, and where a parenthesis is missing
+
+
+though perhaps we can look at what parts of the code the user is changing, to figure out what block is most likely the cause of the error
+in the above example, the user removed the parenthesis between `d` and `e`
+which breaks the outermost block
+but say, if they had removed the parenthesis between `c` and `d`
+then it would only break the middle block, making the middle block undefined and turning the output to
+
+	( a undefined e )
+
+thus we can see how it localizes the error
+
+we explore this more deeply in the next section
+
+### Parsing - Unordered Parsing, Localizing Syntax Errors Using Revision History
+
+(continued from "Parsing - Braced Blocks and Localizing Syntax Errors")
+
+imperative programming languages are executed from top to bottom
+so thats why the interpreter/parse does so as well
+and if there is any syntax errors, the parser fails and the rest of the script isn't checked
+
+however, our language is unordered
+so naturally, it makes sense for parsing to still be able to continue after a syntax error
+which is why localizing errors is important
+we have to find a different way to "execute" the parser such that, errors in one place won't affect others
+
+instead, we can use the method explored in the previous section
+
+essentially the idea is
+we take the latest revision that doesn't have syntax errors
+and parse the block structure
+then we take the current revision, and diff it with the latest correct revision
+and find out which blocks have changed
+and for every syntax error, we can figure out which block was affected
+
+another way to think about it, is we only re-parse the blocks that change
+
+### mergesort and nondeterminism
+
+notice that during the merge operation, we can choose any pair to merge
+the recursive method forces us to merge the same pair that we split
+but being able to choose from a "pool" of sets during each stage, allows for less resource waste
+for example, lets say two workers in stage 5, each with a list, split their lists and give it to stage 6
+eventually, stage 6 gives back the sorted lists back to stage 5
+but let's say so far in the process, stage 6 has only given each worker one sorted list
+so both workers are waiting for their second sorted list to start the merge
+with the nondeterministic model, one of the workers can take both sorted lists and start merging
+while the other worker waits on the other two lists
+
+in fact, we don't even need to think in terms of stages
+how we can think about it is
+we are given a set of lists
+we choose a random list
+if it has more than two elements, split it in half (doesn't matter how, just take out a random half and put it in a different set)
+if it has two elements, then sort them, and mark the list as `#sorted`
+if there are multiple `#sorted` lists, merge them
+
+all these instructions can be executed asynchronously and concurrently through actors
+
+
+### Smalltalk
+
+* I decided to look into smalltalk (found an article relating to it online), and it is _surprisingly_ similar to my language
+* which is interesting because it came out so long ago
+* smalltalk follows the actor-model as well
+* while it says it uses "messages" to communicate between actors, each method is really more like a function call
+* so something like `someObject height.` in smalltalk functions similar to `someObject.height->` in my language
+* smalltalk also has this "object as a universal primitive" idea that my language uses
+* it also seems like smalltalk could be made "reactive"
+* you would have to constantly send messages to the output nodes/objects to get their latest value, but maybe it could work
+
+* I think the main difference is that smalltalk supports variable assignment
+* whereas my language uses insertion instead of assignment
+* variable assignment is a very "synchronous" way of thinking, like sending instructions
+* the problem is that if you want concurrent execution, the order of these messages will be nondeterministic,
+	so the order of these assignments will also be unclear
+* this makes smalltalk hard to parallelize, as talked about [here](https://stackoverflow.com/questions/35940570/what-is-the-difficulty-in-making-smalltalk-parallel)
+
+* by contrast, insertions do not have an inherent order, and so are conducive to concurrent execution
+* state variables are kind of like assignment but require an index or timestamp, so they also play nicely with concurrency
+
+* thus, I think the main difference is that, since smalltalk is so old, it was developed around the idea of synchronous single-threaded execution
+* whereas my language is designed around reactive programming and concurrency
