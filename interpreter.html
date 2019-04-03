@@ -7,24 +7,30 @@
 // keep track of the blockLevel to determine what object we are defining
 
 
-// Rough Grammar:
+// Grammar:
 
-// creation -- ( Block )
-// cloning -- Object( Block )
-// properties -- Block => Key: Expression, Block
-// list items -- Block => Item, Block
-// property access -- Object.PropName | Object[Expression]
-// operators -- Expression => Expression Op Expression
-// insertion -- Object <: Expression
-// templates -- template Object
-// tag declaration -- tag Tag: Expression
-// tag usage -- Object.Tag: Expression
-// keywords (like template, tag) -- Keyword Expression
-// conditionals -- if (Expression) Expression else Expression
-// for-loop -- for Key,Key in Expression: Block
+// Object 	::= ( Templt Block ) | Templt INDENT Block DEDENT							creation
+// Object 	::= Object( Templt Block ) | Object Templt INDENT Block DEDENT				cloning
+// Templt 	::= template | ε															templates
+// Block 	::= Statemnt, Block
+// Statemnt ::= Key: Object																properties
+// Block 	::= Object, Block | Object Block											list items (can't use Statemnt nonterminal here, because of the special spaces separator)
+// Block 	::= Statemnt | ε
+// Object 	::= Object.Name | Object.#Tag | Object[Object]								property access (property names can start with #)
+// Object 	::= Name | _Name															objects can refer to public or private vars
+// Object 	::= Object Op Object														operators
+// Statemnt ::= Object <: Object														insertion
+// Statemnt ::= tag #Tag: Object														tag declaration (note that tag names cannot start with #)
+// Statemnt ::= Object.#Tag: Object														tag usage
+// Tag 		::= Name
+// Statemnt ::= if (Object) Object else Object											conditionals
+// Statemnt ::= for Key in Object: Block												for-loop
+// Key 		::= Name
 
-// first: split into blocks, global and stateless, so we can localize syntax errors
-// then parse each block from left-to-right, top-to-bottom using a state machine
+// first: convert indentation into INDENT and DEDENT, convert newlines to commas, and ignore indentation and newlines in braced blocks.
+//        convert words and operators into tokens
+//
+// then parse everything using an LL parser
 
 
 // some empty lines with spaces and tabs in them
@@ -53,6 +59,9 @@ function parse(program) {
 function splitIntoLines(program) {
 	return program.split('\n').filter(str => ! /^\s*$/.test(str));   // split into lines and filter out empty lines
 }
+
+
+// TODO: Convert newlines to commas
 
 function findBlocks (lines) {
 	var counter = 0;
