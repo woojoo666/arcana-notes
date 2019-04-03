@@ -1,9 +1,9 @@
 Axis Programming Language
 ==========================
 
-Axis is a simple and intuitive language for describing distributed applications. Axis follows the [actor model](https://en.wikipedia.org/wiki/Actor_model), meaning that every object is independent, like cells in a body or servers in a network. This allows for programs to be fast, flexible, and scalable. However, while most actor-model languages rely on message passing between actors, Axis is [reactive](https://en.wikipedia.org/wiki/Reactive_programming), meaning that all actors are bound to each other, so that a change in one will automatically update the rest. This allows for the programmer to focus on defining data relationships instead of message passing, keeping the language high-level and easy to use while maintaining highly concurrent execution.
+Axis is a simple and intuitive language for describing distributed applications. Axis follows the [actor model](https://en.wikipedia.org/wiki/Actor_model), meaning that every object is independent, like cells in a body or servers in a network. This allows for programs to be fast, flexible, and scalable. However, while most actor-model languages revolve around sending messages or instructions, Axis is designed around [reactive programming](https://en.wikipedia.org/wiki/Reactive_programming): the idea that all actors and values are bound to each other, so that a change in one will automatically update the rest. This allows for the programmer to focus on defining persistent data relationships instead of instantaneous instructions, keeping the language high-level and easy to use while maintaining highly concurrent execution.
 
-Before delving into the mechanics, here's a brief taste of what's possible. Here's how to return the [height of a binary tree](https://stackoverflow.com/a/2603707/1852456). The syntax should be relatively understandable if you know python or javascript
+Before delving into the mechanics, here's a brief taste of what's possible. Here's how to return the [height of a binary tree](https://stackoverflow.com/a/2603707/1852456). The syntax should be relatively understandable if you know python or javascript, but don't worry about understanding it fully as it is explained more in depth in later sections.
 
 	binaryTreeHeight: tree >>
 		tag #height.           // declare a tag, which can be used to attach attributes to objects
@@ -18,7 +18,7 @@ Notice how we use a simple `for`-loop to define the height of each node based on
 
 In addition, because everything is unordered, everything can execute independently and concurrently. This makes Axis perfect for defining web services and applications. A lot of the complications attributed to web programming, like routing, HTTP requests, and asynchronous callbacks, completely disappear when using Axis.
 
-For example, we can host a chat server using the following (syntax will be explained in later sections)
+For example, we can host a chat server using the following (also explained more depth in later sections)
 
 	messages: collector(file: 'messages.axis')   // all messages, saved to permanent storage
 	activeUsers: collector
@@ -168,7 +168,7 @@ We can insert to any object, no restrictions. However, by default, objects ignor
 	for num in (1 2 3)
 		foo <: num * num
 
-	console.log(sum)       // will print 1+4+9, aka "13"
+	console.log(sum)       // will print 1+4+9, aka "14"
 
 By leveraging insertion, we can also define object methods (like class methods in Python/Java)
 
@@ -431,3 +431,5 @@ Acknowledgements
 Special thanks to @veggero, @vincesiu, and @vishvanand for all the help and advice in designing the language. A lot of the syntax was heavily inspired by @veggero's language [Nylo](https://github.com/veggero/nylo), which is a different language entirely and definitely worth checking out!
 
 Other inspirations from: Javascript, AngularJS, functional programming (Lisp, Ocaml, Haskell), Python, Verilog, Prolog
+
+Similar languages: Smalltalk, Erlang, Pony
