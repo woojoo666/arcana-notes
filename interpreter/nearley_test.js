@@ -7,7 +7,7 @@ const grammar = require("./nearley_test_grammar.js");
 const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
 
 // Parse something!
-parser.feed("foo\n");
+parser.feed("foo\nbar\nfoo\nfoo");
 
 // parser.results is an array of possible parsings.
 console.log(parser.results); // [[[[ "foo" ],"\n" ]]]
