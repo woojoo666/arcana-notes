@@ -1,0 +1,19 @@
+{
+  "name": "axis_proto_interpreter",
+  "version": "0.0.0",
+  "description": "basic concept interpreter",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "axis",
+    "language"
+  ],
+  "author": "maxithewoowoo@gmail.com",
+  "license": "ISC",
+  "dependencies": {
+    "browserify": "^16.2.3",
+    "nearley": "^2.16.0"
+  }
+}
