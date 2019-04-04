@@ -12,13 +12,12 @@
 // Object 	::= ( Templt Block ) | Templt INDENT Block DEDENT							creation
 // Object 	::= Object( Templt Block ) | Object Templt INDENT Block DEDENT				cloning
 // Templt 	::= template | ε															templates
-// Block 	::= Statemnt, Block
+// Block 	::= Statemnt, Block | Statemnt | ε											note that we allow trailing commas at the end of a block
 // Statemnt ::= Key: Object																properties
 // Block 	::= Object, Block | Object Block											list items (can't use Statemnt nonterminal here, because of the special spaces separator)
-// Block 	::= Statemnt | ε
 // Object 	::= Object.Name | Object.#Tag | Object[Object]								property access (property names can start with #)
-// Object 	::= Name | _Name															objects can refer to public or private vars
-// Object 	::= Object Op Object														operators
+// Object 	::= Name | _Name															objects can refer to public or private vars (tho perhaps I should use separate rule for private vars, like Tag or Key)
+// Object 	::= Object Op Object														operators (TODO: operator precedence)
 // Statemnt ::= Object <: Object														insertion
 // Statemnt ::= tag #Tag: Object														tag declaration (note that tag names cannot start with #)
 // Statemnt ::= Object.#Tag: Object														tag usage
