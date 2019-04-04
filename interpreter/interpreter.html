@@ -1,12 +1,11 @@
 <html>
+<head>
+	<script src="node_modules/nearley/lib/nearley.js"></script>
+	<script src="grammar.js"></script>
+	<script src="parser.js"></script>
+</head>
 <body>
 <script>
-
-
-// every block should be parsed independently
-// keep track of the blockLevel to determine what object we are defining
-
-
 // Grammar:
 
 // Object 	::= ( Templt Block ) | Templt INDENT Block DEDENT							creation
@@ -25,12 +24,10 @@
 // Statemnt ::= if (Object) Object else Object											conditionals
 // Statemnt ::= for Key in Object: Block												for-loop
 // Key 		::= Name
+// Name     ::= [A-z0-9][A-z0-9_]*														names cannot start with "_", but they can have them inside
 
-// first: convert indentation into INDENT and DEDENT, convert newlines to commas, and ignore indentation and newlines in braced blocks.
-//        convert words and operators into tokens
-//
-// then parse everything using an LL parser
-
+</script>
+<script>
 
 // some empty lines with spaces and tabs in them
 var emptyLinesTest = `
@@ -47,13 +44,6 @@ d:
 	foo: 1
 	bar: 2
 `;
-
-function parse(program) {
-
-	var lines = splitIntoLines(program);
-	
-
-}
 
 function splitIntoLines(program) {
 	return program.split('\n').filter(str => ! /^\s*$/.test(str));   // split into lines and filter out empty lines
@@ -77,8 +67,20 @@ function findBlocks (lines) {
 }
 
 console.log(splitIntoLines(emptyLinesTest));
-console.log(parse(test1));
+</script>
+<script>
+// parse function from parser.js
 
+var parsetests = [
+	'testkey:testval,nested:(nestkey:nestval),empty:(),notrailing:comma',
+	'trailing:comma,',
+	'this:should:fail',
+];
+
+parsetests.forEach(test => {
+	console.log("Test Parse: " + test);
+	console.log(parse(test));
+});
 </script>
 </body>
 </html>
