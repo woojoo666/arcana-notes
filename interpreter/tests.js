@@ -44,10 +44,10 @@ this
 indentation`;
 
 var alreadyCommas = `start
-make
+make,
 	sure we,
 	aren't adding,
-	double commas,`;
+double commas,`;
 
 var indentedFirstLine = `		start
 		first line
@@ -69,7 +69,7 @@ console.log(indentationProcessing(testIndentation));
 console.log(indentationProcessing(testIndentation2));
 
 try {
-console.log(indentationProcessing(badIndentation));
+	console.log(indentationProcessing(badIndentation));
 } catch (err) {
 	console.log(err);
 }
@@ -79,7 +79,7 @@ console.log(indentationProcessing(alreadyCommas));
 console.log(indentationProcessing(indentedFirstLine));
 
 try {
-console.log(indentationProcessing(dedentPastFirstLine));
+	console.log(indentationProcessing(dedentPastFirstLine));
 } catch (err) {
 	console.log(err);
 }
@@ -98,3 +98,30 @@ parsetests.forEach(test => {
 	console.log("Test Parse: " + test);
 	console.log(parse(test));
 });
+
+// ------------------ integration tests -----------------
+
+var testCode = `
+testkey:testval,
+
+foo:bar,
+nested:
+	another:block
+	lets:(try:some,braced:blocks)
+
+empty:()
+
+last:
+	test:test,
+`;
+
+// this should fail for now, until we implement list items
+var shouldFail = `
+foo:bar,
+	implicitBlock:propval
+`;
+
+console.log(preprocessor(testCode));
+
+console.log(parse(preprocessor(testCode)));
+console.log(parse(preprocessor(shouldFail)));

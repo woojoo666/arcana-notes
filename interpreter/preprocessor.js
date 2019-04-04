@@ -20,8 +20,8 @@ function emptyLinesAndCommentsProcessing(text) {
 // we are using "{" and "}" to denote indentation increases/decreases
 //
 // parse each line, such that:
-//    * when indentation increases, use an INDENT token "{"
-//    * when indentation decreases, use a DEDENT token "}"
+//    * when indentation increases, insert a INDENT token "{"
+//    * when indentation decreases, insert a DEDENT token "}" and a comma ","
 //       * note that indentation can decrease multiple times at once
 //    * if indentation stays the same, insert a "," delimiter if there isn't one already
 //
@@ -42,24 +42,25 @@ function indentationProcessing(text) {
 	// find every newline via regex, and process the indentation after it
 	return text.replace(/(,?)\n(\t*)/g, (_, comma, indentation) => {
 		let indentationLevel = indentation.length;   // counts number of indents
-		let replacement = '';
+		let replacement = comma || '';
 
 		if (indentationLevel > lastLevel) {
 			// if indentation increased, push new level to stack, and insert "INDENT" token to program
 			indentationStack.push(indentationLevel);
 			lastLevel = indentationStack[indentationStack.length - 1];
-			replacement = INDENT_TOKEN;
+			replacement += INDENT_TOKEN;
 
 		} else if (indentationLevel == lastLevel) {
-			// for statements that are on the same level, replace the newline with a comma if there isn't one already
-			replacement = comma || ',';
+			// for statements that are on the same level, replace the newline with a comma
+			// if there already is a comma, this will simply keep it the same
+			replacement = ',';
 
 		} else {
 			// if indentation decreased, pop levels from stack and insert "DEDENT" token to program, until indentation level matches
 			while (indentationLevel < lastLevel) {
 				indentationStack.pop();
 				lastLevel = indentationStack[indentationStack.length - 1];
-				replacement += DEDENT_TOKEN;
+				replacement += DEDENT_TOKEN + ',';  // a dedent finalizes both the block and the statement that the block is in, so add a comma
 			}
 			if (indentationLevel != lastLevel) {
 				// INVALID INDENTATION, we have dedented to a level that we never indented to in the first place (see "badIndentation" test)
