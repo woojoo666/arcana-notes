@@ -13,7 +13,7 @@
   "author": "maxithewoowoo@gmail.com",
   "license": "ISC",
   "dependencies": {
-    "browserify": "^16.2.3",
     "nearley": "^2.16.0"
-  }
+  },
+  "devDependencies": {}
 }
