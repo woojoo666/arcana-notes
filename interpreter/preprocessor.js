@@ -17,10 +17,11 @@ function emptyLinesAndCommentsProcessing(text) {
 }
 
 // note that text input should not have empty lines
+// we are using "{" and "}" to denote indentation increases/decreases
 //
 // parse each line, such that:
-//    * when indentation increases, use an {INDENT} token
-//    * when indentation decreases, use a {DEDENT} token
+//    * when indentation increases, use an INDENT token "{"
+//    * when indentation decreases, use a DEDENT token "}"
 //       * note that indentation can decrease multiple times at once
 //    * if indentation stays the same, insert a "," delimiter if there isn't one already
 //
@@ -35,8 +36,8 @@ function indentationProcessing(text) {
 	// add a newline at the end with same indentation as first line, to finalize the indentation processing
 	text += '\n' + '\t'.repeat(firstLineIndentation);
 
-	const INDENT_TOKEN = '{INDENT}';
-	const DEDENT_TOKEN = '{DEDENT}';
+	const INDENT_TOKEN = '{';
+	const DEDENT_TOKEN = '}';
 
 	// find every newline via regex, and process the indentation after it
 	return text.replace(/(,?)\n(\t*)/g, (_, comma, indentation) => {
