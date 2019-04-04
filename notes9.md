@@ -6040,3 +6040,64 @@ all these instructions can be executed asynchronously and concurrently through a
 
 * thus, I think the main difference is that, since smalltalk is so old, it was developed around the idea of synchronous single-threaded execution
 * whereas my language is designed around reactive programming and concurrency
+
+### No Isolated Indented Blocks
+
+* you can't do something like
+
+		foo: bar,
+
+			some
+			indented
+			block
+
+* notice that this is implying the indented block is a list item
+* but it's rather confusing
+* so we shouldn't allow this
+* you have to be more obvious about it, either using a capture block or even something like
+
+		foo: bar,
+
+		()
+			some
+			indented
+			block
+
+* note that it's perfectly valid to do this
+
+		foo: bar,
+		(some, indented, block)
+
+* which shows that, in some cases, indented blocks have different syntax restrictions than braced blocks
+* this is why we have to use a different token for indented blocks, eg `{` and `}`
+
+### Single Indented List Item - Confusing Syntax
+
+* these indentation rules can also get confusing in other ways
+* for example, something like this
+
+		foo:
+			(prop: val)
+
+* it might look like `(prop: val)` is the value of `foo`
+* but the indentation adds another set of braces, so in reality it is like `foo: ((prop: val))`
+* these ambiguities arise because properties (of the form `foo: bar`) and list items (of the form `foo`) look so similar
+* perhaps we shouldn't mix properties and list items
+
+* it's not so bad once you have multiple items though, eg
+
+		foo:
+			(prop: val)
+			anotheritem
+
+* I think maybe we can have a warning if there is only one list item, telling the programmer to use a more explicit syntax like
+
+		foo: ((prop: val))
+
+* or perhaps the IDE can insert dynamic index numbers to each list item
+
+
+				foo:
+		0:			(prop: val)
+		1:			anotheritem
+
