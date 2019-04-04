@@ -16,7 +16,8 @@ var grammar = {
     {"name": "Val$ebnf$1", "symbols": [/[a-z]/]},
     {"name": "Val$ebnf$1", "symbols": ["Val$ebnf$1", /[a-z]/], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "Val", "symbols": ["Val$ebnf$1"], "postprocess": d => d[0].join("")},
-    {"name": "Val", "symbols": [{"literal":"("}, "Block", {"literal":")"}], "postprocess": d => d[1]}
+    {"name": "Val", "symbols": [{"literal":"("}, "Block", {"literal":")"}], "postprocess": d => d[1]},
+    {"name": "Val", "symbols": [{"literal":"{"}, "Block", {"literal":"}"}], "postprocess": d => d[1]}
 ]
   , ParserStart: "Block"
 }
