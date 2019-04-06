@@ -5758,7 +5758,7 @@ we are forced to use commas between properties, but it makes it clearer, now tha
 
 
 
-### Parsing - Localizing Syntax Errors
+### Modular Parsing - Localizing Syntax Errors
 
 One of the ideas explored in a previous section, "Why Undefined?"
 is that we can even treat code with syntax errors, as just an `undefined` block
@@ -5766,6 +5766,8 @@ this way, the rest of the program can still run and display their output
 
 this is called "localizing syntax errors"
 and is an important goal we are trying to achieve without our parser
+
+note: later, we call this "modular parsing"
 
 ### Parsing - Indented Blocks and Localizing Syntax Errors
 
@@ -5970,7 +5972,7 @@ thus we can see how it localizes the error
 
 we explore this more deeply in the next section
 
-### Parsing - Unordered Parsing, Localizing Syntax Errors Using Revision History
+### Parsing - Incremental Parsing
 
 (continued from "Parsing - Braced Blocks and Localizing Syntax Errors")
 
@@ -5982,8 +5984,10 @@ however, our language is unordered
 so naturally, it makes sense for parsing to still be able to continue after a syntax error
 which is why localizing errors is important
 we have to find a different way to "execute" the parser such that, errors in one place won't affect others
+modular parsing
 
 instead, we can use the method explored in the previous section
+	see section "Parsing - Braced Blocks and Localizing Syntax Errors"
 
 essentially the idea is
 we take the latest revision that doesn't have syntax errors
@@ -6100,4 +6104,202 @@ all these instructions can be executed asynchronously and concurrently through a
 				foo:
 		0:			(prop: val)
 		1:			anotheritem
+
+### Error Propagation Up Call Stack
+
+* in many languages, eg Java or C++, it is common for errors to propagate up the call-stack
+* however, in my language, where errors are represented by `undefined`, it doesn't necessarily work the same way
+* by default, if `Alice` clones `Bob` who clones `Cassie`, and cloning `Cassie` fails, then `Bob` will simply set that property to `undefined`, but `Alice` isn't necessarily notified of the error
+
+* in imperative languages, you can `throw` and error to immediately exit out of the function, and notify all callers of the issue (until somebody catches the error)
+* perhaps we should have a similar mechanism
+
+* we can have errors be a special type of `undefined` value, that is automatically propagated up callers
+* so if `Bob` clones `Cassie` and it returns an error, then `Bob` will become `undefined` as well and return the same error
+
+* how should the syntax for this work though?
+
+
+### Multiple Dedentation and Partial Dedentation
+
+* notice that multiple dedentations at the same time are legal
+
+		foo:
+			val1
+				val2
+		val3
+
+* this is just the same as `foo: (val1(val2)), val3`
+* the indentation of `val3` terminates the blocks for both `val1` and `val2`
+
+* however, notice that if we have syntax like this
+
+		foo:
+				val1
+				val2
+			val3
+
+* this is illegal
+* `val3` is dedenting to a level that was never indented to, because the indented block "skipped" that level
+* this is called "partial dedentation", and causes a syntax error
+* (unless it is in a braced block, discussed in the next section)
+
+
+### Block Parsing and Multi-Line Expressions - Complications
+
+* first, note that currently our pre-processor replaces indentation with `INDENT` and `DEDENT` tokens, taken from how [python does it](https://stackoverflow.com/questions/27786191/how-to-represent-vertical-alignment-of-syntax-of-code-using-bnf-ebnf-or-etc)
+* now take a look at these three examples
+
+example 1
+
+	foo( (1 * 2) +
+			5 | bar
+		someblock )    // legal, all the same block
+
+example 2
+
+	foo( (1 * 2) +
+			5 | bar)
+		someblock     // legal, someblock can be parsed separately
+
+example 3
+
+	foo( (1 * 2) )
+			5 | bar
+		someblock     // illegal, partial dedent
+
+
+* notice that, without parsing the first line
+* we can't figure out whether or not the following indented block is actually a separate block or not
+* so we are stuck
+* on one hand we want to split into blocks before parsing, in order to do modular parsing
+* on the other hand, we need to do at least some parsing in order to split into blocks
+
+
+* also notice, we can't fully ignore indentation inside braced blocks
+
+			foo( (1 * 2) +
+		someblock     // should immediately terminate previous block
+
+* so in our grammar, we can't just ignore all `INDENT` and `DEDENT` tokens inside braces
+* (note that we are using `{` and `}` current as indent and dedent tokens)
+* (interestingly, python does allow over-dedentation inside braced blocks, which I think is quite ugly)
+
+I can think of two options to handle this
+	1. parse blocks first (manually), and then modular parse each block (using a grammar and nearley.js)
+	2. somehow create a grammar that ignores stuff inside indented blocks, deferring it for parsing later?
+
+### Block Parsing and Multi-Line Expressions - Context-Free Grammar?
+
+* maybe we can do a complex grammar to parse these complex bracing rules
+* we have a special token, like `PARTIALDEDENT`, or `}P` for short, for partial dedentations
+* 	(partial dedentations was discussed in the previous section, "Multiple Dedentation and Partial Dedentation")
+* and these are ignored inside braces
+* however, inside braces, `INDENT` and `DEDENT` tokens still have to follow a valid structure
+* in order to ensure that we never dedent past the block level
+
+* outside braces, `PARTIALDEDENT` is not allowed
+
+* note that we would have to split our grammar into two parts, one for inside braces, and one for outside braces
+* so instead of just having a `Statments` nonterminal, we would need `Statements` and `Statements_in_braces`
+* that way for the grammar rules concerning text in braces, we can ignore `PARTIALDEDENT`
+* we can also ignore newlines
+
+* note that, we can also design the grammar to "defer" parsing of indented blocks
+* we simply have a rule like
+
+		IndentedBlock := INDENT Code DEDENT
+
+* and we create the nonterminal `Code` to capture all text inside the indented block
+
+* however, this actually, won't always work
+* the indentation of the braced block doesn't have to end at the same level it began
+* the indentation can end at a higher level than it began
+* the following indented block has to end one level lower than it began though
+
+		foo( (1 * 2)
+				+ b
+						+ c
+					+ d)
+
+			nestedblock
+				bar
+			zed
+
+		nextblock
+
+* gets converted to
+
+		foo ( (1*2) { + b { + c } }P  )
+			} }P nestedblock { bar } zed nextblock
+
+(I split it into two lines for clarity, first line for the braced block, second line for the nested block)
+
+
+* actually, notice that even if we didn't have a nested block
+
+		foo( (1 * 2)
+				+ b
+						+ c
+					+ d)
+
+		nextblock
+
+* gets converted to
+
+		foo ( (1*2) { + b { + c } }P  ) } nextblock
+
+* if we focus on the important braces
+
+		( ( ) { { } ) }
+
+* this is actually really complex
+* we have a valid `()` structure and a valid `{}` structure interleaved together
+* the valid `()` structure is obviously necessary
+* but the valid `{}` structure is also necessary to make sure we don't indent below the start, both inside and outside the braces `()`
+
+* is this even possible to achieve using a grammar?
+
+* if we replace `(` with `a`, `{` with `b`, `)` with `c`, and `d` with `d`, this looks sort of like `a^m b^n c^m d^n`, which is not context-free
+
+* but just because a subset of our language is not context free, doesn't mean that the language is not context free
+
+### Block Parsing and Multi-Line Expressions - Proof that it is not Context-Free
+
+* actually, we can prove that our language isn't context-free with [double-pumping lemma](https://en.wikipedia.org/wiki/Pumping_lemma_for_context-free_languages)
+* recall how the double-pumping lemma works:
+
+* show that, for all integers $p$, there exists a string $w$ such that, for any any decomposition of $w$ into 5 parts $prefix x1 middle x2 suffix$, with length of $x1 middle x2$ smaller than $p$, then there is always a way to "pump" $x1$ and $x2$ to push the word out of the language, $prefix x1^i middle x2^i suffix \notin L for some i$
+
+* so here, given some $p$, we can create the braced structure
+
+		(^p {^p )^p }^p
+
+* so if $p = 3$ this would look like
+
+		((( {{{ ))) }}}
+
+* note that it is impossible to find a substring smaller than length $p$ that is double-pumpable while keeping the string in the language. In order to keep the string in the language you would either have to pump `(` and `)` at once, or `{` and `}` at once, but both those combinations are more than $p$ characters apart so you can't pump them at the same time.
+
+QED
+
+* thus, interleaved braced structures are impossible to represent using context-free grammars.
+
+* I wonder how python deals with this then?
+
+### Parsing Block Structure During Lexical Analysis
+
+* I think the best option for me is to just parse the braces and indentation first
+	* (trivially achievable using two stacks, one to keep track of parenthesis and one for indentation)
+* and then use a grammar to parse the rest
+* note that parsing the braces and block structure first, also allows me to do modular parsing
+
+* in addition, this method extends nicely into the "Incremental Parsing" idea discussed earlier
+	* see section "Parsing - Incremental Parsing"
+* because when we generate the structure for modular parsing, we can use the same structure for incremental parsing
+
+* looking at the description of python's lexical analysis description,
+* the [section about line joining](https://docs.python.org/3.3/reference/lexical_analysis.html#implicit-line-joining) talks about how it ignores newlines inside parenthesis or braces
+* since this is described in the lexical analysis, I am assuming they are parsing brace structure before doing the actual parsing
+* which is what I was planning on doing too!
 
