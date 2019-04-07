@@ -3934,6 +3934,7 @@ vvvv move this to philosophy section? vvvv
 	* section: "Arguments as a Template", "Clones and Calls Declared Inside the Arguments", "Defining Behavior That Should be Duplicated"
 25. when we declare or extend objects, we define behavior that should be duplicated
 	* section: "Defining Behavior That Should be Duplicated"
+25. modifications "Actor Model vs Functional - Modifications and State", "Referential Transparency"
 
 ### Implementation Rules
 

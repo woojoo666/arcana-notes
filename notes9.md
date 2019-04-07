@@ -6303,3 +6303,62 @@ QED
 * since this is described in the lexical analysis, I am assuming they are parsing brace structure before doing the actual parsing
 * which is what I was planning on doing too!
 
+### Actor Model vs Functional - Modifications and State
+
+https://fsharpforfunandprofit.com/posts/railway-oriented-programming-carbonated/
+
+chest example
+	see section "Combiners, Insertion and Privacy"
+if you want to have an object that you can modify and interact with, eg a card deck
+you can either use "register" pattern or "pipeline" pattern
+* register pattern: receiver has to explicitly register every actor
+	* eg in `foo: [alice,bob,cassie].map(x => x.getInsertions)`, if somebody new wants to insert, they have to be added to the list
+* pipeline pattern: the receiver is passed from actor to actor, and each actor applies their modification to the receiver
+	* eg in `foo: alice(bob(cassie( initial object )))`, if somebody new wants to insert, they have to be explicitly added to the pipeline
+
+functional forces you to modify the code of the object in order to accept modifications from new people
+imperative/actor model allows an object to accept modifications from any source
+makes it much more flexible
+
+this is further shown by how [haskell handles IO](https://www.haskell.org/tutorial/io.html)
+notice how IO operations have to explicitly return IO objects
+and that is just for doing IO operations, like modifying the filesystem
+what if you want to modify arbitrary objects?
+you have to return your actions/modifications as objects
+and then the object you are modifying, has to explicitly accept those modifications
+
+
+axis introduces a default "global state" object that is passed into and returned from every object
+recall from the section "Combiners, Insertion and Privacy", we can generalize this using the simple function
+
+		combiner(caller, arguments, allInsertions) => result + insertions
+
+this allows an actor to modify a receiver actor, without needing the receiver to be explicitly aware
+this is more conducive to the live,persistent, reactive model of axis
+because you can construct new objects that interact with existing objects
+without having to change the code and re-deploy those receiver objects
+
+eg, Bob can deploy a server that accepts song requests
+and anybody can create a program that sends a request, without Bob needing to rewrite his server to explicitly accept that request
+
+essentially introduces the concept of an "environment" that every object can read from and interact with
+note that a parent object can still control the environment of it's child objects, so there is still a sense of control
+but this default global state makes it much easier to write in a dynamic, constructional style
+
+### Referential Transparency
+
+* even though Axis has side effects
+* it still preserves referential transparency!
+* this is because of two main factors
+
+1. unordered modifications via insertion
+2. overdefinition is handled via `overdefined` error
+
+* so you can be sure that, everyone that references an object will see the same value
+
+* but the [wiki page](https://en.wikipedia.org/wiki/Referential_transparency) for referential transparency says that a function has to be pure
+* "the expression value must be the same for the same inputs and its evaluation must have no side effects"
+
+* our language achieves both because the side effects _are_ inputs
+* if you declare an object to be a collector, you have to account for all insertions to it
+* that's the whole point of a collector
