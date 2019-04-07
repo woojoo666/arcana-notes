@@ -6362,3 +6362,185 @@ but this default global state makes it much easier to write in a dynamic, constr
 * our language achieves both because the side effects _are_ inputs
 * if you declare an object to be a collector, you have to account for all insertions to it
 * that's the whole point of a collector
+
+
+### Multi-Line Expressions Allow for Imperative-Style Braced Blocks
+
+* notice a major implication for ignoring indentation inside braced blocks
+* they allow for imperative-style declaration of objects
+
+	foo: (
+		prop1: 10
+		prop2: 20
+	)
+
+* before, this would evaluate to `foo: ( ( prop1: 10, prop2: 20 ) )`
+* but now that indentation is ignored, it goes back to being a single block, `foo: ( prop1: 10, prop2: 20 )`
+
+* this can be confusing
+* this is why it's important for the IDE to subtly show implicit parenthesis, maybe by inserting slightly transparent braces before and after the block
+* that way the programmer knows exactly where the blocks are
+
+### complications with operators
+
+what if we wanted to do
+
+	(foo | bar)[10]
+
+this creates an object and extracts property `10` from it, not what we want
+
+maybe we can do
+
+	(foo | bar)...[10]
+
+or maybe abuse call operator
+
+	(foo | bar)->[10]
+
+we tried to solve it earlier for arithmetic expressions
+	// TODO: FIND REFERENCED SECTION
+
+	foo: (a + b) + c
+
+but note that this doesn't work if we want to use a unary operator, like `.` or `[]`, on the parenthesized expression
+
+maybe we should use `{}` for objects, and `()` for these things
+
+	foo: { a: 10, b: 20 }  // an object
+	bar: (x | y)[0]
+
+
+
+
+### parsing line numbers example - the power of tagging primitives
+
+when writing the parser, i encountered the following problem
+
+* moo lexer will take the raw code, and break it into tokens and identifiers, along with line numbers
+* then I parse for blocks, and merge the tokens of each block into a "blockstring", into then pass each blockstring to the nearley parser
+* the nearley parser will parse the blockstring, and if it finds any errors, will return the line number of the error
+
+notice that because the text given to nearley isn't the same as the text given to the moo lexer, the line numbers returned by each won't match
+so my middle block parsing step, has to provide a mapping between line numbers of the blockstring, to line numbers in the raw code
+
+so in all three steps, there is a mapping
+moo processes the raw code and spits out tokens and identifiers
+i process the tokens and spit out blockstrings
+nearley parses the blockstrings and spits out the line numbers of syntax errors
+
+in each of these steps, we have to keep track of the line numbers
+
+there is another method
+
+we "tag" each character of the raw code with its line number
+so as long as each processing step is returning those same characters, then I can look at the characters spit out at the very end, and see what line they came from
+
+for example we can do
+
+	taggedCode: rawCode.map(char => char(lineNumber: <calculate line number here>))
+	tokens: mooLexer(taggedCode)
+	blockstrings: blockParsing(tokens)
+
+	for block in blockstring:
+		parseResult: nearleyParser(block)
+		if (parseResult.syntaxError)
+			invalidChar: parseResult.syntaxError.faultyText[0]    // get the first character of the text that caused the error
+			console.log( invalidChar.lineNumber )                 // get the lineNumber property that we added in the beginning
+
+it doesn't matter if we add more parsing steps in the beginning
+those characters will persistently carry around those tags
+
+notice that even if the parsing steps create copies of the string, the copies will still carry around those tags
+
+however, something to keep in mind
+if you have a lot of tags, then every copy has to create a copy of each of those tags as well
+so it can get memory intensive
+another way we can do this tagging is
+
+	tag #lineNumber
+
+	taggedCode: rawCode.map(char => char())  // create an empty copy of each character
+	for char in taggedCode:
+		char.#lineNumber: <calculate line number here>
+
+we create a copy of each character, but don't add any tags, this is just so that every character has a unique memory address/reference
+then we can use an external hashmap, leveraging the `tag` and virtual property syntax
+
+this way, no matter how many tags you have, they don't bloat the character objects
+
+
+something to keep in mind is we don't want these modified character primitives leaving our parsing pipeline
+so if we do want to output any of these strings or characters, we should sanitize them first
+basically, replace them with their original character counterparts, without the tags
+
+
+
+
+
+modular parsing
+
+
+currently the idea behind modular parsing is
+when writing a program, you will have a "live" view of the output of your program
+and if there are any syntax errors, it will just make the enclosing block show up as `undefined` along with an error message
+so if you had some code like
+
+	foo:
+		bar: 10
+		zed: 20
+		bla: % some syntax error %
+
+so in the output window, you might see something like
+
+	foo: (bar: 10, zed: 20, bla: undefined(error: "syntax error on line 4") )
+
+
+however, what if the code looked like this
+
+	foo:
+		bar: 10
+		list: 1 2 3
+		list.forEach(% syntax error %)->
+
+notice that the syntax error is in the object being passed to `forEach`, who is responsible for creating clones of that object
+but `foo` doesn't actually contain any references to the faulty object
+it declares and defines the object, but doesn't have any properties pointing to it
+its an "anonymous" child object
+
+thus, in the output view, we wouldn't see any problems with the `foo` object
+we would simply see
+
+	foo: (bar: 10, list: 1 2 3, true)     // note that forEach always returns true
+
+only if we inspect the `forEach` call, might we see the errors
+though that also depends on how `forEach` was implemented
+if it was implemented like so
+
+	List:
+		forEach: fn >>
+			fn(List.head())
+			if (List.next)
+				List.next.forEach(fn)     // recursive call
+
+			=> true
+
+then all children are anonymous as well
+
+we might be tempted to just "bubble up" the syntax error so the caller fails as well
+and so does its caller, all the way up the chain
+but at that point you are basically just having the entire program fail, so that's not modular parsing anymore
+
+the problem is our output isn't a one-to-one mapping with the code
+even though it looks very close
+but the IDE shows the raw code, whereas the output shows the evaluated values
+
+in the IDE, show where the syntax error is
+in the output, only show syntax errors in the object that contains it
+and any object that references that failed object, will just see `undefined`
+this way, in a distributed web, a server can go down due to a syntax error, but everybody trying to read from the server just sees `undefined`, they don't see what caused the outage
+
+so the programmer can see in the IDE where the code has errors
+but if the programmer still wants to continue evaluating and see what the output is, they can
+
+syntax errors are indicated in the code, they only make sense in context of the code
+but when you evaluate them, they become `undefined` values in the output
