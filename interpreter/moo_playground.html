@@ -1,0 +1,56 @@
+<html>
+<head>
+	<script src="https://cdn.jsdelivr.net/npm/moo@0.5.0/moo.min.js"></script>
+</head>
+<body>
+<textarea id="editor" style="width: 500px; height: 300px">
+foo:
+	a: 10
+	b: 20   // test comment
+
+	for x in list:
+		dosomething(x)
+
+	should: failhere;
+</textarea>
+<br>
+<button onclick="reset()"> go </button>
+<button onclick="next()"> next token </button>
+<br>
+Moo Playground. Open Console. Press "go" to start parsing text. Press "next token" to get next token.
+
+<script>
+let lexer = null;
+let editor = document.getElementById('editor');
+
+function reset() {
+	let input = editor.value;
+	lexer.reset(input);
+	console.log('------- lexer reset ------');
+	console.log('input: ' + input);
+}
+
+function next() {
+	console.log(lexer.next())
+}
+
+document.body.onload = () => {
+	lexer = moo.compile({
+		WS:      /[ \t]+/,
+		comment: /\/\/.*?$/,
+		number:  /[0-9]+/,
+		string:  /"(?:\\["\\]|[^\n"\\])*"/,
+		lparen:  '(',
+		rparen:  ')',
+		colon: ':',
+		indent: { match: /\n\t*/, lineBreaks: true },
+		identifier: { match: /\w+/ , type: moo.keywords({
+				keyword: ['for', 'in', 'if', 'else', 'while'],
+			})},
+	});
+
+	reset();
+}
+</script>
+</body>
+</html>
