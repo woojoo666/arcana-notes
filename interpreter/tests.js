@@ -84,6 +84,30 @@ try {
 	console.log(err);
 }
 
+
+var noIndentChar = "foo: bar";
+var tabIndentChar = `
+	foo
+		bar`;
+var spacesIndentChar = `
+    foo
+        bar`;
+var mixedIndentChars = `
+	foo
+	    bar`;
+var illegalIndentChar = "\r  foo";
+
+console.assert(getIndentCharacter(noIndentChar) === '\t', "indentation error");
+console.assert(getIndentCharacter(tabIndentChar) === '\t', "indentation error");
+console.assert(getIndentCharacter(spacesIndentChar) === ' ', "indentation error");
+
+try {
+	console.log(getIndentCharacter(mixedIndentChars));
+	console.log(getIndentCharacter(illegalIndentChar));
+} catch (err) {
+	console.log(err);
+}
+
 // ------------------- parser tests ------------------------
 
 // parse function from parser.js

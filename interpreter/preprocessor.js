@@ -1,10 +1,58 @@
 // preprocessing
 function preprocessor(program) {
 	var processed = program;
+	try {
+		let indentChar = getIndentCharacter(processed);
+
+	} catch (err) {
+		console.log("Syntax error detected in preprocessor");
+		console.log(err);
+	}
+
+	// vvvv old stuff vvv
 	processed = emptyLinesAndCommentsProcessing(processed);
 	processed = indentationProcessing(processed);
 
 	return processed;
+}
+
+// Returns the character used for indentation, either spaces " " or tabs "\t"
+// Returns tabs by default, if zero indentation is detected in the file.
+// Throw error if mixed tabs and spaces detected, or if indentation uses a different character entirely.
+
+// TODO: indicate line number and column number in error message.
+function getIndentCharacter(text) {
+
+	let indentChar = '';
+
+	// note: String.protype.matchAll is not supported in IE, Edge, Opera, or Node.js,
+	//       so instead I am using a stringMatchAll function provided in matchAllPolyfill.js
+	let indentationMatches = stringMatchAll(text, /(^|\n)([^\S\n]+)\S/g);  // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
+
+	// go through all indentations in the file
+	for (match of indentationMatches) {
+
+		let indentation = match[2];
+
+		let illegalIndentChars = indentation.replace(/[ \t]/g,''); // remove tabs and spaces to find illegal characters
+		if (illegalIndentChars.length > 0) {
+			// indentation contains characters other than tabs or spaces
+			// throw error, and print out the first bad character
+			throw Error('Bad indentation, illegal indentation character with unicode value '
+				+ illegalIndentChars[0].charCodeAt(0));
+		}
+
+		if (!indentChar) {
+			indentChar = indentation[0]; // set indentChar to first indentation character found
+			// TODO: if indent char is spaces, maybe we should also track the number of spaces? eg 4 spaces = 1 indent
+		}
+
+		if (indentation.replace(new RegExp(indentChar, 'g'),'').length > 0) {
+			throw Error('Bad indentation, mixed spaces and tabs');
+		}
+	};
+	
+	return indentChar || '\t';  // if no indentation character found, return "\t" by default
 }
 
 function emptyLinesAndCommentsProcessing(text) {
