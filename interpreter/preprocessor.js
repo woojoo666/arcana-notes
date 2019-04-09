@@ -1,8 +1,15 @@
+// TODO: wrap this entire file in a class so these constants aren't exposed
+// 	     Then we can also have class members like indentSequence and baseIndentation, which are used across the pipeline
+
+// notice that this indentation regex includes lines with zero indentation
+const indentationRegex = /(^|\n)([^\S\n]*)\S/; // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
+const parenthesisRegex = /\(|\)/;
+
 // preprocessing
 function preprocessor(program) {
 	var processed = program;
 	try {
-		let indentChar = getIndentCharacter(processed);
+		let indentSequence = getIndentSequence(processed);
 
 	} catch (err) {
 		console.log("Syntax error detected in preprocessor");
@@ -21,18 +28,21 @@ function preprocessor(program) {
 // Throw error if mixed tabs and spaces detected, or if indentation uses a different character entirely.
 
 // TODO: indicate line number and column number in error message.
-function getIndentCharacter(text) {
+// TODO: we can also calculate baseIndentation here
+function getIndentSequence(text) {
 
-	let indentChar = '';
+	let indentSequence = '';
 
 	// note: String.protype.matchAll is not supported in IE, Edge, Opera, or Node.js,
 	//       so instead I am using a stringMatchAll function provided in matchAllPolyfill.js
-	let indentationMatches = stringMatchAll(text, /(^|\n)([^\S\n]+)\S/g);  // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
+	let indentationMatches = stringMatchAll(text, new RegExp(indentationRegex, 'g'));
 
 	// go through all indentations in the file
-	for (match of indentationMatches) {
+	for (let match of indentationMatches) {
 
 		let indentation = match[2];
+
+		if (indentation.length <= 0) continue;
 
 		let illegalIndentChars = indentation.replace(/[ \t]/g,''); // remove tabs and spaces to find illegal characters
 		if (illegalIndentChars.length > 0) {
@@ -42,17 +52,18 @@ function getIndentCharacter(text) {
 				+ illegalIndentChars[0].charCodeAt(0));
 		}
 
-		if (!indentChar) {
-			indentChar = indentation[0]; // set indentChar to first indentation character found
-			// TODO: if indent char is spaces, maybe we should also track the number of spaces? eg 4 spaces = 1 indent
+		if (!indentSequence) {
+			indentSequence = indentation[0]; // set indentSequence to first indentation character found
+			// TODO: if indent char is spaces, maybe we should also track the number of spaces? eg 4 spaces = 1 indent.
+			//       If we do, then we should throw an error if there are spaces left-over, "inconsistent indentation error"
 		}
 
-		if (indentation.replace(new RegExp(indentChar, 'g'),'').length > 0) {
+		if (indentation.replace(new RegExp(indentSequence, 'g'),'').length > 0) {
 			throw Error('Bad indentation, mixed spaces and tabs');
 		}
 	};
 	
-	return indentChar || '\t';  // if no indentation character found, return "\t" by default
+	return indentSequence || '\t';  // if no indentation character found, return "\t" by default
 }
 
 function emptyLinesAndCommentsProcessing(text) {
@@ -62,6 +73,32 @@ function emptyLinesAndCommentsProcessing(text) {
 	text = text.replace(/\/\/.*($|\n)/g, (_, linebreak) => linebreak);    // strips out comments
 
 	return text;
+}
+
+// { str: <string>, ranges: [{offset, length}]}
+function slice_preserveMapping() {
+
+}
+
+function join_preserveMapping() {
+
+}
+
+// a class for maintaining text offset mappings while doing string operations
+class Block {
+
+	constructor (parent) {
+		this.parent = parent; // parent block
+		this.chunks = [];   // every chunk is either a slice of the parent, or an annotation like "{ BLOCK_12 }"
+	}
+
+	append (block) {
+
+	}
+
+	slice (offset, length) {
+		return new Block()
+	}
 }
 
 // note that text input should not have empty lines
@@ -75,6 +112,7 @@ function emptyLinesAndCommentsProcessing(text) {
 //
 // also note that the initial indentation level of the program is determined by the first line
 function indentationProcessing(text) {
+
 
 	let firstLineIndentation = text.match(/^\t*/)[0].length; // subtract out first ^ char
 
@@ -118,4 +156,120 @@ function indentationProcessing(text) {
 		}
 		return replacement;
 	});
+}
+
+// takes an indentationRegex match, and returns the indentation length
+function indentLength (match, indentSequence) {
+	let indentation = match[2]; // indentation should be in the second capture group
+	return indentation.split(indentSequence).length - 1;
+}
+
+function getBlockIterator(text, indentSequence) {
+	// match parenthesis, indentation, and end of input
+	// note: RegExp.exec() and stringMatchAll() will infinitely match $ if used with the 'g' flag,
+	//       so make sure to check for that when looping through the matches.
+	let blockRegex = new RegExp(parenthesisRegex.source+'|'+indentationRegex.source+'|$', 'g');
+
+	// make sure to use an iterable here, not an array, because matching $ with the global flag will infinitely loop at the end
+	let matches = stringMatchAll(text, blockRegex); // provided in matchAllPolyfill.js
+
+	let baseIndentation = indentLength(text.match(indentationRegex), indentSequence); // get indentation of first line
+	let indentationStack = [baseIndentation];
+	let lastLevel = indentationStack[indentationStack.length - 1];  // lastLevel is always the top of the stack
+
+	let bracesLevel = 0;
+
+	return {
+		*[Symbol.iterator]() {
+
+			for (let match of matches) {
+				// note that matching $ with global flag will cause it to match infinitely,
+				// so make sure we exit after the first match of $
+				let endOfInput = match[0].length == 0;
+
+				let blockType = parenthesisRegex.test(match[0]) ? "Braces" : "Indent";
+				let delimiterType = null;  // "start" to indicate block start, "end" for end of a block
+				let offset = match.index;
+
+				if (blockType == "Braces") {
+					if (match[0] == '(') {
+						delimiterType = "start";
+						bracesLevel++;
+					} else {
+						delimiterType = "end";
+						bracesLevel--;
+						if (bracesLevel < 0)
+							throw Error("Pre-processing error, extra closed brace at offset " + offset);
+					}
+
+					yield { delimiterType, blockType, offset };
+
+				} else { // indent type is "Indent"
+
+					let indentationLevel = null;
+
+					if (endOfInput) { // this means we are at end of input (matched with "$")
+						indentationLevel = baseIndentation; 
+					} else {
+						indentationLevel = indentLength(match, indentSequence);   // counts number of indents
+					}
+
+					// If we are inside a braced block, make sure indentation stays above the block's base level,
+					// but otherwise ignore the indentation
+					if (bracesLevel > 0) {
+						if (indentationLevel < lastLevel) {
+							throw Error("Pre-processing error, dedented below the base indentation of this braced block, offset " + offset);
+						}
+						if (endOfInput) {
+							throw Error("Pre-processing error, unclosed braces");
+							break;  // break, to prevent infinite loops from $ constantly matching
+						}
+						continue;
+					}
+
+					if (indentationLevel > lastLevel) {
+						// if indentation increased, push new level to stack, and insert "INDENT" token to program
+						indentationStack.push(indentationLevel);
+						lastLevel = indentationStack[indentationStack.length - 1];
+
+						delimiterType = "start";
+						yield { delimiterType, blockType, offset };
+
+					} else if (indentationLevel < lastLevel) {
+						// if indentation decreased, pop levels from stack and insert "DEDENT" token to program, until indentation level matches
+						while (indentationLevel < lastLevel) {
+							indentationStack.pop();
+							lastLevel = indentationStack[indentationStack.length - 1];
+
+							if (indentationStack.length == 0) {
+								throw Error("Pre-processing error, dedented below the first line's indentation, offset " + offset);
+							}
+
+							delimiterType = "end";
+							yield { delimiterType, blockType, offset };
+						}
+						if (indentationLevel != lastLevel) {
+							// INVALID INDENTATION, we have dedented to a level that we never indented to in the first place (see "badIndentation" test)
+							// note that this will also naturally catch cases where we dedent past the first line indentation (see "dedentPastFirstLine" test)
+							throw Error("Pre-processing error, bad indentation at offset " + offset);
+						}
+					}
+				}
+
+				if (endOfInput) break;
+			}
+
+			if (bracesLevel > 0) {
+				throw Error("Pre-processing error, unclosed braces");
+			}
+		}
+	}
+}
+
+function extractBlocks(text, indentSequence) {
+	let blockStack = [];
+
+	console.log("-------- extractBlocks -----------");
+
+	console.table(getBlockIterator(text, indentSequence));
 }
