@@ -4,7 +4,7 @@
   "description": "basic concept interpreter",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node node_modules/jasmine/bin/jasmine"
   },
   "keywords": [
     "axis",
@@ -15,5 +15,7 @@
   "dependencies": {
     "nearley": "^2.16.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "jasmine": "^3.4.0"
+  }
 }
