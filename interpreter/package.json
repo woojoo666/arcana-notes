@@ -4,7 +4,7 @@
   "description": "basic concept interpreter",
   "main": "app.js",
   "scripts": {
-    "test": "node node_modules/jasmine/bin/jasmine"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "axis",

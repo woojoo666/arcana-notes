@@ -6,4 +6,6 @@ Song.prototype.persistFavoriteStatus = function(value) {
 	throw new Error("not yet implemented");
 };
 
-module.exports = Song;
+if (typeof module === 'object' && module.exports) {
+	module.exports = Song;
+}

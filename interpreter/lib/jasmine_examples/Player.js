@@ -21,4 +21,6 @@ Player.prototype.makeFavorite = function() {
 	this.currentlyPlayingSong.persistFavoriteStatus(true);
 };
 
-module.exports = Player;
+if (typeof module === 'object' && module.exports) {
+	module.exports = Player;
+}
