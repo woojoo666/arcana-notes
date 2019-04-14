@@ -19,7 +19,6 @@
     "@babel/core": "^7.4.3",
     "@babel/preset-env": "^7.4.3",
     "babel-jest": "^24.7.1",
-    "jasmine": "^3.4.0",
     "jest": "^24.7.1"
   }
 }
