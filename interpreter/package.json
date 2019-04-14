@@ -4,7 +4,7 @@
   "description": "basic concept interpreter",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node node_modules/jest/bin/jest.js"
   },
   "keywords": [
     "axis",
@@ -16,6 +16,10 @@
     "nearley": "^2.16.0"
   },
   "devDependencies": {
-    "jasmine": "^3.4.0"
+    "@babel/core": "^7.4.3",
+    "@babel/preset-env": "^7.4.3",
+    "babel-jest": "^24.7.1",
+    "jasmine": "^3.4.0",
+    "jest": "^24.7.1"
   }
 }
