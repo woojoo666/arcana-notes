@@ -208,9 +208,8 @@ class Block {
 
 		// if you have say, 3 children, it should end up something like this
 		// <text> (Block1)  <text> {Block2} <text> {Block3} <text>
-		// note that for braced blocks, we don't need to add "(" or ")", because it is already in the text
 
-		let str = this.text.slice(this.startOffset, this.children[0].endOffset)
+		let str = this.text.slice(this.startOffset, this.children[0].startOffset)
 		for (let i = 0; i < this.children.length; i++) {
 
 			let current = this.children[i];

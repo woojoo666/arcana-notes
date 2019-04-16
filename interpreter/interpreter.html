@@ -33,9 +33,10 @@
 <script type="module">
 	import { PreProcessor, Block } from './preprocessor.js';
 
-	var test = new PreProcessor('    test:(hello:world)');
+	var test = new PreProcessor('alice(bob)cassie\n\tdave\nethan');
 	test.run();
 	console.log(test);
+	window.preprocessor = test;
 </script>
 </body>
 </html>
