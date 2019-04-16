@@ -20,8 +20,6 @@ PreProcessor.prototype.run = function () {
 		this.setIndentSequence();
 		let blockBoundaries = this.getBlockIterator();
 		this.constructBlockTree(blockBoundaries);
-		console.log(this.rootBlock);
-		console.log(this.rootBlock.getBlockString());
 		this.parseBlockRecursive(this.rootBlock);
 
 	} catch (err) {
@@ -38,7 +36,7 @@ PreProcessor.prototype.run = function () {
 // TODO: we can also calculate baseIndentation here
 PreProcessor.prototype.setIndentSequence = function () {
 
-	this.indentSequence = '\t';  // default indent sequence is "\t"
+	this.indentSequence = null;  // default indent sequence is "\t"
 
 	// note: String.protype.matchAll is not supported in IE, Edge, Opera, or Node.js,
 	//       so instead I am using a matchAll function provided in matchAllPolyfill.js
@@ -59,16 +57,20 @@ PreProcessor.prototype.setIndentSequence = function () {
 				+ illegalIndentChars[0].charCodeAt(0));
 		}
 
-		if (!indentSequence) {
+		if (!this.indentSequence) {
 			this.indentSequence = indentation[0]; // set indentSequence to first indentation character found
 			// TODO: if indent char is spaces, maybe we should also track the number of spaces? eg 4 spaces = 1 indent.
 			//       If we do, then we should throw an error if there are spaces left-over, "inconsistent indentation error"
 		}
 
-		if (indentation.replace(new RegExp(indentSequence, 'g'),'').length > 0) {
+		if (indentation.replace(new RegExp(this.indentSequence, 'g'),'').length > 0) {
 			throw Error('Bad indentation, mixed spaces and tabs');
 		}
 	};
+
+	if (!this.indentSequence) {
+		this.indentSequence = '\t';   // default indent sequence is "\t"
+	}
 
 	return this;
 }
@@ -250,7 +252,7 @@ PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
 
 	for (let { delimiterType, blockType, offset, text } of blockBoundaries) {
 		if (delimiterType == 'start') {
-			let child = new Block(text, currentBlock, blockType);
+			let child = new Block(this.rawText, currentBlock, blockType);
 			child.startOffset = offset+text.length;
 			currentBlock.children.push(child);
 
@@ -266,8 +268,8 @@ PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
 
 PreProcessor.prototype.parseBlockRecursive = function (block) {
 	block.parseTree = parse(block.getBlockString());
-	for (let child in block.children) {
-		parseBlockRecursive(child);
+	for (let child of block.children) {
+		this.parseBlockRecursive(child);
 	}
 
 	return this;
