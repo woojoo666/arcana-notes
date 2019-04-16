@@ -53,7 +53,19 @@ but in this new age of distributed networks, we are increasingly seeing programs
 in Axis, every object is "alive", you can modify them live, udpate them live, have some parts running while you modify other parts
 
 
+after making the chat server, talk about how you might want to separate the server and client, if things get bigger and more complex
+show how you can easily move the client to a separate module
+and then show how you can easily move the client module to a separate file
+and how you can easily navigate to the file and clone it, providing environment variables
 
+
+this is what actor model provides
+strong modularity, which makes it easy to move components around
+extremely flexible
+unordered
+
+
+maybe also give an example of calling web APIs
 
 
 
