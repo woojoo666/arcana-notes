@@ -3985,6 +3985,9 @@ Nested Property Triggers:
 Muxes
 * 
 
+Lazy evaluation, dont-call-by-dont-need
+	section: "Detecting Unobserved Nodes, Dont-Call-By-Dont-Need"
+
 ### Operations
 
 * property access

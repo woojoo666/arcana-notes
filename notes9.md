@@ -4470,6 +4470,7 @@ flexible scoping and mixins
 move away from hierarchies
 this is why we use type as a property
 perhaps `template` should be a property too
+properties, not hierarchies
 
 
 
@@ -4479,7 +4480,7 @@ stratified complexity
 
 
 
-
+### Latches and Feedback
 
 hmm it does seem more and more like Axis is just actor model, not dataflow
 important to note that actor model is nondeterministic
@@ -4528,8 +4529,8 @@ it's impact will ripple through the entire graph
 though when it goes back to `undefined` it will naturally correct itself...I think
 
 
-* reason we thought it was determinant was because depends solely on inputs
-* no "arbitary" picking like mentioned in wiki
+* reason we thought it was determinant was because we thought outputs depend solely on current inputs
+* no "arbitration" or arbitrary selection mechanisms, like mentioned in [the wiki](https://en.wikipedia.org/wiki/Indeterminacy_in_concurrent_computation)
 * however, there is arbitary picking, the order in which updates happen is random
 
 * maybe you have to localize feedback, declare a module as having `feedback` or interpreter will complain
@@ -4537,6 +4538,8 @@ though when it goes back to `undefined` it will naturally correct itself...I thi
 
 * notice that, ignoring the initial `undefined` state, the final `#distance` value for all nodes won't actually have feedback
 * the dependency graph will be a DAG, acyclic graph
+
+### Distributed Feedback
 
 * maybe every time we update a module, it invalidates all properties of a module
 * so for `latch` example earlier, when you change `input`, it also sets `output` back to undefined
@@ -4740,7 +4743,7 @@ so it does seem like initial value matters
 * we can look through the history of `input` and see that the previous value of `input` was `10`, which explains the current value of `output`
 
 
-* I think this is pretty much all we need to 
+* I think this is pretty much all we need to prove determinacy in our language
 
 
 ### Timeless - Rewriting History and Synchronization
@@ -4784,7 +4787,7 @@ we are taking functions that operate on values
 and making them work with time streams
 
 
-how does this fit into the idea that actor model is indeeterminant
+how does this fit into the idea that actor model is indeterminant
 actor model languages like Pony use naive message passing
 but they might have behavior that depends on message arrival order
 eg receiving asynchronous print commands
@@ -4802,7 +4805,7 @@ and now, the program behavior is determinant, solely based on the definition of 
 
 
 
-
+### Feedback and Update Order, Evaluation Order
 
 multiple ways we can define how our interpreter should handle feedback
 
@@ -4810,7 +4813,7 @@ reset, invalidate previous values
 ignore previous values, assume initial value is `undefined` and go from there
 in this case the latch would go back to `undefined` if the input went back to `undefined`
 note that earlier we mentioned that this method was impossible
-	// TODO: FIND REFERENCED SECTION, where we talk about "invalidates all properties of a module"
+	see section "Distributed Feedback"
 because if the feedback spans multiple modules, then how could we be sure the other modules are also invalidating their values?
 	this is also where we introduced the triangle maximum `trifecta` example
 however, now that transient behavior is well defined in the language behavior, everything is determinant
@@ -5586,7 +5589,7 @@ another example
 * `height` is just a function we are applying to the root node, that recursively will apply itself to child nodes
 
 * though we can also use this default-value method for `shortestDistance` example
-* 	(from section "Shortest Distance Example - Default Value of Infinity")
+	* (from section "Shortest Distance Example - Default Value of Infinity")
 * and it will be different from recursion:
 
 		shortestDistance: graph start end >>
@@ -5686,10 +5689,35 @@ biota
 spore
 stasis
 slime mold
+spore
+fungi
 
 evolve - highlights how data and behaviors change over time
 threads
 
+orchestra
+harmony
+symphony
+choir
+blend
+meld
+ensemble
+trio
+quartet
+rally
+huddle
+chatter
+cluster
+troupe
+syndicate (actually there is an actor-model language named this already, https://syndicate-lang.org)
+
+bee
+beacon  - captures the idea of seeing other signals and broadcasting a signal of your own
+firefly
+lantern
+flare
+candlelight
+lodestar
 
 
 ### Multi-line Braced-Blocks
@@ -6193,7 +6221,7 @@ I can think of two options to handle this
 
 * maybe we can do a complex grammar to parse these complex bracing rules
 * we have a special token, like `PARTIALDEDENT`, or `}P` for short, for partial dedentations
-* 	(partial dedentations was discussed in the previous section, "Multiple Dedentation and Partial Dedentation")
+	* (partial dedentations was discussed in the previous section, "Multiple Dedentation and Partial Dedentation")
 * and these are ignored inside braces
 * however, inside braces, `INDENT` and `DEDENT` tokens still have to follow a valid structure
 * in order to ensure that we never dedent past the block level
@@ -6397,6 +6425,10 @@ or maybe abuse call operator
 
 	(foo | bar)->[10]
 
+or just use call operator normally
+
+	(=> foo | bar)->[10]
+
 we tried to solve it earlier for arithmetic expressions
 	// TODO: FIND REFERENCED SECTION
 
@@ -6404,15 +6436,24 @@ we tried to solve it earlier for arithmetic expressions
 
 but note that this doesn't work if we want to use a unary operator, like `.` or `[]`, on the parenthesized expression
 
-maybe we should use `{}` for objects, and `()` for these things
+maybe we should use `{}` for objects, and `()` for operator precedence
 
 	foo: { a: 10, b: 20 }  // an object
-	bar: (x | y)[0]
+	bar: (x | y)[0]        // operator precedence shorthand, equivalent to or(x,y)[0]
 
 
+or maybe we _can_ make it so that unary operators also "strip away parenthesis" for singleton objects
+if you want to for some reason do `or(x, y)[0]` using the `|` operator, we could simply do
 
+	bar: (0: x | y)[0]
 
-### parsing line numbers example - the power of tagging primitives
+note that to help make this "parenthesis stripping" obvious, we should leverage syntax highlighting
+when the parenthesis are "stripped", they should be highlighted the same color as mathematical operators like `+` or `|`
+that way it's obvious that they are only being used for operator precedence, not object creation
+it also has to be something that happens statically, determined during parsing
+it's a syntax thing, not a runtime thing
+
+### Parsing and Line Numbers Example - the power of tagging primitives
 
 when writing the parser, i encountered the following problem
 
@@ -6473,11 +6514,130 @@ something to keep in mind is we don't want these modified character primitives l
 so if we do want to output any of these strings or characters, we should sanitize them first
 basically, replace them with their original character counterparts, without the tags
 
+### Proxies and Data Processing
+
+* this actually reminds me of one of the original motivations between tagging, and the language itself actually
+* I often ran into this pattern
+* where I had some complex pipeline
+* and I might have a giant set of data
+* but I only want to filter and analyzes certain items
+* but I still want to keep track of the context of those items within the larger dataset
+
+
+* in some cases you can just use a hashmap
+
+		images >>
+		sizes: hashmap()
+
+		for (image in images)
+			area: image.width * image.height
+			if (area > 10000)
+				sizes.put(image, "big")
+			else
+				sizes.put(image, "small")
+
+* and eventually, that is what tagging, aka the `#` syntax, evolved into
+
+* but sometimes a hashmap doesn't work
+* for example, in the `lineNumber` example in the previous section
+	* see section "Parsing and Line Numbers Example"
+* in a more generalized sense
+* if you have some large array that contains duplicates
+* and you want to do data processing on a subset of that array
+* while keeping track of the indices of those items
+* the `lineNumber` example from earlier is a good example of this
+* but here is a simpler example
+
+		chunk: array.sliceSpecial(size: 10)      // use third party api to slice a certain part of the array
+		specialItems: findSpecialItems(chunk)    // use third party api to extract certain items
+		firstSpecialItem: ???                    // how do we get the first item, when we have lost the indice information?
+
+* the hashmap method doesn't work here because the array contains duplicates
+* so if you tag an item with it's corresponding index, it may end up with multiple indices attached
+
+* note that we can't just modify the third party api, and even if it wasn't a third party function,
+* it's inconvenient to have two versions of every function, one version that preserves indices and one that doesn't
+
+* one method is to clone items, so every element of the array contains a unique clone of the source item
+* this is the method we used in the `lineNumber` example
+* this way, because every item is unique, we can tag them without worry
+
+* however, this won't always work, if the source items have behavior that you don't want to clone
+* eg if they call external APIs, you don't want to duplicate those calls just because you want to add a small "index" tag
+
+* the most robust method is to use wrappers
+
+		wrapped: array.map((v, i) => (index: i, value: v))
+
+* however, often wrappers can get ugly
+* because now we have to extract the values every time
+* so we wouldn't be able to use the third party apis like `sliceSpecial` and `findSpecialItems`, which operate on the values directly
+* we would have to modify the api functions to extract the value first
+
+* proxies are basically wrappers that make it "feel" like you are working with the source items
+
+		foo: (val: 10)
+		fooProxy: proxy(foo)->
+		console.log(fooProxy.val)    // will print "10"
+
+* this way, we can proxy values and before tagging them, so each tag will correspond to a unique proxy object (no collisions)
+
+		tag #index
+		proxiedArray: array.map(( obj, i >> obj#index: i => proxy(v) ))
+		
+		chunk: proxiedArray.sliceSpecial(size: 10)
+		specialItems: findSpecialItems(chunk)
+		firstSpecialItem: specialItems.sortBy(#index)[0]
+
+* then we can extract the original item using a symbol property
+
+		originalItem: firstSpecialItem[proxy.sourceKey]
+
+* property access is automatically forwarded to the source item
+* and they leverage symbol properties, to ensure that proxy-specific properties don't collide with properties of the source item
+
+* proxy implementation
+
+		proxy: source >>
+			sourceKey.
+			=>
+				[key]: if (key = sourceKey) source else source[key]
+
+* note that if the source item is a proxy, you might have to worry about collisions
+
+		p1: proxy("hi")->
+		p2: proxy(p1)->
+		p2[proxy.sourceKey]   // ambiguous, are you trying to get the source of p1 or p2?
+
+* according to the implementation of proxies, this example would return the source of `p2`, but then how would you access the `sourceKey` property of `p1`?
+* you can easily solve this by providing your own `sourceKey` to resolve this ambiguity
+
+		sourceKey1.
+		sourceKey2.
+		p1: proxy("hi", sourceKey: sourceKey1)->
+		p2: proxy(p1, sourceKey: sourceKey2)->
+		p2[proxy.sourceKey1]   // forwards the property access to p1, and retrieves the source
+
+* however, you have to be careful with proxies, because sometimes you don't want them to "leave" the pipeline
+* but it isn't always clear what functions are part of the pipeline and which ones aren't
+* so you have to explicitly specify when you want to send the proxy, and when you want to send the source object
+* for example
+
+		items: sourceItems.map(x => proxy(x)->)
+		subset: items.filter(x => fn(x)).map(x => gn(x))   // here we want to pass the proxies to these external functions
+
+		someExternalAPI(subset)   // here we don't
+
+* this might be a good place to use firewalls actually
+
+* you "fence out" exactly what functions you want inside the firewall
+* and scope all proxies to the firewall
+* so any proxies leaving the firewall will automatically extract the source
+* or maybe just become undefined
 
 
 
-
-modular parsing
+### modular parsing - syntax errors vs output errors
 
 
 currently the idea behind modular parsing is
@@ -6544,3 +6704,620 @@ but if the programmer still wants to continue evaluating and see what the output
 
 syntax errors are indicated in the code, they only make sense in context of the code
 but when you evaluate them, they become `undefined` values in the output
+
+
+
+
+### scope and insertion and firewalling
+
+maybe insertion and scope are linked
+the only way you can "firewall" stuff and prevent signals from getting out via insertion or cloning
+is to override the scope
+the parent can always override the child's scope
+control the child's environment
+even if the parent is cloning another object, they can control the environment
+override the scope
+so if that object has private behavior, or references private variables, then it will immediately stop working
+eg
+
+	foo:
+		_private: 10
+		collect: collector
+		bar:
+			zed: _private * 3
+			collect <: "bla"
+
+	firewalled:
+		_scope: ()   // override scope
+		child: foo.bar()    // clone using the new scope
+
+note that in `firewalled.child`, `zed` will be undefined and no insertions will be made to `collect`
+
+it is essentially like a surface copy, a psuedo-clone
+only copies the public behavior
+
+anytime you override scope with a blank slate, aka `_scope: ()`, then it's like a surface copy
+but you can override it with whatever scope you want
+
+note however, that in this case, `foo.bar.zed` references private behavior
+once `firewalled` overrides the scope, then the child loses all access to this private behavior
+
+so firewalling is a double-edged sword
+it prevents data from getting out, but it also prevents clones from accessing private behavior
+which makes sense
+if you want access to private behavior, you have to permit communication between the source and the clone
+
+
+### errors pII
+
+
+in Java, anybody in call stack can catch the error and prevent it from propagating
+this makes sense
+when you call another function, you delegate behavior to it
+and it is allows to act however it wants
+if it chooses the catch the error so that you don't see it, then that's its perogative
+
+so perhaps we should do the same thing
+errors propagate up the call/clone stack until somebody captures it
+
+
+however this idea of a "call stack" feels very procedural,
+and does not really fit in with the "everything is data" philosophy
+
+so why is it so convenient?
+check out the code for the parser, specifically the functions `getBlockIterator` or `indentationProcessing`
+
+
+note that another way we can do errors, is just use a collector
+
+	foo:
+		errors: collectors
+		bar: someFunction(
+				if (someError) errors <: "error message"
+			)->
+
+this isn't the same though, because it goes directly to the collector, there is no propagation up a call stack
+so intermediate functions can't "capture" it
+note that this is also completely possible in imperative languages, they would just use assignment, eg
+
+	errors = new Array();
+	myArray.forEach(x => {
+			if (someError) {
+				errors.push("error message");
+			}
+		});
+
+but the call-stack propagation method, allows for a more systematic way of handling errors
+the "control flow" of a program is made up of all it's sub-calls and statements
+and throwing errors is an easy way to break out of the entire flow, now matter how many layers deep the method calls are
+
+you can think of the procedure of a program, as like a slowly growing tree of statements and function calls
+and throwing errors is like exiting out of the entire tree
+but you can also "catch" errors, basically isolating out a tree branch so any issues in that branch don't spread to the rest of the tree
+
+it does feel very hierarchal though
+
+
+
+
+
+`foo(x => x*x)` vs `foo((x => x*x))`
+
+
+
+	extractBlocks: text, blockBoundaries >>
+		var blockStack: list
+		var current: blockStack.last
+
+		for (index in range) { @index
+			if (index % 2 = 0 && current is prime)
+				blockStack.push(someVal)
+			else
+				blockStack.pop
+
+notice how `current` is reactive
+in imperative, every time we push or pop to blockstack we would have to manually update `current`
+this is rather hard to think about though
+it might be intuitive to want to simply declare `current: blockStack.last`
+it might not be clear why `current` has to be a state variable
+
+
+
+
+
+how would we replicate the following JS code
+
+	let arr = [];
+	for (timestamp of timestamps) {
+		if (timestamp % 2 == 0)
+			arr.push("even");
+		else
+			for (index = 0; index < 3; index++)
+				arr.push("odd " + index);
+	}
+
+mixing indexes
+
+	var arr
+
+	for (timestamp in timestamps) @timestamp
+		if (timestamp % 2 = 0)
+			arr.push("even")
+		else
+			for (0 < index < 3) @timestamp,index    // notice: compound index
+				arr.push("odd " + index)
+
+notice that we are mixing compound indexes with regular indexes
+
+
+
+### Javascript Import System vs Axis
+
+module system is extremely annoying
+especially because node.js and ES6 use different module systems
+so basically you can't have javascript files that work across both
+because if you use `module.exports` and `require`, it won't work with ES6
+and if you use ES6 modules, while they do work with experimental versions of Node.js, most libraries are written in Node.js
+eg Jasmine testing framework
+
+javascript creates strong separation between files
+which makes it hard to split code amongst multiple files
+HTML allows you to just append multiple javascript files into the same runtime/environment
+but Node.js sandboxes each file and forces you to expose variables using `module.exports`, and import variables using `require`
+
+the HTML method is quick and easy, but ugly, often results in polluting the global namespace
+the Node.js method is annoying to work with, and also makes files unusable in the browser / client-side
+
+
+in Axis, files are treated like templates
+remember that every file contains a "block"
+eg
+
+	name >>
+
+	greeting: "Hello, my name is " + name
+	informal_greeting: "Whats up, Im " + name
+
+let's say this block was stored in `person.axis`
+then it is the same as declaring
+
+	person: template
+		name >>
+		greeting: "Hello, my name is " + name
+		informal_greeting: "Whats up, Im " + name
+
+so if you were in a different file, say, in the same directory, you could do
+
+	bob: directory.person(name: "Bob")   // directory is a variable provided by the environment, by default it points to the current directory
+	console.log(bob.greeting)            // will print "Hello, my name is Bob"
+
+we can use the provided `directory` variable in many ways
+
+	x: directory.root.Users.Foo.Documents    // absolute path, equivalent to "/Users/Foo/Documents"
+	x: directory.parent
+	x: directory.someFolder['some file with spaces.axis']
+	x: directory.root['Program Files/nodejs/node.exe']     // absolute path, using path string
+
+note that any folder accessed inside Axis will have these methods/properties available
+whereas any file accessed inside Axis will be treated as a module template, at least if it has the `axis` extension
+
+
+notice how we can easily control what variables are passed in, the environment, without using `import` or `require` statements
+because it works via cloning, no special syntax required
+and we can also easily access variables declared in other files, because it works just like property access
+
+
+the filesystem should be viewed as just another data structure
+a tree structure, with folders pointing to other folders and files
+so just like you might access a url or web node, and traverse to another web node, eg `SpotifyAPI.artists.TaylorSwift`
+you can do the same thing for the file system
+
+
+
+
+
+
+
+
+
+if we have modules that automatically propagate errors
+eg array.indexoutofbounds
+isn't that now the same thing as having regular errors
+before we were using undefined for everything, and then you can explicitly return an error if you want
+a whitelist system
+but now it sounds like we are moving towards modules that can throw errors that automatically propagate
+and you can capture the error if you want
+a blacklist system
+
+maybe we can have a `collector` of errors that automatically gets passed upwards
+anytime you have an error, you return undefined, and insert to the error collector
+
+
+
+snapshot
+you can include/import data from other people's servers and use it
+for example, importing a library
+but when you "commit" the code, you may want to snapshot it
+so that you know what version of each library that you are using
+snapshot works the same as capturing and state variables
+external libraries are just state variables
+
+
+
+
+* environment fragmentation
+* if people are constantly "snapshotting" libraries and such
+* eg something like
+
+		environment:
+			someLib: ^someLib.version['1.1.2']
+
+		myModule: template
+			foo: someLib.bar * 10
+
+		result: myModule(...environment)
+
+* it can get confusing if all of these objects were split amongst multiple files
+* which is actually pretty common in programming nowadays
+* eg for Node.js, you have the library mappings defined in `package.json`,
+* and then you'd have a function defined in a commonjs module,
+* and Node.js would automatically use the `package.json` mappings to provide the correct version of each library to your module
+
+* the reason this can get confusing is
+* if `myModule` was defined in a separate file
+* it isn't immediately clear what version of `someLib` you are using
+* at least in Node.js, we know that the mapping is defined in `package.json`
+* but in Axis, if we just looked at `myModule`, we are not sure what version of `someLib` it is meant to be used with
+* and we might get unexpected behavior if we use `myModule` with the wrong environment
+
+* I guess this sorta makes sense though
+* when we write a module, we are defining semantic relationships between inputs
+* for example, if I said `foo: => sum(a,b)`
+* I could technically call `foo` with the environment mapping `sum: product`
+* which would return the product of `a` and `b`, even though `foo` was originally defined to return the sum
+
+
+
+
+
+config files are ugly
+
+
+
+
+with babelJS, we generate files
+eg we can take ES6 modules and convert them to commonJS modules
+but we would want to ignore these generated files in git
+but this behavior would actually come naturally in Axis
+because in dataflow languages, you only need to track the inputs
+everything else can be re-generated
+
+so you would do something like
+	
+	commonJS_modules: babel(ES6_modules)
+
+and then the generated files would just be a caching step
+an optimization
+
+
+
+
+
+es6 module imports are ugly
+https://stackoverflow.com/questions/55673389/jest-babel-cannot-find-modules-without-the-path-prefix/55674558#55674558
+regular specifiers use file paths
+bare specifiers are resolved by the environment, eg browser or Node.js
+	can differ by environment
+
+thus, some imports are determined by the file
+and some imports ane determined by the environment
+very ugly
+
+Axis, on the other hand, doesn't have this inconsistency
+because modules and imports are achieved through regular cloning
+so it's always up to the environment to provide variables
+
+
+
+
+
+testing framework
+would be cool if failed tests stay "alive"
+so that you can inspect them in the browser or something
+inspect failed objects
+
+
+
+### Iterables and Generators
+
+* one really useful feature of javascript is Iterators or [Generators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*)
+
+* you can take an in-order traversal of a tree
+* and then use continuations/yield to create an iterable
+
+		function * inOrderIterable (tree) {
+
+			function traversal (node) {
+				if (!node) return;
+				traversal(node.left);
+				yield node.value;
+				traversal(node.right);
+			}
+
+			inOrderTraversal(tree);
+		}
+
+* I used this pattern in `preprocessor.js`, in the function `getBlockIterable()`
+
+* can we replicate this abstraction pattern in Axis?
+* it is difficult because it is a pattern inherently rooted in "execution order"
+
+* actually I can think of two ways of doing it
+* one is to just create a list
+
+		inOrderTraversal: node >>
+			if (node = undefined) => ()
+			else => (
+				...inOrderTraversal(node.left)->,
+				node.value,
+				...inOrderTraversal(node.right)->,
+			)
+
+* we would have to make liberal use of lazy-evaluation optimizations in the background though
+
+* another method is to use _order as an input_
+
+		inOrderIterable(tree, callback)
+
+			inOrderTraversal: node, index >>
+				if (node = undefined) => index
+
+				leftReturnIndex: inOrderTraversal(node.left, index)
+				callback(leftReturnIndex, node.value)
+				rightReturnIndex: inOrderTraversal(node.right, leftReturnIndex+1)
+
+				=> rightReturnIndex
+
+			inOrderTraversal(tree, 0)
+
+* a lot of keeping track of one-off errors though
+
+* perhaps instead of formatting the result like an array, using indexes
+* maybe we can instead format it like a linkedlist, using `next` properties
+* that way we don't have to keep track raw numerical indexes
+* we use `next` the same way we use `yield` in iterators
+* to specify the "next" value of the iteration
+* how would we do this....
+
+* or maybe, we can leverage feedback
+* recall the `treeHeight` example, where we defined the relationship between the `height` of each node
+* here, we want to define the relationship between the `order` of each node
+
+* somehow we want to say: in each node, our value comes "after" the traversal of `node.left`, and "before" the traversal of `node.right`
+
+
+* one way we can think about iterables is
+* every iterable is a sequence of statements
+* each statement either executes an action or yields a value
+* note that an action can also be a sequence of statements
+* so we get this recursive structure
+* eg, with the `inOrderTraversal`, we do
+	1. traverse node.left
+	2. yield node.value
+	3. traverse node.right
+
+* so we need to replicate this pattern in Axis
+* maybe we can use the `do` keyword
+
+		inOrderTraversal: do
+			inOrderTraversal(node.left)
+			yield node.value
+			inOrderTraversal(node.right)
+
+* `do` basically defines a sequence of actions
+* `inOrderTraversal` extends `do`, so it returns a sequence of actions
+* in the body of the `do`, we have two recursive calls to itself, each returning a sequence of actions
+* the `do` keyword is responsible for appending those two sequences in order
+
+* wait but if `do` is just for defining sequence, what if we just defined a sequence directly, using lists
+* then we basically just come back to the method defined earlier
+
+		inOrderTraversal:
+			...inOrderTraversal(node.left)
+			node.value
+			...inOrderTraversal(node.right)
+
+* I guess ultimately it does just come back to lazy evaluation
+* if we want to code at high-level by "defining relationships", we have to rely on lazy-evaluation to optimize the execution
+
+* I guess maybe we can use a keyword to specify the optimization
+
+		inOrderTraversal: Iterable
+			...inOrderTraversal(node.left)
+			node.value
+			...inOrderTraversal(node.right)
+
+* I guess this can get ugly if there are a huge number of statements
+* you wouldn't want to put a `...` in front of every single one
+* it's much easier to put a `yield` in front of the values instead
+* for example, take a look at the `getBlockIterator()` function in `preprocessor.js`
+
+* perhaps `Iterable()` will actually, by default, concatenate all arguments
+* so the above example becomes
+
+		inOrderTraversal: Iterable
+			inOrderTraversal(node.left)
+			( node.value )
+			inOrderTraversal(node.right)
+
+* notice that we don't have to put `...` in front of the statements, but we do have to wrap the values
+
+
+
+* I wonder if this has any implications for state variables
+* we introduced the `do` keyword because we wanted to define ordered statements for state variables
+	// TODO: FIND REFERENCED SECTION
+* but we just showed that `do` is un-necessary
+
+* state variables were for defining the timeline of value
+* so if we had multiple event listeners modifying the same variable
+
+
+* another method is perhaps instead of concatenating a bunch of lists
+* instead, we create a system for passing the index forward
+* eg, in something like
+
+		foo: Iterable
+			yield "hello"
+			yield "world"
+
+* `yield` will automatically insert the value into the Iterable's `collect` collector, but with a dynamic index
+* so "hello" will be inserted with index `0` and "world" will be inserted with index `1`
+* if you have recursive iterables like
+
+		inOrderTraversal: Iterable
+			inOrderTraversal(node.left)
+			yield node.value
+			inOrderTraversal(node.right)
+
+* then it will figure out the indexes appropriately, even in deeply nested `yield` statements
+
+
+### Iterables and inversion of control
+
+* I was listening to [this talk](https://frontendmasters.com/courses/rethinking-async-js/callback-problems-inversion-of-control/) about how callbacks create an inversion of control
+* for example, if you did something like
+
+		thirdPartyAPI.inOrderTraversal(tree, callback)
+
+* then you are trusting that the `thirdPartyAPI` isn't going to do anything stupid
+* like call the callback more than necessary
+
+* ES6 generators/iterables were designed to [eliminate these problems](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*#Description)
+
+* it sorta makes sense
+* instead of giving the function to the third party API to call
+* the third party API yields, giving "control" back to you, so you can choose what to do at every iteration
+* in a way, its like, instead of giving a function to the third party, the third party gives the data to you
+
+* however, this actually really isn't any different
+* you are still defining a behavior that is repeated for every item
+* before, we had to worry about the third party calling the callback too many times
+* now, we have to worry about the third party returning too many items
+
+* I guess the only difference is that, with Iterables, you can `break` or `return` out of the iteration
+* eg
+
+		// returns the first number divisible by 5
+		for (let val of list) {
+			if (val % 5 == 0)
+				return val;    // immediately breaks out of the iteration
+		}
+		
+* whereas with `forEach` and `reduce` functions, no matter what you did, the function would still iterate through every item
+* even if we simply ignored subsequent items like so:
+
+		// returns the first number divisible by 5
+		var result = list.reduce((acc, val) => {
+				if (acc != undefined) return acc;
+				if (val % 5 == 0) return val;
+				else return undefined;
+			})
+		return result;
+
+* notice that after finding the first number divisible by 5, we ignore all subsequence numbers,
+	* but `reduce` will continue going through the entire list
+* this makes Iterables seem useful for infinite streams
+
+* however, this benefit becomes unnecessary once you have lazy evaluation
+* iterables are pretty much just lazy-evaluated lists
+
+
+### Lazy Evaluation Revisited - Insertion and Feedback
+
+* notice that we can't have infinite streams if there is insertion
+* insertion naturally "observes" everybody else
+* so in the context of lazy-evaluation, where things are only evaluated when accessed
+* we can think of collectors as constantly accessing all insertions
+* so any insertions automatically have to be evaluated
+* but of course, only if the collector is being accessed
+
+* thus, we can bring insertion into the framework of lazy evaluation
+* we can write our interpreter such that everything is lazy evaluated
+* but we also need to keep track of insertions
+* such that once you access a collector, it will automatically access and evaluate its insertions
+
+* note that this means that, for any object/module that contains insertions
+* you have to track all the instances/clones of it
+* though you don't have to evaluate the values inside those clones, until the collector is accessed
+
+
+* does this mean that if you have an infinite stream that inserts to a collector
+* that the program won't have any issues
+* until you try to access the collector, at which it runs into an infinite loop trying to evaluate all the insertions?
+* I guess this kinda makes sense
+* the value of that collector is "infinity"
+* so when you try to access it, the program hangs
+
+* property access is starting to feel like function calls
+* kinda like how SmallTalk works
+
+
+* feedback breaks lazy-evaluation though
+* think back to the `shortestDistance` example
+* when the output is observed, then it will backtrack looking for everything that needs to be evaluated
+* but with feedback, nodes will be stuck in a deadlock, each node waiting for the other nodes to evaluate first
+* in addition, it wouldn't be enough to just look at the current value of the input
+* because feedback can create behavior that is dependent on past values of the inputs
+	* see section "Latches and Feedback"
+
+* in addition, feedback can be really hard to detect if it is across multiple servers
+	* see section "Distributed Feedback"
+* if there are public variables or "externally facing nodes", then we don't know if they are in feedback or not
+
+### Detecting Unobserved Nodes, Dont-Call-By-Dont-Need
+
+* so it seems really difficult to figure out if something is "needed"
+* but perhaps we can do the opposite
+* we can figure out if something definitely isn't needed
+* for example, if an output property isn't being used, and isn't being referenced anywhere, then it definitely isn't needed
+	* notice that if a property is in a feedback loop, it would be referenced
+* visually, if a node has no outgoing edges, then it isn't needed
+* but we can work backwards from these "unobserved" nodes to find more unobserved nodes
+* so to generalize, a node is "unobserved" if:
+	1. it has no references
+	2. the only nodes referencing it, are unobserved nodes
+
+* this is really similar to normal lazy evaluation
+* where we look at what nodes are needed, and traverse backwards to figure out what nodes need to be evaluated
+* but this is the opposite
+* we look at what nodes are _not_ needed, and traverse backwards to figure out what nodes _don't_ need to be evaluated
+* it is like the [inverse](https://en.wikipedia.org/wiki/Inverse_(logic)) of [call-by-need](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_need)
+* which is why I call this method "dont-call-by-dont-need"
+
+* in essence, instead of having all nodes start out as unneeded, and then figuring out which ones are needed
+* all nodes start as needed, and then we figure out which ones aren't needed
+
+* this takes care of feedback, because by default all nodes are needed
+* and when we go through the graph pruning out unneeded ones, nodes that are in feedback won't be pruned out
+
+* how does this handle externally facing nodes, where we don't know if there is feedback or not
+* well, perhaps we can simply assume that externally facing nodes are being observed
+* so public variables always have to be evaluated
+* unless we know for sure that it isn't being observed
+* eg if an HTML element isn't on the screen, and isn't referenced in the program, then we know it isn't being used
+
+
+* all this kinda reminds me of [abstract interpretation](https://en.wikipedia.org/wiki/Abstract_interpretation), a concept I saw on reddit
+* the concept is basically saying that, even though some "yes/no" questions may be uncomputable, eg the halting problem
+* we can still gain useful information by factoring in uncertainty and instead asking the question "yes/maybe/no"
+* so while we might not have a generalized algorithm for determining if a program will halt or not
+* we can use certain algorithms to detect _certain_ cases where a program is guaranteed to halt, or guaranteed to not halt
+* 	eg, if the program is a finite state machine, we can for sure answer that the program will halt
+
+* likewise, in our language, we cannot always determine if a feedback loop depends on transient behavior or not
+	* eg, the latch example depends on transient behavior, but the `#shortestDistance` example does not
+	* note: I haven't actually proved whether or not this is possible, I am just guessing
+* so for feedback loops, we can't determine if we can lazy-evaluate them or not
+* however, there are still places where we _can_ use lazy-evaluation
+* as outlined above
