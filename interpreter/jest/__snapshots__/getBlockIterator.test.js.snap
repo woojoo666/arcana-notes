@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`control test 1`] = `
+exports[`Successfully retrieve block boundaries controlTest 1`] = `
 Array [
   Object {
     "blockType": "Braces",
@@ -65,6 +65,152 @@ b",
     "offset": 60,
     "text": "
 b",
+  },
+]
+`;
+
+exports[`Successfully retrieve block boundaries emptyLineAtStartOrEnd 1`] = `
+Array [
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 5,
+    "text": "
+		i",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 22,
+    "text": "
+			a",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 49,
+    "text": "",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 49,
+    "text": "",
+  },
+]
+`;
+
+exports[`Successfully retrieve block boundaries multilineBracedBlock 1`] = `
+Array [
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 2,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 8,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 28,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 29,
+    "text": "
+	i",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 45,
+    "text": "",
+  },
+]
+`;
+
+exports[`Successfully retrieve block boundaries multilineBracedBlock2 1`] = `
+Array [
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 2,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 8,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 27,
+    "text": "
+)",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 29,
+    "text": "
+	i",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 45,
+    "text": "",
+  },
+]
+`;
+
+exports[`Successfully retrieve block boundaries multilineBracedBlock3 1`] = `
+Array [
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 2,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 8,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 27,
+    "text": "
+)",
   },
 ]
 `;

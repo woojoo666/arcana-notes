@@ -41,16 +41,131 @@ test('test custom matcher and helper function fromDelimiterString()', () => {
 	expect(delimiters).toEqualDelimiterString(delimiterStr);
 });
 
-test('control test', () => {
-	let text = 
+let shouldPass = [
+	{
+		name: 'controlTest',
+		text:
 `( ( foo ) ) ( bar )
 	indented block
 		another indented block
-back to base level`;
-	let processor = new PreProcessor(text);
-	processor.setIndentSequence();
-	expect(processor.indentSequence).toBe('\t');
-	let blockBoundaries = processor.getBlockIterator();
-	expect(blockBoundaries).toEqualDelimiterString('(())(){{}}');
-	expect([...blockBoundaries]).toMatchSnapshot();
+back to base level`,
+		expected: ('(())(){{}}')
+	},
+
+
+	// note that the base level starts at indentation level 1 here
+	{
+		name: 'emptyLineAtStartOrEnd',
+		text:
+`
+	foo
+		indented block
+			another indented block
+`, // should implicitly return to base level because end of input
+		expected: ('{{}}')
+	},
+
+
+	{
+		name: 'multilineBracedBlock',
+		text:
+`( ( foo ) + 10
+	+ 20
+		+ 30 )
+	indented block`,
+		expected: ('(()){}')
+	},
+
+
+	{
+		name: 'multilineBracedBlock2',
+		text:
+`( ( foo ) + 10
+	+ 20
+		+ 30
+)
+	indented block`,
+		expected: ('(()){}')
+	},
+
+
+	{
+		name: 'multilineBracedBlock3',
+		text:
+`( ( foo ) + 10
+	+ 20
+		+ 30
+)
+base level block`,
+		expected: ('(())')
+	},
+];
+
+describe('Successfully retrieve block boundaries', () => {
+	shouldPass.forEach(testCase => {
+		test(testCase.name, () => {
+			let processor = new PreProcessor(testCase.text);
+			processor.setIndentSequence();
+			let blockBoundaries = processor.getBlockIterator();
+			expect(blockBoundaries).toEqualDelimiterString(testCase.expected);
+			expect([...blockBoundaries]).toMatchSnapshot();
+		});
+	});
+});
+
+let shouldFail = [
+	{
+		name: 'unclosedBrace',
+		text:
+`( ( foo ) ( bar )
+	indented block`,
+		expected: null
+	},
+
+	{
+		name: 'extraClosedBrace',
+		text:
+`( ( foo ) ( bar ) ) )
+	indented block`,
+		expected: null
+	},
+
+	{
+		name: 'illegalDedent',
+		text:
+`	indented block
+			another indented block
+		illegal dedent`,
+		expected: null
+	},
+
+	{
+		name: 'dedentedBelowBase',
+		text:
+`	first line
+oops dedented too far`,
+		expected: null
+	},
+
+	{
+		name: 'dedentedBelowBlockBase',
+		text:
+`base level
+	( braced block base level
+oops
+	)`,
+		expected: null
+	},
+];
+
+// TODO: check error messages, all messages should contain something like "preprocessor error"
+describe('Should throw error while retrieving block boundaries', () => {
+	shouldFail.forEach(testCase => {
+		test(testCase.name, () => {
+			let processor = new PreProcessor(testCase.text);
+			processor.setIndentSequence();
+			let iterable = processor.getBlockIterator();
+			expect(() => [...iterable]).toThrow();   // iterate through iterable to trigger errors
+		});
+	});
 });
