@@ -1,0 +1,70 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`control test 1`] = `
+Array [
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 2,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 8,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 10,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 12,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 18,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 19,
+    "text": "
+	i",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 35,
+    "text": "
+		a",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 60,
+    "text": "
+b",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 60,
+    "text": "
+b",
+  },
+]
+`;
