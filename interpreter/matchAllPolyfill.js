@@ -5,7 +5,7 @@
 
 // For now I am using the library function from [this SO answer](https://stackoverflow.com/a/50470820/1852456)
 
-const stringMatchAll = (text, pattern) => ({
+const matchAll = (text, pattern) => ({
 	[Symbol.iterator]: function * () {
 		const clone = new RegExp(pattern.source, pattern.flags);
 		let match = null;
@@ -17,3 +17,5 @@ const stringMatchAll = (text, pattern) => ({
 		} while (match);
 	}
 });
+
+export { matchAll };

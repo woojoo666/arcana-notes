@@ -1,7 +1,5 @@
 <html>
 <head>
-	<script src="matchAllPolyfill.js"></script>
-	<script src="preprocessor.js"></script>
 	<script src="node_modules/nearley/lib/nearley.js"></script>
 	<script src="grammar.js"></script>
 	<script src="parser.js"></script>
@@ -28,7 +26,16 @@
 // Key 		::= Name
 // Name     ::= [A-z0-9][A-z0-9_]*														names cannot start with "_", but they can have them inside
 
+
+
 </script>
-<script src="tests.js"></script>
+<!--script src="tests.js"></script-->
+<script type="module">
+	import { PreProcessor, Block } from './preprocessor.js';
+
+	var test = new PreProcessor('test:(hello:world)');
+	test.run();
+	console.log(test);
+</script>
 </body>
 </html>

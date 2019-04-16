@@ -1,24 +1,32 @@
-// TODO: wrap this entire file in a class so these constants aren't exposed
-// 	     Then we can also have class members like indentSequence and baseIndentation, which are used across the pipeline
+// PreProcessor and Block Classes
+
+import { matchAll } from './matchAllPolyfill.js';
 
 // notice that this indentation regex includes lines with zero indentation
 const indentationRegex = /(^|\n)([^\S\n]*)\S/; // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
 const parenthesisRegex = /\(|\)/;
 
+class PreProcessor {
+
+	constructor (rawText) {
+		this.rawText = rawText;
+		this.indentSequence = '';
+	}
+}
+
 // preprocessing
-function preprocessor(program) {
-	var processed = program;
+PreProcessor.prototype.run = function () {
 	try {
-		let indentSequence = getIndentSequence(processed);
-		let blockBoundaries = getBlockIterator(program, indentSequence);
-		let rootBlock = createBlockTree(program, blockBoundaries);
-		parseBlockRecursive(rootBlock);
-		return rootBlock;
+		this.setIndentSequence();
+		let blockBoundaries = this.getBlockIterator();
+		this.constructBlockTree(blockBoundaries);
+		console.log(this.rootBlock);
+		console.log(this.rootBlock.getBlockString());
+		this.parseBlockRecursive(this.rootBlock);
 
 	} catch (err) {
 		console.log("Syntax error detected in preprocessor");
 		console.log(err);
-		return null;
 	}
 }
 
@@ -28,20 +36,20 @@ function preprocessor(program) {
 
 // TODO: indicate line number and column number in error message.
 // TODO: we can also calculate baseIndentation here
-function getIndentSequence(text) {
+PreProcessor.prototype.setIndentSequence = function () {
 
-	let indentSequence = '';
+	this.indentSequence = '\t';  // default indent sequence is "\t"
 
 	// note: String.protype.matchAll is not supported in IE, Edge, Opera, or Node.js,
-	//       so instead I am using a stringMatchAll function provided in matchAllPolyfill.js
-	let indentationMatches = stringMatchAll(text, new RegExp(indentationRegex, 'g'));
+	//       so instead I am using a matchAll function provided in matchAllPolyfill.js
+	let indentationMatches = matchAll(this.rawText, new RegExp(indentationRegex, 'g'));
 
 	// go through all indentations in the file
 	for (let match of indentationMatches) {
 
 		let indentation = match[2];
 
-		if (indentation.length <= 0) continue;
+		if (indentation.length <= 0) continue;   // indentationRegex includes lines with zero indentation, so skip them
 
 		let illegalIndentChars = indentation.replace(/[ \t]/g,''); // remove tabs and spaces to find illegal characters
 		if (illegalIndentChars.length > 0) {
@@ -52,7 +60,7 @@ function getIndentSequence(text) {
 		}
 
 		if (!indentSequence) {
-			indentSequence = indentation[0]; // set indentSequence to first indentation character found
+			this.indentSequence = indentation[0]; // set indentSequence to first indentation character found
 			// TODO: if indent char is spaces, maybe we should also track the number of spaces? eg 4 spaces = 1 indent.
 			//       If we do, then we should throw an error if there are spaces left-over, "inconsistent indentation error"
 		}
@@ -61,26 +69,30 @@ function getIndentSequence(text) {
 			throw Error('Bad indentation, mixed spaces and tabs');
 		}
 	};
-	
-	return indentSequence || '\t';  // if no indentation character found, return "\t" by default
+
+	return this;
 }
 
-// takes an indentationRegex match, and returns the indentation length
-function indentLength (match, indentSequence) {
-	let indentation = match[2]; // indentation should be in the second capture group
-	return indentation.split(indentSequence).length - 1;
-}
+PreProcessor.prototype.getBlockIterator = function () {
 
-function getBlockIterator(text, indentSequence) {
+	let self = this;
+
+	// takes an indentationRegex match, and returns the indentation length
+	function indentLength (match) {
+		let indentation = match[2]; // indentation should be in the second capture group
+		return indentation.split(self.indentSequence).length - 1;
+	}
+
 	// match parenthesis, indentation, and end of input
-	// note: RegExp.exec() and stringMatchAll() will infinitely match $ if used with the 'g' flag,
+	// note: RegExp.exec() and matchAll() will infinitely match $ if used with the 'g' flag,
 	//       so make sure to check for that when looping through the matches.
 	let blockRegex = new RegExp(parenthesisRegex.source+'|'+indentationRegex.source+'|$', 'g');
 
 	// make sure to use an iterable here, not an array, because matching $ with the global flag will infinitely loop at the end
-	let matches = stringMatchAll(text, blockRegex); // provided in matchAllPolyfill.js
+	let matches = matchAll(this.rawText, blockRegex); // provided in matchAllPolyfill.js
 
-	let baseIndentation = indentLength(text.match(indentationRegex), indentSequence); // get indentation of first line
+	// TODO: baseIndentation can be found in setIndentSequence
+	let baseIndentation = indentLength(this.rawText.match(indentationRegex), this.indentSequence); // get indentation of first line
 	let indentationStack = [baseIndentation];
 	let lastLevel = indentationStack[indentationStack.length - 1];  // lastLevel is always the top of the stack
 
@@ -113,13 +125,12 @@ function getBlockIterator(text, indentSequence) {
 					yield { delimiterType, blockType, offset, text: match[0] };
 
 				} else { // indent type is "Indent"
-
 					let indentationLevel = null;
 
 					if (endOfInput) { // this means we are at end of input (matched with "$")
 						indentationLevel = baseIndentation; 
 					} else {
-						indentationLevel = indentLength(match, indentSequence);   // counts number of indents
+						indentationLevel = indentLength(match);   // counts number of indents
 					}
 
 					// If we are inside a braced block, make sure indentation stays above the block's base level,
@@ -135,24 +146,21 @@ function getBlockIterator(text, indentSequence) {
 						continue;
 					}
 
-					if (indentationLevel > lastLevel) {
-						// if indentation increased, push new level to stack, and insert "INDENT" token to program
+					if (indentationLevel > lastLevel) { // indentation increased
 						indentationStack.push(indentationLevel);
 						lastLevel = indentationStack[indentationStack.length - 1];
 
 						delimiterType = "start";
 						yield { delimiterType, blockType, offset, text: match[0] };
-
-					} else if (indentationLevel < lastLevel) {
-						// if indentation decreased, pop levels from stack and insert "DEDENT" token to program, until indentation level matches
-						while (indentationLevel < lastLevel) {
+					
+					} else if (indentationLevel < lastLevel) { // indentation decreased
+						while (indentationLevel < lastLevel) { // pop levels from stack until indentation level matches
 							indentationStack.pop();
 							lastLevel = indentationStack[indentationStack.length - 1];
 
 							if (indentationStack.length == 0) {
 								throw Error("Pre-processing error, dedented below the first line's indentation, offset " + offset);
 							}
-
 							delimiterType = "end";
 							yield { delimiterType, blockType, offset, text: match[0] };
 						}
@@ -163,10 +171,8 @@ function getBlockIterator(text, indentSequence) {
 						}
 					}
 				}
-
 				if (endOfInput) break;
 			}
-
 			if (bracesLevel > 0) {
 				throw Error('Pre-processing error, unclosed braces');
 			}
@@ -227,10 +233,10 @@ class Block {
 	}
 }
 
-function createBlockTree(text, blockBoundaries) {
-	let root = new Block(text, null, null);
-	let blockStack = [root];
-	let currentBlock = root;
+PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
+	this.rootBlock = new Block(this.rawText, null, null);
+	let blockStack = [this.rootBlock];
+	let currentBlock = this.rootBlock;
 
 	function stackPush(item) {
 		blockStack.push(item);
@@ -242,7 +248,7 @@ function createBlockTree(text, blockBoundaries) {
 		currentBlock = blockStack[blockStack.length-1];
 	}
 
-	for (let { delimiterType, blockType, offset, text } in blockBoundaries) {
+	for (let { delimiterType, blockType, offset, text } of blockBoundaries) {
 		if (delimiterType == 'start') {
 			let child = new Block(text, currentBlock, blockType);
 			child.startOffset = offset+text.length;
@@ -255,12 +261,16 @@ function createBlockTree(text, blockBoundaries) {
 		}
 	}
 
-	return root;
+	return this;
 }
 
-function parseBlockRecursive(block) {
+PreProcessor.prototype.parseBlockRecursive = function (block) {
 	block.parseTree = parse(block.getBlockString());
 	for (let child in block.children) {
 		parseBlockRecursive(child);
 	}
+
+	return this;
 }
+
+export { PreProcessor, Block };

@@ -19,6 +19,7 @@
 // note: `nearley` and `grammar` objects included by the scripts in the <head> of the html
 
 function parse (text) {  // TODO: when we write our tokenizer, change this to take in tokens instead of raw text
+	console.log('parsing: \n' + text);
 	try {
 		const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
 		parser.feed(text);
