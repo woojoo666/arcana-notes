@@ -3986,7 +3986,7 @@ Muxes
 * 
 
 Lazy evaluation, dont-call-by-dont-need
-	section: "Detecting Unobserved Nodes, Dont-Call-By-Dont-Need"
+	section: "Pruning Unobserved Nodes, Dont-Call-By-Dont-Need", "Dont-Call-By-Dont-Need Problems"
 
 ### Operations
 

@@ -7275,7 +7275,7 @@ inspect failed objects
 	* see section "Distributed Feedback"
 * if there are public variables or "externally facing nodes", then we don't know if they are in feedback or not
 
-### Detecting Unobserved Nodes, Dont-Call-By-Dont-Need
+### Pruning Unobserved Nodes, Dont-Call-By-Dont-Need
 
 * so it seems really difficult to figure out if something is "needed"
 * but perhaps we can do the opposite
@@ -7321,3 +7321,25 @@ inspect failed objects
 * so for feedback loops, we can't determine if we can lazy-evaluate them or not
 * however, there are still places where we _can_ use lazy-evaluation
 * as outlined above
+
+### Dont-Call-By-Dont-Need Problems
+
+(continued from section)
+
+* actually, there are issues with the issue outlined earlier
+* in order to find which nodes aren't observed, we have to evaluate the entire graph first!
+* because we never know if a node will eventually end up observing a given node
+
+* only after we do an initial pass, constructing all the bindings
+* can we start pruning nodes out
+* so really all we are doing is finding nodes that don't need to be updated
+* but it seems like we still do have to evaluate the entire graph
+
+
+so what about a stream of infinite insertions
+that is really what we are trying to optimize here
+
+
+note that with public nodes, we can detect if they are unobserved
+only when an external nodes "asks" for a certain value
+then it becomes observed
