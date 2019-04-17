@@ -2,8 +2,9 @@
 
 import { matchAll } from './matchAllPolyfill.js';
 
-// notice that this indentation regex includes lines with zero indentation
-const indentationRegex = /(^|\n)([^\S\n]*)\S/; // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
+// notice that indentation regexes include lines with zero indentation
+const newlineIndentRegex = /\n([^\S\n]*)(?=\S)/;  // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
+const firstLineIndentRegex = /^([^\S\n]*)(?=\S)/; // first line has to be handled separately because possible zero-length match
 const parenthesisRegex = /\(|\)/;
 
 class PreProcessor {
@@ -40,12 +41,18 @@ PreProcessor.prototype.setIndentSequence = function () {
 
 	// note: String.protype.matchAll is not supported in IE, Edge, Opera, or Node.js,
 	//       so instead I am using a matchAll function provided in matchAllPolyfill.js
-	let indentationMatches = matchAll(this.rawText, new RegExp(indentationRegex, 'g'));
+	let indentationMatches = matchAll(this.rawText, new RegExp(newlineIndentRegex, 'g'));
+	
+	// first line has to be handled separately because possible zero-length match,
+	// and zero-length matches cause matchAll() to loop infinitely
+	let firstLineMatch = this.rawText.match(firstLineIndentRegex);
+	if (firstLineMatch) {
+		indentationMatches = [firstLineMatch, ...indentationMatches];
+	}
 
 	// go through all indentations in the file
 	for (let match of indentationMatches) {
-
-		let indentation = match[2];
+		let indentation = match[1];
 
 		if (indentation.length <= 0) continue;   // indentationRegex includes lines with zero indentation, so skip them
 
@@ -79,29 +86,41 @@ PreProcessor.prototype.getBlockIterator = function () {
 
 	let self = this;
 
-	// takes an indentationRegex match, and returns the indentation length
+	// takes an newlineIndentRegex match, and returns the indentation length
 	function indentLength (match) {
-		let indentation = match[2]; // indentation should be in the second capture group
+		let indentation = match[1]; // indentation should be in the second capture group
 		return indentation.split(self.indentSequence).length - 1;
 	}
 
 	// match parenthesis, indentation, and end of input
 	// note: RegExp.exec() and matchAll() will infinitely match $ if used with the 'g' flag,
 	//       so make sure to check for that when looping through the matches.
-	let blockRegex = new RegExp(parenthesisRegex.source+'|'+indentationRegex.source+'|$', 'g');
+	let blockRegex = new RegExp(parenthesisRegex.source+'|'+newlineIndentRegex.source+'|$', 'g');
 
 	// make sure to use an iterable here, not an array, because matching $ with the global flag will infinitely loop at the end
 	let matches = matchAll(this.rawText, blockRegex); // provided in matchAllPolyfill.js
 
-	// TODO: baseIndentation can be found in setIndentSequence
-	let baseIndentation = indentLength(this.rawText.match(indentationRegex), this.indentSequence); // get indentation of first line
+	let baseIndentation = -1;
 	let indentationStack = [baseIndentation];
 	let lastLevel = indentationStack[indentationStack.length - 1];  // lastLevel is always the top of the stack
 
 	let bracesLevel = 0;
-
 	return {
 		*[Symbol.iterator]() {
+
+			// first line has to be handled separately because possible zero-length match,
+			// and zero-length matches cause matchAll() to loop infinitely
+			let firstLineMatch = self.rawText.match(firstLineIndentRegex);
+			if (firstLineMatch) {
+				let indentationLevel = indentLength(firstLineMatch); 
+				indentationStack.push(indentationLevel);
+				lastLevel = indentationStack[indentationStack.length - 1];
+				let blockType = 'Indent';
+				let delimiterType = 'start';
+				let offset = firstLineMatch.index;
+
+				yield { delimiterType, blockType, offset, text: firstLineMatch[0] };
+			}
 
 			for (let match of matches) {
 				// note that matching $ with global flag will cause it to match infinitely,
@@ -235,9 +254,8 @@ class Block {
 }
 
 PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
-	this.rootBlock = new Block(this.rawText, null, null);
-	let blockStack = [this.rootBlock];
-	let currentBlock = this.rootBlock;
+	let blockStack = [];
+	let currentBlock = null;
 
 	function stackPush(item) {
 		blockStack.push(item);
@@ -253,7 +271,11 @@ PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
 		if (delimiterType == 'start') {
 			let child = new Block(this.rawText, currentBlock, blockType);
 			child.startOffset = offset+text.length;
-			currentBlock.children.push(child);
+			if (currentBlock == null) { // if currentBlock is null, this must be the root block
+				this.rootBlock = child;
+			} else {
+				currentBlock.children.push(child);
+			}
 
 			stackPush(child);
 		} else {

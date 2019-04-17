@@ -3,6 +3,12 @@
 exports[`Successfully retrieve block boundaries controlTest 1`] = `
 Array [
   Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "",
+  },
+  Object {
     "blockType": "Braces",
     "delimiterType": "start",
     "offset": 0,
@@ -43,28 +49,34 @@ Array [
     "delimiterType": "start",
     "offset": 19,
     "text": "
-	i",
+	",
   },
   Object {
     "blockType": "Indent",
     "delimiterType": "start",
     "offset": 35,
     "text": "
-		a",
+		",
   },
   Object {
     "blockType": "Indent",
     "delimiterType": "end",
     "offset": 60,
     "text": "
-b",
+",
   },
   Object {
     "blockType": "Indent",
     "delimiterType": "end",
     "offset": 60,
     "text": "
-b",
+",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 79,
+    "text": "",
   },
 ]
 `;
@@ -74,16 +86,29 @@ Array [
   Object {
     "blockType": "Indent",
     "delimiterType": "start",
+    "offset": 0,
+    "text": "
+	",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
     "offset": 5,
     "text": "
-		i",
+		",
   },
   Object {
     "blockType": "Indent",
     "delimiterType": "start",
     "offset": 22,
     "text": "
-			a",
+			",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 49,
+    "text": "",
   },
   Object {
     "blockType": "Indent",
@@ -100,8 +125,69 @@ Array [
 ]
 `;
 
+exports[`Successfully retrieve block boundaries indentedBraces 1`] = `
+Array [
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 3,
+    "text": "
+	",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 5,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 11,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 12,
+    "text": "
+",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "start",
+    "offset": 30,
+    "text": "(",
+  },
+  Object {
+    "blockType": "Braces",
+    "delimiterType": "end",
+    "offset": 38,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 39,
+    "text": "",
+  },
+]
+`;
+
 exports[`Successfully retrieve block boundaries multilineBracedBlock 1`] = `
 Array [
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "",
+  },
   Object {
     "blockType": "Braces",
     "delimiterType": "start",
@@ -131,7 +217,13 @@ Array [
     "delimiterType": "start",
     "offset": 29,
     "text": "
-	i",
+	",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 45,
+    "text": "",
   },
   Object {
     "blockType": "Indent",
@@ -145,6 +237,12 @@ Array [
 exports[`Successfully retrieve block boundaries multilineBracedBlock2 1`] = `
 Array [
   Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "",
+  },
+  Object {
     "blockType": "Braces",
     "delimiterType": "start",
     "offset": 0,
@@ -165,16 +263,21 @@ Array [
   Object {
     "blockType": "Braces",
     "delimiterType": "end",
-    "offset": 27,
-    "text": "
-)",
+    "offset": 28,
+    "text": ")",
   },
   Object {
     "blockType": "Indent",
     "delimiterType": "start",
     "offset": 29,
     "text": "
-	i",
+	",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 45,
+    "text": "",
   },
   Object {
     "blockType": "Indent",
@@ -188,6 +291,12 @@ Array [
 exports[`Successfully retrieve block boundaries multilineBracedBlock3 1`] = `
 Array [
   Object {
+    "blockType": "Indent",
+    "delimiterType": "start",
+    "offset": 0,
+    "text": "",
+  },
+  Object {
     "blockType": "Braces",
     "delimiterType": "start",
     "offset": 0,
@@ -208,9 +317,14 @@ Array [
   Object {
     "blockType": "Braces",
     "delimiterType": "end",
-    "offset": 27,
-    "text": "
-)",
+    "offset": 28,
+    "text": ")",
+  },
+  Object {
+    "blockType": "Indent",
+    "delimiterType": "end",
+    "offset": 46,
+    "text": "",
   },
 ]
 `;

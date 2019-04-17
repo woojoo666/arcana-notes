@@ -49,7 +49,7 @@ let shouldPass = [
 	indented block
 		another indented block
 back to base level`,
-		expected: ('(())(){{}}')
+		expected: ('{(())(){{}}}')
 	},
 
 
@@ -62,7 +62,7 @@ back to base level`,
 		indented block
 			another indented block
 `, // should implicitly return to base level because end of input
-		expected: ('{{}}')
+		expected: ('{{{}}}')
 	},
 
 
@@ -73,7 +73,7 @@ back to base level`,
 	+ 20
 		+ 30 )
 	indented block`,
-		expected: ('(()){}')
+		expected: ('{(()){}}')
 	},
 
 
@@ -85,7 +85,7 @@ back to base level`,
 		+ 30
 )
 	indented block`,
-		expected: ('(()){}')
+		expected: ('{(()){}}')
 	},
 
 
@@ -97,7 +97,18 @@ back to base level`,
 		+ 30
 )
 base level block`,
-		expected: ('(())')
+		expected: ('{(())}')
+	},
+
+
+	{
+		name: 'indentedBraces',
+		text:
+`foo
+	( bar )
+base level block
+(another)`,
+		expected: ('{{()}()}')
 	},
 ];
 
