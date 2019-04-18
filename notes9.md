@@ -7343,3 +7343,27 @@ that is really what we are trying to optimize here
 note that with public nodes, we can detect if they are unobserved
 only when an external nodes "asks" for a certain value
 then it becomes observed
+
+
+
+
+
+### Relational Expression / Comparison Shorthands
+
+chaining relational operators:
+
+	a < b < c  is equivalent to  (a < b) & (b < c)
+
+note that python, perl6, and mathematica all have this already
+
+
+parallelism?
+
+	if (someObj = 5 | = 10 | .length > 0 & [foo] != undefined | = 15)
+
+	is equivalent to
+
+	if (someObj = 5 | someObj = 10 | someObj.length > 0 & someObj[foo] != undefined | someObj = 15)
+
+notice that it should follow short circuit evaluation
+
