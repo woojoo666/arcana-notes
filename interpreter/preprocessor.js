@@ -63,6 +63,7 @@ PreProcessor.prototype.getBlockIterator = function () {
 	// match parenthesis, indentation, and end of input
 	// note: RegExp.exec() and matchAll() will infinitely match $ if used with the 'g' flag,
 	//       so make sure to check for that when looping through the matches.
+	// TODO: could we use Moo lexer for this?
 	let blockRegex = new RegExp(parenthesisRegex.source+'|'+newlineIndentRegex.source+'|$', 'g');
 
 	// make sure to use an iterable here, not an array, because matching $ with the global flag will infinitely loop at the end
@@ -95,6 +96,8 @@ PreProcessor.prototype.getBlockIterator = function () {
 				// note that matching $ with global flag will cause it to match infinitely,
 				// so make sure we exit after the first match of $
 				let endOfInput = match[0].length == 0;
+
+				// TODO: ignore lines that are only contain comments
 
 				let blockType = parenthesisRegex.test(match[0]) ? 'Braces' : 'Indent';
 				let delimiterType = null;  // "start" to indicate block start, "end" for end of a block

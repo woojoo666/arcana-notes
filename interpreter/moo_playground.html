@@ -4,14 +4,14 @@
 </head>
 <body>
 <textarea id="editor" style="width: 500px; height: 300px">
-foo:
-	a: 10
-	b: 20   // test comment
+binaryTreeHeight: tree >>
+	tag #height.           // declare a tag, which can be used to attach attributes to objects
 
-	for x in list:
-		dosomething(x)
+	// calculate height of all nodes
+	for node in tree.nodes:
+		node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // height based on heights of children
 
-	should: failhere;
+	=> tree.#height   // return height of root node
 </textarea>
 <br>
 <button onclick="reset()"> go </button>
@@ -36,16 +36,38 @@ function next() {
 
 document.body.onload = () => {
 	lexer = moo.compile({
-		WS:      /[ \t]+/,
+		WS:      /[^\S\n]+/,
 		comment: /\/\/.*?$/,
 		number:  /[0-9]+/,
 		string:  /"(?:\\["\\]|[^\n"\\])*"/,
+		params: '>>',
+		return: '=>',
+
 		lparen:  '(',
 		rparen:  ')',
+		indent:  '{',
+		dedent:  '}',
+		lbracket: '[',
+		rbracket: ']',
+
+		op_E:  /\*\*/,
+		op_AS: /\+|\-/,       // add, subtract
+		op_MDR: /\*|\/|\%/,   // multiply, divide, remainder
+
+		op_comparators: /\<\=|\>\=|\<|\>/,
+		op_equality: /\=\=|\=|\!\=\=|\!\=/,
+
+		op_logic: /\&|\|/,
+
+		insertion: '<:',
 		colon: ':',
-		indent: { match: /\n\t*/, lineBreaks: true },
+		propAccess: /\.(?=\w|\#)/,
+		period: '.',
+		newLine: { match: /\n/, lineBreaks: true },
+		comma: ',',
+		tag: /\#\w+/,
 		identifier: { match: /\w+/ , type: moo.keywords({
-				keyword: ['for', 'in', 'if', 'else', 'while'],
+				keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag'],
 			})},
 	});
 
