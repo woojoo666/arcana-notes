@@ -1,6 +1,6 @@
 <html>
 <head>
-	<script src="https://cdn.jsdelivr.net/npm/moo@0.5.0/moo.min.js"></script>
+	<script src="node_modules/moo/moo.js"></script>
 </head>
 <body>
 <textarea id="editor" style="width: 500px; height: 300px">
@@ -63,7 +63,7 @@ document.body.onload = () => {
 		colon: ':',
 		propAccess: /\.(?=\w|\#)/,
 		period: '.',
-		newLine: { match: /\n/, lineBreaks: true },
+		newline: { match: /\n/, lineBreaks: true },
 		comma: ',',
 		tag: /\#\w+/,
 		identifier: { match: /\w+/ , type: moo.keywords({
