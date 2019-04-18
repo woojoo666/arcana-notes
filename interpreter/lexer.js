@@ -22,7 +22,8 @@ let rules = {
 	op_comparators: /\<\=|\>\=|\<|\>/,
 	op_equality: /\=\=|\=|\!\=\=|\!\=/,
 
-	op_logic: /\&|\|/,
+	op_and: '&',
+	op_or: '|',
 
 	insertion: '<:',
 	colon: ':',
