@@ -116,7 +116,6 @@ describe('Successfully retrieve block boundaries', () => {
 	shouldPass.forEach(testCase => {
 		test(testCase.name, () => {
 			let processor = new PreProcessor(testCase.text);
-			processor.setIndentSequence();
 			let blockBoundaries = processor.getBlockIterator();
 			expect(blockBoundaries).toEqualDelimiterString(testCase.expected);
 			expect([...blockBoundaries]).toMatchSnapshot();
@@ -174,7 +173,6 @@ describe('Should throw error while retrieving block boundaries', () => {
 	shouldFail.forEach(testCase => {
 		test(testCase.name, () => {
 			let processor = new PreProcessor(testCase.text);
-			processor.setIndentSequence();
 			let iterable = processor.getBlockIterator();
 			expect(() => [...iterable]).toThrow();   // iterate through iterable to trigger errors
 		});

@@ -11,14 +11,13 @@ class PreProcessor {
 
 	constructor (rawText) {
 		this.rawText = rawText;
-		this.indentSequence = '';
+		this.indentSequence = null;
 	}
 }
 
 // preprocessing
 PreProcessor.prototype.run = function () {
 	try {
-		this.setIndentSequence();
 		let blockBoundaries = this.getBlockIterator();
 		this.constructBlockTree(blockBoundaries);
 		this.parseBlockRecursive(this.rootBlock);
@@ -29,68 +28,37 @@ PreProcessor.prototype.run = function () {
 	}
 }
 
-// Returns the character used for indentation, either spaces " " or tabs "\t"
-// Returns tabs by default, if zero indentation is detected in the file.
+// Returns the indentation length
+// sets the character used for indentation, either spaces " " or tabs "\t"
 // Throw error if mixed tabs and spaces detected, or if indentation uses a different character entirely.
+PreProcessor.prototype.getIndentationLength = function (indentation) {
 
-// TODO: indicate line number and column number in error message.
-// TODO: we can also calculate baseIndentation here
-PreProcessor.prototype.setIndentSequence = function () {
+	if (indentation.length <= 0) return 0;
 
-	this.indentSequence = null;  // default indent sequence is "\t"
-
-	// note: String.protype.matchAll is not supported in IE, Edge, Opera, or Node.js,
-	//       so instead I am using a matchAll function provided in matchAllPolyfill.js
-	let indentationMatches = matchAll(this.rawText, new RegExp(newlineIndentRegex, 'g'));
-	
-	// first line has to be handled separately because possible zero-length match,
-	// and zero-length matches cause matchAll() to loop infinitely
-	let firstLineMatch = this.rawText.match(firstLineIndentRegex);
-	if (firstLineMatch) {
-		indentationMatches = [firstLineMatch, ...indentationMatches];
+	let illegalIndentChars = indentation.replace(/[ \t]/g,''); // remove tabs and spaces to find illegal characters
+	if (illegalIndentChars.length > 0) {
+		// indentation contains characters other than tabs or spaces
+		// throw error, and print out the first bad character
+		throw Error('Bad indentation, illegal indentation character with unicode value '
+			+ illegalIndentChars[0].charCodeAt(0));
 	}
-
-	// go through all indentations in the file
-	for (let match of indentationMatches) {
-		let indentation = match[1];
-
-		if (indentation.length <= 0) continue;   // indentationRegex includes lines with zero indentation, so skip them
-
-		let illegalIndentChars = indentation.replace(/[ \t]/g,''); // remove tabs and spaces to find illegal characters
-		if (illegalIndentChars.length > 0) {
-			// indentation contains characters other than tabs or spaces
-			// throw error, and print out the first bad character
-			throw Error('Bad indentation, illegal indentation character with unicode value '
-				+ illegalIndentChars[0].charCodeAt(0));
-		}
-
-		if (!this.indentSequence) {
-			this.indentSequence = indentation[0]; // set indentSequence to first indentation character found
-			// TODO: if indent char is spaces, maybe we should also track the number of spaces? eg 4 spaces = 1 indent.
-			//       If we do, then we should throw an error if there are spaces left-over, "inconsistent indentation error"
-		}
-
-		if (indentation.replace(new RegExp(this.indentSequence, 'g'),'').length > 0) {
-			throw Error('Bad indentation, mixed spaces and tabs');
-		}
-	};
 
 	if (!this.indentSequence) {
-		this.indentSequence = '\t';   // default indent sequence is "\t"
+		this.indentSequence = indentation[0]; // set indentSequence to first indentation character found
+		// TODO: if indent char is spaces, maybe we should also track the number of spaces? eg 4 spaces = 1 indent.
+		//       If we do, then we should throw an error if there are spaces left-over, "inconsistent indentation error"
 	}
 
-	return this;
+	if (indentation.replace(new RegExp(this.indentSequence, 'g'),'').length > 0) {
+		throw Error('Bad indentation, mixed spaces and tabs');
+	}
+
+	return  indentation.split(this.indentSequence).length - 1;
 }
 
 PreProcessor.prototype.getBlockIterator = function () {
 
-	let self = this;
-
-	// takes an newlineIndentRegex match, and returns the indentation length
-	function indentLength (match) {
-		let indentation = match[1]; // indentation should be in the second capture group
-		return indentation.split(self.indentSequence).length - 1;
-	}
+	var self = this;
 
 	// match parenthesis, indentation, and end of input
 	// note: RegExp.exec() and matchAll() will infinitely match $ if used with the 'g' flag,
@@ -112,7 +80,7 @@ PreProcessor.prototype.getBlockIterator = function () {
 			// and zero-length matches cause matchAll() to loop infinitely
 			let firstLineMatch = self.rawText.match(firstLineIndentRegex);
 			if (firstLineMatch) {
-				let indentationLevel = indentLength(firstLineMatch); 
+				let indentationLevel = self.getIndentationLength(firstLineMatch[1]); 
 				indentationStack.push(indentationLevel);
 				lastLevel = indentationStack[indentationStack.length - 1];
 				let blockType = 'Indent';
@@ -151,7 +119,7 @@ PreProcessor.prototype.getBlockIterator = function () {
 					if (endOfInput) { // this means we are at end of input (matched with "$")
 						indentationLevel = baseIndentation; 
 					} else {
-						indentationLevel = indentLength(match);   // counts number of indents
+						indentationLevel = self.getIndentationLength(match[1]);   // counts number of indents
 					}
 
 					// If we are inside a braced block, make sure indentation stays above the block's base level,

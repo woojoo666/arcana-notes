@@ -1,43 +1,45 @@
 import { PreProcessor } from '../preprocessor';
 
 
-let noIndentation = "foo: bar";
-let tabIndentation = `
-	foo
-		bar`;
-let spacesIndentation = `
-  foo
-    bar`;
-let mixedIndentation = `
-	foo
-	  bar`;
-let illegalIndentation = "\r  foo";
+let noIndentation = '';
+let tabIndentation = '\t\t';
+let spacesIndentation = '  ';
+let mixedIndentation = '\t  ';
+let illegalIndentation = '\r';
 
+// In the following tests, ince we are manually calling getIndentationLength, 
+// we don't need to initialize the PreProcessor with any arguments
 
 test('indentation using tabs', () => {
-	let processor = new PreProcessor(tabIndentation);
-	processor.setIndentSequence();
+	let processor = new PreProcessor();
+	expect(processor.getIndentationLength(tabIndentation)).toBe(2);
 	expect(processor.indentSequence).toBe('\t');
 });
 
 test('indentation using spaces', () => {
-	let processor = new PreProcessor(spacesIndentation);
-	processor.setIndentSequence();
+	let processor = new PreProcessor();
+	expect(processor.getIndentationLength(spacesIndentation)).toBe(2);
 	expect(processor.indentSequence).toBe(' ');
 });
 
 test('no indentation, should use the default indentSequence, tabs', () => {
-	let processor = new PreProcessor(noIndentation);
-	processor.setIndentSequence();
-	expect(processor.indentSequence).toBe('\t');
+	let processor = new PreProcessor();
+	expect(processor.getIndentationLength(noIndentation)).toBe(0);
+	expect(processor.indentSequence).toBe(null);
 });
 
 test('mixed indentation, should throw an error', () => {
-	let processor = new PreProcessor(mixedIndentation);
-	expect(processor.setIndentSequence).toThrow();
+	let processor = new PreProcessor();
+	expect(processor.getIndentationLength.bind(processor, mixedIndentation)).toThrow();
 });
 
+test('multi-line mixed indentation, should throw an error', () => {
+	let processor = new PreProcessor();
+	expect(processor.getIndentationLength(tabIndentation)).toBe(2);  // first line should process fine
+	expect(processor.getIndentationLength.bind(processor, spacesIndentation)).toThrow();
+})
+
 test('illegal indentation character, should throw an error', () => {
-	let processor = new PreProcessor(illegalIndentation);
-	expect(processor.setIndentSequence).toThrow();
+	let processor = new PreProcessor();
+	expect(processor.getIndentationLength.bind(processor, illegalIndentation)).toThrow();
 });

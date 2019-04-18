@@ -3,7 +3,6 @@ import { PreProcessor, Block } from '../preprocessor';
 test('control test', () => {
 	let text = 'alice(bob)cassie\n\tdave\nethan';
 	let preprocessor = new PreProcessor(text);
-	preprocessor.setIndentSequence();
 	let blockBoundaries = preprocessor.getBlockIterator();
 	preprocessor.constructBlockTree(blockBoundaries);
 
