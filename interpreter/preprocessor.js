@@ -3,35 +3,28 @@
 import { matchAll } from './matchAllPolyfill.js';
 
 // notice that indentation regexes include lines with zero indentation
-const newlineIndentRegex = /\n([^\S\n]*)(?=\S)/;  // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
-const firstLineIndentRegex = /^([^\S\n]*)(?=\S)/; // first line has to be handled separately because possible zero-length match
-const parenthesisRegex = /\(|\)/;
+const indentRegex = /\n([^\S\n]*)(?=\S)/;  // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
+const firstIndentRegex = /^([^\S\n]*)(?=\S)/; // first line has to be handled separately because possible zero-length match
+const parenRegex = /\(|\)/;
 
 class PreProcessor {
 
-	constructor (rawText) {
-		this.rawText = rawText;
+	constructor (source) {
+		this.source = source;
 		this.indentSequence = null;
 	}
 }
 
 // preprocessing
 PreProcessor.prototype.run = function () {
-	try {
-		let blockBoundaries = this.getBlockIterator();
-		this.constructBlockTree(blockBoundaries);
-		this.parseBlockRecursive(this.rootBlock);
-
-	} catch (err) {
-		console.log("Syntax error detected in preprocessor");
-		console.log(err);
-	}
+	let blockBoundaries = this.getBlockIterator();
+	this.constructBlockTree(blockBoundaries);
 }
 
 // Returns the indentation length
 // sets the character used for indentation, either spaces " " or tabs "\t"
 // Throw error if mixed tabs and spaces detected, or if indentation uses a different character entirely.
-PreProcessor.prototype.getIndentationLength = function (indentation) {
+PreProcessor.prototype.indentLength = function (indentation) {
 
 	if (indentation.length <= 0) return 0;
 
@@ -64,15 +57,16 @@ PreProcessor.prototype.getBlockIterator = function () {
 	// note: RegExp.exec() and matchAll() will infinitely match $ if used with the 'g' flag,
 	//       so make sure to check for that when looping through the matches.
 	// TODO: could we use Moo lexer for this?
-	let blockRegex = new RegExp(parenthesisRegex.source+'|'+newlineIndentRegex.source+'|$', 'g');
+	// TODO: ignore lines that are only contain comments
+	let blockRegex = new RegExp(parenRegex.source+'|'+indentRegex.source+'|$', 'g');
 
 	// make sure to use an iterable here, not an array, because matching $ with the global flag will infinitely loop at the end
-	let matches = matchAll(this.rawText, blockRegex); // provided in matchAllPolyfill.js
+	let matches = matchAll(this.source, blockRegex); // provided in matchAllPolyfill.js
 
-	let baseIndentation = -1;
-	let indentationStack = [baseIndentation];
-	function previousLevel() {
-		return indentationStack[indentationStack.length - 1];
+	let baseIndent = -1;
+	let indentStack = [baseIndent];
+	function prevLevel() {
+		return indentStack[indentStack.length - 1];
 	}
 
 	let bracesLevel = 0;
@@ -81,77 +75,57 @@ PreProcessor.prototype.getBlockIterator = function () {
 
 			// first line has to be handled separately because possible zero-length match,
 			// and zero-length matches cause matchAll() to loop infinitely
-			let firstLineMatch = self.rawText.match(firstLineIndentRegex);
-			if (firstLineMatch) {
-				let indentationLevel = self.getIndentationLength(firstLineMatch[1]); 
-				indentationStack.push(indentationLevel);
-				let blockType = 'Indent';
-				let delimiterType = 'start';
-				let offset = firstLineMatch.index;
-
-				yield { delimiterType, blockType, offset, text: firstLineMatch[0] };
+			let match = self.source.match(firstIndentRegex);
+			if (match) {
+				let indentLevel = self.indentLength(match[1]); 
+				indentStack.push(indentLevel);
+				yield { direction: 'start', blockType: 'Indent', offset: match.index, matchText: match[0] };
 			}
 
 			for (let match of matches) {
 				// note that matching $ with global flag will cause it to match infinitely,
 				// so make sure we exit after the first match of $
+				let matchText = match[0];
 				let endOfInput = match[0].length == 0;
-
-				// TODO: ignore lines that are only contain comments
-
-				let blockType = parenthesisRegex.test(match[0]) ? 'Braces' : 'Indent';
-				let delimiterType = null;  // "start" to indicate block start, "end" for end of a block
+				let blockType = parenRegex.test(matchText) ? 'Braces' : 'Indent';
+				let direction = null;  // "start" to indicate block start, "end" for end of a block
 				let offset = match.index;
-				let offsetLast = match.index + match[0].length;
+				let offsetLast = match.index + matchText.length;
 
 				if (blockType == 'Braces') {
-					if (match[0] == '(') {
-						delimiterType = 'start';
-						bracesLevel++;
-					} else {
-						delimiterType = 'end';
-						bracesLevel--;
-						if (bracesLevel < 0)
-							throw Error('Pre-processing error, extra closed brace at offset ' + offset);
-					}
+					let direction = (matchText == '(')? 'start' : 'end';
+					bracesLevel += (direction == 'start')? +1 : -1;
+					if (bracesLevel < 0)
+						throw Error('Pre-processing error, extra closed brace at offset ' + offset);
 
-					yield { delimiterType, blockType, offset, text: match[0] };
+					yield { direction, blockType, offset, matchText };
 
 				} else { // indent type is "Indent"
-					let indentationLevel = null;
-
-					if (endOfInput) { // this means we are at end of input (matched with "$")
-						indentationLevel = baseIndentation; 
-					} else {
-						indentationLevel = self.getIndentationLength(match[1]);   // counts number of indents
-					}
+					let indentLevel = endOfInput ? baseIndent : self.indentLength(match[1]);
 
 					// If we are inside a braced block, make sure indentation stays above the block's base level,
 					// but otherwise ignore the indentation
 					if (bracesLevel > 0) {
-						if (indentationLevel < previousLevel()) {
+						if (indentLevel < prevLevel()) {
 							throw Error('Pre-processing error, dedented below the base indentation of this braced block, offset ' + offset);
 						}
 						continue;
 					}
 
-					if (indentationLevel > previousLevel()) { // indentation increased
-						indentationStack.push(indentationLevel);
+					if (indentLevel > prevLevel()) { // indentation increased
+						indentStack.push(indentLevel);
 
-						delimiterType = "start";
-						yield { delimiterType, blockType, offset, text: match[0] };
+						yield { direction: 'start', blockType, offset, matchText };
 					
-					} else if (indentationLevel < previousLevel()) { // indentation decreased
-						while (indentationLevel < previousLevel()) { // pop levels from stack until indentation level matches
-							indentationStack.pop();
-
-							if (indentationStack.length == 0) {
+					} else if (indentLevel < prevLevel()) { // indentation decreased
+						while (indentLevel < prevLevel()) { // pop levels from stack until indentation level matches
+							indentStack.pop();
+							if (indentStack.length == 0) {
 								throw Error("Pre-processing error, dedented below the first line's indentation, offset " + offset);
 							}
-							delimiterType = "end";
-							yield { delimiterType, blockType, offset, text: match[0] };
+							yield { direction: 'end', blockType, offset, matchText };
 						}
-						if (indentationLevel != previousLevel()) {
+						if (indentLevel != prevLevel()) {
 							// INVALID INDENTATION, we have dedented to a level that we never indented to in the first place (see "badIndentation" test)
 							// note that this will also naturally catch cases where we dedent past the first line indentation (see "dedentPastFirstLine" test)
 							throw Error('Pre-processing error, bad indentation at offset ' + offset);
@@ -177,8 +151,8 @@ class Block {
 		return 'BLOCK_'+this.idCounter++;
 	}
 
-	constructor (text, parent, blockType) {
-		this.text = text;
+	constructor (source, parent, blockType) {
+		this.source = source;
 		this.parent = parent; // parent block
 		this.blockType = blockType;
 		this.children = [];   // every chunk is either a slice of the parent, or an annotation like "{ BLOCK_12 }"
@@ -188,13 +162,13 @@ class Block {
 
 	getBlockString () {
 		if (this.children.length == 0) {
-			return this.text.slice(this.startOffset, this.endOffset);
+			return this.source.slice(this.startOffset, this.endOffset);
 		}
 
 		// if you have say, 3 children, it should end up something like this
 		// <text> (Block1)  <text> {Block2} <text> {Block3} <text>
 
-		let str = this.text.slice(this.startOffset, this.children[0].startOffset)
+		let str = this.source.slice(this.startOffset, this.children[0].startOffset)
 		for (let i = 0; i < this.children.length; i++) {
 
 			let current = this.children[i];
@@ -213,7 +187,7 @@ class Block {
 				str += '{' + current.id + '}';
 			}
 
-			str += this.text.slice(current.endOffset, next.startOffset);
+			str += this.source.slice(current.endOffset, next.startOffset);
 		}
 		return str;
 	}
@@ -226,10 +200,10 @@ PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
 		return blockStack[blockStack.length-1];
 	}
 
-	for (let { delimiterType, blockType, offset, text } of blockBoundaries) {
-		if (delimiterType == 'start') {
-			let child = new Block(this.rawText, currentBlock(), blockType);
-			child.startOffset = offset+text.length;
+	for (let { direction, blockType, offset, matchText } of blockBoundaries) {
+		if (direction == 'start') {
+			let child = new Block(this.source, currentBlock(), blockType);
+			child.startOffset = offset+matchText.length;
 			if (currentBlock() == null) { // if currentBlock is null, this must be the root block
 				this.rootBlock = child;
 			} else {
@@ -241,15 +215,6 @@ PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
 			currentBlock().endOffset = offset;
 			blockStack.pop();
 		}
-	}
-
-	return this;
-}
-
-PreProcessor.prototype.parseBlockRecursive = function (block) {
-	block.parseTree = parse(block.getBlockString());
-	for (let child of block.children) {
-		this.parseBlockRecursive(child);
 	}
 
 	return this;

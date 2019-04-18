@@ -4,79 +4,79 @@ exports[`Successfully retrieve block boundaries controlTest 1`] = `
 Array [
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "",
     "offset": 0,
-    "text": "",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 0,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 2,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 8,
-    "text": ")",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 10,
-    "text": ")",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 12,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 18,
-    "text": ")",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 19,
-    "text": "
+    "direction": "start",
+    "matchText": "
 	",
+    "offset": 19,
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 35,
-    "text": "
+    "direction": "start",
+    "matchText": "
 		",
+    "offset": 35,
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
-    "offset": 60,
-    "text": "
+    "direction": "end",
+    "matchText": "
 ",
-  },
-  Object {
-    "blockType": "Indent",
-    "delimiterType": "end",
     "offset": 60,
-    "text": "
-",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "
+",
+    "offset": 60,
+  },
+  Object {
+    "blockType": "Indent",
+    "direction": "end",
+    "matchText": "",
     "offset": 79,
-    "text": "",
   },
 ]
 `;
@@ -85,42 +85,42 @@ exports[`Successfully retrieve block boundaries emptyLineAtStartOrEnd 1`] = `
 Array [
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 0,
-    "text": "
+    "direction": "start",
+    "matchText": "
 	",
+    "offset": 0,
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 5,
-    "text": "
+    "direction": "start",
+    "matchText": "
 		",
+    "offset": 5,
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 22,
-    "text": "
+    "direction": "start",
+    "matchText": "
 			",
+    "offset": 22,
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 49,
-    "text": "",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 49,
-    "text": "",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 49,
-    "text": "",
   },
 ]
 `;
@@ -129,53 +129,53 @@ exports[`Successfully retrieve block boundaries indentedBraces 1`] = `
 Array [
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "",
     "offset": 0,
-    "text": "",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 3,
-    "text": "
+    "direction": "start",
+    "matchText": "
 	",
+    "offset": 3,
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 5,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 11,
-    "text": ")",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
-    "offset": 12,
-    "text": "
+    "direction": "end",
+    "matchText": "
 ",
+    "offset": 12,
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 30,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 38,
-    "text": ")",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 39,
-    "text": "",
   },
 ]
 `;
@@ -184,52 +184,52 @@ exports[`Successfully retrieve block boundaries multilineBracedBlock 1`] = `
 Array [
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "",
     "offset": 0,
-    "text": "",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 0,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 2,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 8,
-    "text": ")",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 28,
-    "text": ")",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 29,
-    "text": "
+    "direction": "start",
+    "matchText": "
 	",
+    "offset": 29,
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 45,
-    "text": "",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 45,
-    "text": "",
   },
 ]
 `;
@@ -238,52 +238,52 @@ exports[`Successfully retrieve block boundaries multilineBracedBlock2 1`] = `
 Array [
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "",
     "offset": 0,
-    "text": "",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 0,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 2,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 8,
-    "text": ")",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 28,
-    "text": ")",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
-    "offset": 29,
-    "text": "
+    "direction": "start",
+    "matchText": "
 	",
+    "offset": 29,
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 45,
-    "text": "",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 45,
-    "text": "",
   },
 ]
 `;
@@ -292,39 +292,39 @@ exports[`Successfully retrieve block boundaries multilineBracedBlock3 1`] = `
 Array [
   Object {
     "blockType": "Indent",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "",
     "offset": 0,
-    "text": "",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 0,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "start",
+    "direction": "start",
+    "matchText": "(",
     "offset": 2,
-    "text": "(",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 8,
-    "text": ")",
   },
   Object {
     "blockType": "Braces",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": ")",
     "offset": 28,
-    "text": ")",
   },
   Object {
     "blockType": "Indent",
-    "delimiterType": "end",
+    "direction": "end",
+    "matchText": "",
     "offset": 46,
-    "text": "",
   },
 ]
 `;
