@@ -17,5 +17,5 @@ test('control test', () => {
 	daveBlock.endOffset = 22;
 
 	root.children = [bobBlock, daveBlock];
-	expect(root.getBlockString()).toBe('alice(1)cassie\n\t{2}\nethan');
+	expect(root.getBlockString()).toBe('alice(BLOCK_1)cassie\n\t{BLOCK_2}\nethan');
 });

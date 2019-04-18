@@ -174,7 +174,7 @@ class Block {
 		if (this.idCounter == undefined) {
 			this.idCounter = 0;
 		}
-		return this.idCounter++;
+		return 'BLOCK_'+this.idCounter++;
 	}
 
 	constructor (text, parent, blockType) {
