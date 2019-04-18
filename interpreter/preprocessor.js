@@ -70,7 +70,9 @@ PreProcessor.prototype.getBlockIterator = function () {
 
 	let baseIndentation = -1;
 	let indentationStack = [baseIndentation];
-	let lastLevel = indentationStack[indentationStack.length - 1];  // lastLevel is always the top of the stack
+	function previousLevel() {
+		return indentationStack[indentationStack.length - 1];
+	}
 
 	let bracesLevel = 0;
 	return {
@@ -82,7 +84,6 @@ PreProcessor.prototype.getBlockIterator = function () {
 			if (firstLineMatch) {
 				let indentationLevel = self.getIndentationLength(firstLineMatch[1]); 
 				indentationStack.push(indentationLevel);
-				lastLevel = indentationStack[indentationStack.length - 1];
 				let blockType = 'Indent';
 				let delimiterType = 'start';
 				let offset = firstLineMatch.index;
@@ -125,27 +126,21 @@ PreProcessor.prototype.getBlockIterator = function () {
 					// If we are inside a braced block, make sure indentation stays above the block's base level,
 					// but otherwise ignore the indentation
 					if (bracesLevel > 0) {
-						if (indentationLevel < lastLevel) {
+						if (indentationLevel < previousLevel()) {
 							throw Error('Pre-processing error, dedented below the base indentation of this braced block, offset ' + offset);
-						}
-						if (endOfInput) {
-							throw Error('Pre-processing error, unclosed braces');
-							break;  // break, to prevent infinite loops from $ constantly matching
 						}
 						continue;
 					}
 
-					if (indentationLevel > lastLevel) { // indentation increased
+					if (indentationLevel > previousLevel()) { // indentation increased
 						indentationStack.push(indentationLevel);
-						lastLevel = indentationStack[indentationStack.length - 1];
 
 						delimiterType = "start";
 						yield { delimiterType, blockType, offset, text: match[0] };
 					
-					} else if (indentationLevel < lastLevel) { // indentation decreased
-						while (indentationLevel < lastLevel) { // pop levels from stack until indentation level matches
+					} else if (indentationLevel < previousLevel()) { // indentation decreased
+						while (indentationLevel < previousLevel()) { // pop levels from stack until indentation level matches
 							indentationStack.pop();
-							lastLevel = indentationStack[indentationStack.length - 1];
 
 							if (indentationStack.length == 0) {
 								throw Error("Pre-processing error, dedented below the first line's indentation, offset " + offset);
@@ -153,7 +148,7 @@ PreProcessor.prototype.getBlockIterator = function () {
 							delimiterType = "end";
 							yield { delimiterType, blockType, offset, text: match[0] };
 						}
-						if (indentationLevel != lastLevel) {
+						if (indentationLevel != previousLevel()) {
 							// INVALID INDENTATION, we have dedented to a level that we never indented to in the first place (see "badIndentation" test)
 							// note that this will also naturally catch cases where we dedent past the first line indentation (see "dedentPastFirstLine" test)
 							throw Error('Pre-processing error, bad indentation at offset ' + offset);
@@ -223,32 +218,25 @@ class Block {
 
 PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
 	let blockStack = [];
-	let currentBlock = null;
 
-	function stackPush(item) {
-		blockStack.push(item);
-		currentBlock = blockStack[blockStack.length-1];
-	}
-
-	function stackPop() {
-		blockStack.pop();
-		currentBlock = blockStack[blockStack.length-1];
+	function currentBlock() {
+		return blockStack[blockStack.length-1];
 	}
 
 	for (let { delimiterType, blockType, offset, text } of blockBoundaries) {
 		if (delimiterType == 'start') {
-			let child = new Block(this.rawText, currentBlock, blockType);
+			let child = new Block(this.rawText, currentBlock(), blockType);
 			child.startOffset = offset+text.length;
-			if (currentBlock == null) { // if currentBlock is null, this must be the root block
+			if (currentBlock() == null) { // if currentBlock is null, this must be the root block
 				this.rootBlock = child;
 			} else {
-				currentBlock.children.push(child);
+				currentBlock().children.push(child);
 			}
 
-			stackPush(child);
+			blockStack.push(child);
 		} else {
-			currentBlock.endOffset = offset;
-			stackPop();
+			currentBlock().endOffset = offset;
+			blockStack.pop();
 		}
 	}
 
