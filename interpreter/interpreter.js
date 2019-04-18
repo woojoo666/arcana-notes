@@ -1,5 +1,7 @@
 // This contains all the "glue" connecting the preprocessor, lexer, parser, and interpreter
 
+import { PreProcessor, Block } from './preprocessor.js';
+
 /*
 I want the structure of the reactive graph to look like:
 
@@ -19,45 +21,55 @@ Node {
 
 Every node represents a single object. Note that conveniently enough,
 	every code block (delimited by braces or indentation) corresponds to an object.
+Actually, incorrect, there is no one-to-one mapping between syntax blocks and live objects.
+	For example, if I declare 3 blocks inside foo, and then clone foo, "foo: (()()()), bar: foo()"
+	then I have 5 syntax blocks but 8 objects.
 Notice that it is recursive, so every object node contains child object nodes,
 	which keep track of their offset and original block length,
 	so when any piece of code changes, you can traverse the node tree to figure
 	out exactly which node needs to be re-parsed.
 */
 
-// analyzes braces and indentation to extract all nested blocks
-// returns undefined if block structure is illegal, eg if there are unclosed braces
-function extractBlocks(text) {
+class Interpreter {
 
-	let match = text.match(/(^|\n)[ \t]+/);
-	if (match)
-	let indentChar = match[0];
-
-	text.match(/(\(|\)|(^)) 
-
-	xxxx UNFINISHED xxxx
-	
-	let lines = block.split('\n').filter(str => ! /^\s*$/.test(str));   // split into lines and filter out empty lines
-
-	if (lines.length <= 0) {
-		return []; // empty block
+	constructor (source) {
+		this.source = source;
 	}
 
-	let blockIndentationLevel = text.match(/^\t*/)[0].length; // indentation level of this entire block is determined by first line
-
-	let tokens = [];
-	lines.forEach(line => {
-		while (line != '') {
-			
+	run () {
+		try {
+			var preprocessor = new PreProcessor(this.source);
+			preprocessor.run();
+		} catch (err) {
+			console.log("Syntax error detected in preprocessor");
+			console.log(err);
 		}
-	});
-}
 
-// if nestedBlocks isn't provided, will call extractBlocks to extract nested blocks
-// note that since extractBlocks recurses deeply and extracts all nested blocks, theoretically
-// extractBlocks should only need to be called on the top-level block, and then every block will pass
-// along the extracted block data recursively so no child needs to call extractBlocks again
-function parseBlock(blockString, nestedBlocks) {
-	// call parser?
-}
+		parseBlockRecursive(preprocessor.rootBlock);
+	}
 
+	parseBlockRecursive (block) {
+		let blockString = block.getBlockString();
+
+		let tokens = lexicalAnalysis(blockString);
+
+		for (let child of block.children) {
+			this.parseBlockRecursive(child);
+		}
+
+		return this;
+	}
+
+	lexicalAnalysis (blockString) {
+
+	}
+
+	// if nestedBlocks isn't provided, will call extractBlocks to extract nested blocks
+	// note that since extractBlocks recurses deeply and extracts all nested blocks, theoretically
+	// extractBlocks should only need to be called on the top-level block, and then every block will pass
+	// along the extracted block data recursively so no child needs to call extractBlocks again
+	parseBlock (blockString, nestedBlocks) {
+		// call parser?
+	}
+
+}
