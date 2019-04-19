@@ -64,6 +64,8 @@ strong modularity, which makes it easy to move components around
 extremely flexible
 unordered
 
+"this is the power of actor-model programming. We get concurrency for free"
+
 
 maybe also give an example of calling web APIs
 

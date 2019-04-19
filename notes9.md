@@ -7354,7 +7354,7 @@ chaining relational operators:
 
 	a < b < c  is equivalent to  (a < b) & (b < c)
 
-note that python, perl6, and mathematica all have this already
+note that [python, perl6, and mathematica all have this already](https://stackoverflow.com/questions/4090845/language-support-for-chained-comparison-operators-x-y-z)
 
 
 parallelism?
@@ -7367,3 +7367,171 @@ parallelism?
 
 notice that it should follow short circuit evaluation
 
+
+maybe we can leverage this short-circuit evaluation to get ternary operators
+
+	x: cond & option1 | option2
+
+maybe you could leverage it for `if-else` like chaining as well
+
+	size: 250;
+
+	console.log('size is ' +
+	          size < 10   & 'tiny'
+	        | size < 100  & 'small'
+	        | size < 500  & 'medium'
+	        | size < 1000 & 'large'
+	        |               'enormous')
+
+actually, note that ternary and short-circuit are different in javascript
+
+```js
+console.log(options && undefined || 'else');  // will print 'else'
+console.log(options ?  undefined :  'else');  // will print undefined
+```
+
+see [this answer](https://stackoverflow.com/questions/51051571/what-is-the-difference-between-using-and-over-a-ternary-operator/51051784) for more details
+
+likewise, I don't think we can equate ternary and short-circuit evaluation in Axis
+I think we should still use the `?` syntax explored earlier
+
+
+	x: cond ? option1 else option2
+
+	size: 250;
+
+	console.log('size is ' +
+	             size < 10   ? 'tiny'
+	        else size < 100  ? 'small'
+	        else size < 500  ? 'medium'
+	        else size < 1000 ? 'large'
+	        else               'enormous')
+
+	
+
+### Isolating Error Handling
+
+this was kinda talked about in metaprogramming sections
+	// TODO: FIND REFERENCED SECTIONS
+
+notice how complex code can get when you have to account for errors throughout the code
+
+```js
+for (let match of matches) {
+	let matchText = match[0];
+	let endOfInput = match[0].length == 0;
+	let blockType = parenRegex.test(matchText) ? 'Braces' : 'Indent';
+	let direction = null;  // "start" to indicate block start, "end" for end of a block
+	let offset = match.index;
+	let offsetLast = match.index + matchText.length;
+
+	if (blockType == 'Braces') {
+		let direction = (matchText == '(')? 'start' : 'end';
+		bracesLevel += (direction == 'start')? +1 : -1;
+		if (bracesLevel < 0)
+			throw Error('Pre-processing error, extra closed brace at offset ' + offset);
+
+		yield { direction, blockType, offset, matchText };
+
+	} else {
+		let indentLevel = endOfInput ? baseIndent : self.indentLength(match[1]);
+
+		if (bracesLevel > 0) { // If we are inside a braced block,
+			if (indentLevel < prevLevel()) { // make sure indentation stays above the block's base level,
+				throw Error('dedented below base indentation, offset ' + offset);
+			}
+			continue; // but otherwise ignore the indentation
+		}
+
+		if (indentLevel > prevLevel()) { // indentation increased
+			indentStack.push(indentLevel);
+
+			yield { direction: 'start', blockType, offset, matchText };
+		
+		} else if (indentLevel < prevLevel()) { // indentation decreased
+			while (indentLevel < prevLevel()) { // pop levels from stack until indentation level matches
+				indentStack.pop();
+				if (indentStack.length == 0) {
+					throw Error("Pre-processing error, dedented below enclosing braces, offset " + offset);
+				}
+				yield { direction: 'end', blockType, offset, matchText };
+			}
+			if (indentLevel != prevLevel()) {
+				throw Error('Pre-processing error, bad indentation at offset ' + offset);
+			}
+		}
+	}
+	if (endOfInput) break;
+}
+if (bracesLevel > 0) {
+	throw Error('Pre-processing error, unclosed braces');
+}
+```
+look how much simpler it could be if we didn't have to worry about these errors
+
+```js
+for (let match of matches) {
+	let matchText = match[0];
+	let endOfInput = match[0].length == 0;
+	let blockType = parenRegex.test(matchText) ? 'Braces' : 'Indent';
+	let direction = null;  // "start" to indicate block start, "end" for end of a block
+	let offset = match.index;
+	let offsetLast = match.index + matchText.length;
+
+	if (blockType == 'Braces') {
+		let direction = (matchText == '(')? 'start' : 'end';
+		bracesLevel += (direction == 'start')? +1 : -1;
+		yield { direction, blockType, offset, matchText };
+
+	} else { // indent type is "Indent"
+		let indentLevel = endOfInput ? baseIndent : self.indentLength(match[1]);
+
+		// If we are inside a braced block, ignore the indentation
+		if (bracesLevel > 0) continue;
+
+		if (indentLevel > prevLevel()) { // indentation increased
+			indentStack.push(indentLevel);
+
+			yield { direction: 'start', blockType, offset, matchText };
+		
+		} else if (indentLevel < prevLevel()) { // indentation decreased
+			while (indentLevel < prevLevel()) { // pop levels from stack until indentation level matches
+				indentStack.pop();
+				yield { direction: 'end', blockType, offset, matchText };
+			}
+		}
+	}
+	if (endOfInput) break;
+}
+```
+Axis allows for abstracting away error detection from the main process
+
+	block1:
+		var indentStack(index: iteration)
+		block2:
+			block3:
+		block4:
+			block5:
+				do while (indentLevel < prevLevel()) { @iteration
+					indentStack.pop();
+					yield { direction: 'end', blockType, offset, matchText };
+
+	errors: collector
+	errorDetection:
+		if (block2.indentLevel = undefined) errors <: 'indentlevel undefined'
+		for iteration in block5[0]: @iteration
+			if (indentStack.length = undefined):
+				errors <: 'Pre-processing error, dedented below enclosing braces, offset " + block5[0][iteration].offset
+
+
+
+
+### Bracket blocks
+
+what happens if you do `foo[a: 10]`
+what happens if you do `foo[...bar]`
+what happens if you do `foo[bar <: 10]`
+
+I think all of these should be illegal
+
+what about `foo[bar(10)]`
