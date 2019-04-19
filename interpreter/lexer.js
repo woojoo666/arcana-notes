@@ -32,6 +32,9 @@ let rules = {
 	newline: { match: /\n/, lineBreaks: true },
 	comma: ',',
 	tag: /\#\w+/,
+	privateVar: { match: /\_\w+/ , type: moo.keywords({
+			keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag'],
+		})},
 	identifier: { match: /\w+/ , type: moo.keywords({
 			keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag'],
 		})},
@@ -44,9 +47,15 @@ class Lexer {
 		this.blockType = blockType;  // blockType is used to figure out things like, should we ignore newlines
 	}
 
-	run () {
+	// also used in grammar
+	initLexer () {
 		this.moo = moo.compile(rules);
 		this.moo.reset(this.blockString);
+		return this;
+	}
+
+	run () {
+		initLexer();
 
 		let tokens = [];
 

@@ -44,6 +44,7 @@ back to base level`);
 	window.preprocessor = test;
 </script>
 <script type="module">
+	import { PreProcessor, Block } from './preprocessor.js';
 	import { Lexer } from './lexer.js';
 
 	let src = `
@@ -57,12 +58,17 @@ back to base level`);
 			=> tree.#height   // return height of root node
 		`;
 
-	var lexer = new Lexer(src, 'Indent'); // try parsing it as an indented block
-	console.table(lexer.run().tokens);
+	let preprocessor = new PreProcessor(src);
+	preprocessor.run();
+	window.preprocessor = preprocessor;
 
+	function lexRecursive(block) {
+		let lexer = new Lexer(block.getBlockString(), block.blockType);
+		console.table(lexer.run().tokens);
+		block.children.forEach(lexRecursive);
+	}
 
-	var lexer = new Lexer(src, 'Braces'); // try parsing it as a braced block, it should omit newlines
-	console.table(lexer.run().tokens);
+	lexRecursive(preprocessor.rootBlock);
 </script>
 </body>
 </html>
