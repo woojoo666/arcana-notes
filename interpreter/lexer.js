@@ -7,6 +7,8 @@ let rules = {
 	string:  /"(?:\\["\\]|[^\n"\\])*"/,
 	params: '>>',
 	return: '=>',
+	getReturn: '->',
+	insertion: '<:',
 
 	lparen:  '(',
 	rparen:  ')',
@@ -15,26 +17,17 @@ let rules = {
 	lbracket: '[',
 	rbracket: ']',
 
-	op_E:  /\*\*/,
-	op_AS: /\+|\-/,       // add, subtract
-	op_MDR: /\*|\/|\%/,   // multiply, divide, remainder
+	operator:  /[!+-*/<=>&|]+/,  // capture all operator sequences, the grammar will detect invalid ones
+	// TODO: what about for "3*-2", the lexer will split it into "3" "*-" and "2", causing a syntax error.
+	//       Should we keep this behavior, and force the programmer to write "3 * -2" instead,
+	//       or should we maybe add special rules to interpret it the same as "3 * -2"
 
-	op_comparators: /\<\=|\>\=|\<|\>/,
-	op_equality: /\=\=|\=|\!\=\=|\!\=/,
-
-	op_and: '&',
-	op_or: '|',
-
-	insertion: '<:',
 	colon: ':',
 	propAccess: /\.(?=\w|\#)/,
 	period: '.',
 	newline: { match: /\n/, lineBreaks: true },
 	comma: ',',
 	tag: /\#\w+/,
-	privateVar: { match: /\_\w+/ , type: moo.keywords({
-			keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag'],
-		})},
 	identifier: { match: /\w+/ , type: moo.keywords({
 			keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag'],
 		})},
@@ -55,7 +48,7 @@ class Lexer {
 	}
 
 	run () {
-		initLexer();
+		this.initLexer();
 
 		let tokens = [];
 

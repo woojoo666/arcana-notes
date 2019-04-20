@@ -7535,3 +7535,15 @@ what happens if you do `foo[bar <: 10]`
 I think all of these should be illegal
 
 what about `foo[bar(10)]`
+
+### Unary Operators and Ambiguity
+
+ * `a-b` can be interpretted as:
+	* two list items with one unary operator: `a` and `-b`
+	* one item created from a binary operator: `a - b`
+
+* intuitively:
+	* `a-b` should be interpretted as a single item
+	* `a -b` should be interpretted as two items
+	* `a - b` should be interpretted as a single item
+
