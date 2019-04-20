@@ -7539,7 +7539,7 @@ what about `foo[bar(10)]`
 ### Unary Operators and Ambiguity
 
  * `a-b` can be interpretted as:
-	* two list items with one unary operator: `a` and `-b`
+	* two list items with one unary operator: `a, -b`
 	* one item created from a binary operator: `a - b`
 
 * intuitively:
@@ -7547,3 +7547,24 @@ what about `foo[bar(10)]`
 	* `a -b` should be interpretted as two items
 	* `a - b` should be interpretted as a single item
 
+* actually, this is how matlab/octave handles it
+
+```matlab
+x = [1-2]    % result: [-1]
+x = [1 -2]   % result: [1, -2]
+x = [1 - 2]  % result: [-1]
+
+x = [1--2]  % illegal syntax
+x = [1- -2]  % result: [3]
+x = [1- - 2]  % result: [3]
+x = [1 - - 2]  % result: [3]
+
+x = [1 - - - 2]  % result: [-1]
+x = [1 - - - - 2]  % result: [3]
+```
+
+* maybe I should just classify an operator as a unary operator if it:
+	* is the operator `!`, `!!`, `+`, or `-`
+	* is preceded by whitespace or comma
+	* is followed by a word character `\w`, or an open brace `(`
+* then I can just modify the lexer to catch unary operators before they are passed to the grammar
