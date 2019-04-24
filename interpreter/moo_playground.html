@@ -53,8 +53,13 @@ document.body.onload = () => {
 		rbracket: ']',
 
 		// there are 4 unary ops, !!, !, +, and -
-		// unary operators have to be preceded by whitespace/comma, and followed by a word/openbrace
-		unary_op: /(?<=^|\s|\,)(\!\!|[!+-])(?=\w|\()/,
+		// unary ops can be after whitespace, openbrace, comma, operator, start-of-input
+		// unary ops cannot be after word, quote, -> operator, closed-brace, 
+		// unary operators have to be preceded by a whitespace/comma, and followed by a word/openbrace
+		// TODO: update unary rules to follow the rules outlined in "Unary Operators and Ambiguity V"
+		unary_op: /(?<=^|\W)(\!\!|[!+-])(?=\w|\()/,
+
+		bin_op: ['+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
 
 		operator:  /[\!\+\-\*\/\<\=\>\&\|]+/,  // capture all operator sequences, the grammar will detect invalid ones
 		// TODO: what about for "3*-2", the lexer will split it into "3" "*-" and "2", causing a syntax error.

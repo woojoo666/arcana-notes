@@ -18,13 +18,11 @@ let rules = {
 	rbracket: ']',
 
 	// there are 4 unary ops, !!, !, +, and -
-	// unary operators have to be preceded by whitespace/comma, and followed by a word/openbrace
-	unary_op: /(?<=^|\s|\,)(\!\!|[!+-])(?=\w|\()/,
+	// unary operators have to be preceded by whitespace/comma/openbrace, and followed by a word/openbrace
+	// TODO: update unary rules to follow the rules outlined in "Unary Operators and Ambiguity V"
+	unary_op: /(?<=^|\s|\,|\(|\[)(\!\!|[!+-])(?=\w|\()/,
 
 	operator:  /[\!\+\-\*\/\<\=\>\&\|]+/,  // capture all operator sequences, the grammar will detect invalid ones
-	// TODO: what about for "3*-2", the lexer will split it into "3" "*-" and "2", causing a syntax error.
-	//       Should we keep this behavior, and force the programmer to write "3 * -2" instead,
-	//       or should we maybe add special rules to interpret it the same as "3 * -2"
 
 	colon: ':',
 	propAccess: /\.(?=\w|\#)/,

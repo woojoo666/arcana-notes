@@ -7547,24 +7547,431 @@ what about `foo[bar(10)]`
 	* `a -b` should be interpretted as two items
 	* `a - b` should be interpretted as a single item
 
-* actually, this is how matlab/octave handles it
+* actually, this is how matlab/octave handles it (using [octave-online](https://octave-online.net/) to test:
 
 ```matlab
 x = [1-2]    % result: [-1]
 x = [1 -2]   % result: [1, -2]
 x = [1 - 2]  % result: [-1]
 
-x = [1--2]  % illegal syntax
-x = [1- -2]  % result: [3]
-x = [1- - 2]  % result: [3]
+x = [1--2]     % error
+x = [1- -2]    % result: [3]
+x = [1- - 2]   % result: [3]
 x = [1 - - 2]  % result: [3]
 
-x = [1 - - - 2]  % result: [-1]
+x = [1 - - - 2]    % result: [-1]
 x = [1 - - - - 2]  % result: [3]
 ```
+
+* matlab also briefly mentions its spacing rules [here](https://www.mathworks.com/help/matlab/matlab_prog/case-and-space-sensitivity.html) and [here](https://www.mathworks.com/help/matlab/matlab_prog/command-vs-function-syntax.html)
 
 * maybe I should just classify an operator as a unary operator if it:
 	* is the operator `!`, `!!`, `+`, or `-`
 	* is preceded by whitespace or comma
 	* is followed by a word character `\w`, or an open brace `(`
 * then I can just modify the lexer to catch unary operators before they are passed to the grammar
+
+### Unary Operators and Ambiguity II - Matlab/Octave Analysis
+
+(continued from section "Unary Operators and Ambiguity")
+
+* more observations, using [octave-online](https://octave-online.net/):
+
+```matlab
+x = [2*-3]   % result: [-6]
+x = [2*- 3]  % result: [-6]
+x = [2 *3]   % result: [ 6]
+x = [2 * *3] % error
+x = [2 **3]  % 8
+x = [2** 3]  % 8
+
+
+x = [2 + - + - +1] % result: [3]
+x = [2 + - ! - !1] % result: [1]
+
+x = [2 ! !1] % result: [2, 1]
+x = [2 - -1] % result: [3]
+
+x = [2- -1] % result: [3]
+x = [2! !1] % error
+
+x = [2!]    % error
+x = [2! 1]  % error
+x = [2 ! 1] % result: [2, 0]
+
+y = 5
+x = [y---3] % result: [2] (note: octave has "--" decrement op)
+x = [y---3] % result: [1]
+x = [1+-+2] % result: [-1]
+
+x = [x -+]
+```
+
+* I think the way it works is there are a set of binary operators, `+,-,**,*,/,%,&&,||,<,>,<=,>=,=,==`
+* and a set of unary operators `!,+,-`
+
+* the lexer consumes as many operator characters as it can, the first largest-valid operator, and creates an operator token
+
+then the token is parsed via these rules:
+	1. if the operator token has no leading whitespace, eg `x- y` or `x-y`, it is considered a binary operator (which is why `[2! 1]` fails)
+	2. else, if it has trailing whitespace, eg `x - y`, then it is first considered a binary operator, and if that fails, it is considered a unary operator
+	3. else, it must look like `x -y`, and it is considered a unary operator first, and if that fails, it is considered a binary operator
+
+* if there are multiple operator tokens, the first is determined by the rules above, all the rest are considered unary operators
+
+
+* hmm that means something like `[1 -+2]` would be interpretted like `[1, -2]`
+* and it is! tested with octave-online
+
+* what about `[1 -+ 2]`? this is also interpretted like `[1, -2]`, as predicted
+* because the first largest-valid operator, `-`, has no whitespace after, so it is considered a unary operator
+* and since `+` is the second successive operator it is automatically considered a unary operator
+
+* what about `[2 *- 3]`? as predicted, it is interpretted as `[-6]`, because even though `*` has no trailing whitespace,
+* 	it can't be a unary operator, so it is interpretted as a binary op
+
+* what about `[2!1]`? as predicted, it gives an error, since `!` has no leading whitespace it is considered a binary op, which fails
+
+* in summary
+
+```matlab
+x = [1 -+2]  % result: [1, -2]
+x = [1 -+ 2] % result: [1, -2]
+x = [2 *- 3] % result: [-6]
+x = [2!1]    % error
+```
+
+* So it seems like we have decoded the rules behind octave (at least, octave-online)
+
+### Unary Operators and Ambiguity III - My Rules to Resolve Ambiguity
+
+(continued from section "Unary Operators and Ambiguity II - Matlab/Octave Analysis")
+
+* I personally want to make my rules a bit simpler than Octave's
+* the way mine will work is
+
+for the first largest-valid operator:
+	1. if the operator token has leading whitespace, but no trailing whitespace, then it is considered a unary operator first (and if that fails it is considered binary)
+	2. otherwise, the operator is considered a binary operator first (and if that fails it is considered unary)
+
+* the only difference this has with the octave rules is, if the operator has no leading whitespace, eg `[2!1]`
+* with octave's rules, it must be a binary op, so `[2!1]` will fail
+* with my rules, it is first considered a binary op but if that fails it is tried as a unary op, so `[2!1]` will return `[2, 0]`
+
+* these rules are also quite easy to represent using regex
+* in the moo lexer
+
+### Unary Operators and Ambiguity IV
+
+* actually how do we account for something like `foo: 1 -2`
+* should it be parsed as a property and a list item, `foo: 1, -2`
+* or should it be parsed as `foo: (1-2)`
+
+* how does matlab/octave handle it?
+
+```matlab
+x = 1-2   % result: x = -1
+x = 1, -2 % result: x = 1, ans = -2
+x = 1 -2  % result: x = -1
+
+x = [y=5 -2]  % result: x = [5, -2], y = 5
+y=5 -2        % result: y = 3
+```
+
+* so the rules change if it isn't in an array declaration
+
+* actually, according to our rules, properties have to be preceded and followed by commas or newlines
+* so `foo: 1 -2` has to be parsed as a single property
+
+* it can still be confusing if we have expressions in space-delimited lists
+
+		x: (1 * (2-3) -4 *5)
+
+* if we followed matlab/octave rules, this would be equivalent to
+
+		x: (1*(2-3), -4*5)    // result: (-1, -20)
+
+* clearly very confusing
+
+
+* perhaps the rule we should use is,
+* space-delimited lists can only contain objects or unary expressions, eg
+
+		x: (1 2 -3 4 -5)
+
+* you can also do property access and all that
+
+		x: (1 2 -3 foo.bar zed[test])
+
+* but it cannot contain normal expressions, aka ones that contain binary operators, eg `2 * 3`
+* this means that for something like
+
+		foo(1 |2 -3)
+
+* the inside of the brackets will be parsed as a single expression
+* because it uses the binary operator `|`, so it can't be parsed as a list of unary expressions
+* whereas something like
+
+		foo(1 -2 -3)
+
+* can be parsed as a list of unary expressions, so it is parsed as 3 separate items
+
+
+* or maybe we should make it illegal to mix spaces and commas
+* eg `foo: combine(10 20 30, x: "hello", y: "world")`
+* or maybe we should make it so you can only have one space-delimited 
+
+* or maybe we should just use brackets `[]` for lists
+* this would free up braces `()` for grouping
+* however, it would prevent one from mixing list items and properties
+
+* or maybe if you want to use binary ops in space-delimited lists, you can't use spaces
+* eg
+	
+		(1*2 3+4 -5)
+
+### Unary Operators and Ambiguity V - Revised Rules to Resolve Ambiguity
+
+* actually I think no matter how we design these rules it will be sorta confusing
+* whether we allow binary operators in space-delimited lists, or not
+* or if the presence of a binary op automatically makes the entire thing an expression
+
+* either way, what's important is that it's always possible to make it unambiguous and not confusing
+* just use commas, and don't use uneven spacing like `a -b`
+* instead of doing
+
+		(1 * (2-3) -4 *5)
+
+* do
+
+		( 1 * (2-3), -4*5 )
+
+* this is clear and unambiguous
+
+* when it comes to space-delimited lists, I think I'll just use octave's rules
+* with a few small tweaks
+
+* something I don't like about octave's rules is that it depends on the operator
+
+```matlab
+[1 -2]    % "-" evaluated as unary due to spacing rules
+[1 *2]    % "*" evaluated as binary because doesn't exist as unary op
+[1 - 2]   % "-" evaluated as binary due to spacing rules
+[1 ! 2]   % "!" evaluated as unary because doesn't exist as binary op
+```
+
+* the only exception is if there is no leading whitespace, where it is forced to be a binary op, so something like `[x!y]` would throw an error
+
+* I think if we want it to depend on spacing, we shouldn't depend on the operator as well
+* so the way I want to design it is
+
+1. if the operator token has leading whitespace, but no trailing whitespace, then it is considered a unary operator first (and if that fails it is considered binary)
+2. otherwise it is evaluated as a binary op
+
+* thus:
+
+		(1 -2)    // "-" evaluated as unary due to spacing rules
+		(1 *2)    // error, "*" evaluated as unary
+		(1 - 2)   // "-" evaluated as binary due to spacing rules
+		(1 ! 2)   // error, "!" evaluated as unary
+		(1!2)     // error, "!" evaluated as unary
+		(1! 2)    // error, "!" evaluated as unary
+
+* what if you have multiple operators?
+* recall that matlab/octave treats every operator after the first one as a unary operator
+* this makes sense, as you can't have multiple binary operators anyways
+
+* however, I think it looks confusing if you have unary operators with leading and trailing whitespace, that look like binary ops
+* again, I think if it depends on spacing, it shouldn't depend on anything else
+* so if you have leading and trailing whitespace then it is a binary op
+* something like `1 !!2`, the first `!` op is unary because leading but no trailing, and all following ops cannot have whitespace otherwise they will be considered binary
+* the only time you are allowed spaces after unary ops, is at the beginning of a statement
+* eg
+
+		1, ! ! 2, 3
+		4 + (! ! 5)   // enclose in parenthesis so now ! ops are at beginning of statement (note that + will strip the parenthesis)
+
+
+### type casting?
+
+
+type casting
+
+unlike javascript, does not convert `0` to `false`
+only `undefined` is converted to `false`
+
+however type casting works for boolean->string or number->string
+eg `"x" + y()'`
+
+
+
+
+### Dynamic Overriding
+
+notice the difference between the two lines below
+
+	foo(a b c)   // passes 3 arguments
+	foo(0: a, 1: b, 2: c)   // sets three properties
+
+this is different from object creation, where they are the same
+
+	(a b c) = (0: a, 1: b, 2: c)
+
+
+slightly related: how would we override multiple properties of array at once, eg override range 0-10
+or how would we override multiple properties of object at once, eg a dynamic set of keys?
+
+two ways are
+
+	source(...object)   // override source with all properties in input object
+
+	source.apply(object)  // equivalent to the line above
+
+note that if you have static set of keys in scope that you want to pass in, you can do
+
+	key1: ...
+	key2: ...
+	key3: ...
+
+	source(key1^^ key2^^ key3^^ )   // the ^^ operator is the same as object property shorthand in javascript
+
+### Typing - Static vs Ducktyping
+
+* i was looking at [Bosque language](https://www.theregister.co.uk/AMP/2019/04/18/microsoft_bosque_programming_language/) and they talk about reference equality problems
+* how ambiguities can arise if two references point to the same memory
+
+* there is one case in my language that seems similar
+* alias variables, eg `foo: (cond) ? a else b`
+* somewhere you have to be worried about changing types as well
+
+
+* type systems force people to know what types are accepted beforehand
+* eg if you do
+
+		ArrayList<Toy> toys = new ArrayList<>();
+
+* then you can only insert items that are of type `Toy` or extend `Toy`
+* then there is a static set of types that can be used
+* reminds me of the chest example
+	* see section "Combiners, Insertion and Privacy"
+
+* wheras with ducktyping, as long as you implement the correct methods/properties, it will work
+* this allows people to dynamically create "new types", and use them
+* the source doesn't have a pre-defined list of compatible types
+* its dynamic
+
+* actually this is wrong, even in statically typed languages, you can dynamically create a new compatible type
+* like in Java, you can dynamically create an anonymous class that extends `Toy`, and it will work
+
+* static typing seems to be more about,
+* running some basic checks on the input objects beforehand
+* so when you create `function (Toy t)`, it won't just accept any old object
+* it makes sure that the object has type `Toy`
+* and there is a set of rules on how an object's `type` property is determined (you can't just set it yourself, you have to "extend" the parent object)
+
+* maybe we can do something similar
+
+
+
+mixins
+can you combine objects to so that the result object has multiple types?
+I guess you are guaranteed no collisions if the objects use symbol properties
+what if the parent objects have private behavior
+does this violate privacy/security somehow?
+
+### Making the Case for Reference Equality
+
+* I looked a bit more into [Bosque's arguments against reference equality](https://github.com/Microsoft/BosqueLanguage/blob/master/docs/language/overview.md#011-equality-and-representation)
+* it seems like they are really just pushing for [more useful equality comparisons](https://github.com/Microsoft/BosqueLanguage/blob/master/docs/language/overview.md#5.21-Equality-Comparison)
+* basically it seems like they are saying that, many places that use reference equality would be better suited to use something else, like value comparison
+* for example, if you were comparing two arrays, its more useful to compare the values in the array, then check if they are the same "reference"
+* the idea is that, when you inspect or compare an object, you shouldn't think in terms of memory locations or addresses or other computer-hardware concepts
+* you should define some concept of "value"
+* so that even if two objects have different addresses, as long as they have the same value, they are "equal"
+* basically it seems like Bosque forces you to define a "value" property for all custom classes/objects
+
+* I personally don't think of "references" as memory locations
+* I think of them as a way to represent or capture a concept
+* when I create an object `foo: (...)`, I am creating a new concept called `foo`
+* and I can prescribe whatever relationships I want between `foo` and other objects
+* including a "value" property, if I wish
+* but by default, I can use reference equality to see if somebody is pointing to my `foo` object
+
+* I could use some sort of "deep value equality" algorithm to do comparisons
+* traverse through both objects, looking for primitive values and discarding circular references
+* but I don't think this should be the default
+* especially when, in a reactive language like mine, objects are constantly changing
+* you don't want two objects to be unequal one moment, and then equal the next
+	* just because some internal property changed
+
+* in addition, I don't create a distinction between primitives and other objects
+* whereas it seems like Bosque seems to treat primitives as some sort of fundamental source of equality
+* I treat primitives like any another object
+* they just happen to have predefined equality functions
+* but ultimately, those equality functions are rooted in reference equality as well
+* for example, take the numbers `1`, `2` and `3`
+* these objects exist as distinct concepts
+* it's up to us to define the relationships between them, that `1 + 2 = 3`
+
+* we sorta talked about this in "Objects as Property Keys II"
+* also, functional langs represent numbers and primitives using functions, similar concept
+
+* I think we also talked about similar ideas when talking about Symbols
+* because languages like Lisp allows creation of primitive Symbols
+* that represent abstract concepts, and use reference equality, just like objects in my language
+
+* the philosophy is, when you define a new object, you are by default creating a "new unique concept"
+* and you shouldn't worry about whether your new object might happen to contain the same primitive values as some other object in the world
+* every created object starts out as distinct
+* just like in the real world, where every physical object is different, even if they may look the same
+* whether or not we _treat_ them the same is up to us to define,
+	* and can be achieved by overriding the hash or equality operators of the objects
+
+
+* note: another way we can think of "deep equality" is
+* we look at the properties of the two objects, and compare
+* if a property points to the same address for both objects, then we continue
+* if the property points to different addresses, then we do a deep equality comparison on those two addresses
+* basically recurses whenever it sees unequal references
+* however, if two references are unequal, but at least one of the references points to an empty object (no properties)
+* then the original two objects are determined to be unequal
+* because remember, we use these empty objects to represent "primitive" concepts
+* like, `1` and `2` are both just empty objects
+
+* but here we can see how deep equality can be a problem
+* because what if we have private behavior
+* it would be a security/privacy concern if you could compare private behavior, that you can't see
+* you can take an arbitrary object, and check if it "equals" `3`, even if you can't see its value
+* so yet another reason why deep equality should not be the default
+
+### synchronization, external calls, and timeouts
+
+how can you synchronize a module if it contains an external call
+maybe it passes a collector
+you don't know how many times the external actor will insert into that collector
+maybe you pass a callback, you don't know how many times the external actor will call that callback
+maybe you are simply calling an external library function, but you don't know if the result might change
+	eg if there is private behavior, after you extract the result of the function call, it might still change after some time
+
+this seems related to the "inversion of control" problem with callbacks,
+	discussed earlier in the section "Iterables"
+
+perhaps we can leverage timeouts
+after a certain amount of time, you stop listening to changes
+perhaps this doesn't even need to be a special built-in mechanism
+if you do something like
+
+	foo: timestamp >>
+
+		collect: collector
+		externalApi1(collect)
+		externalApi2(collect)
+
+		=> collect.filter(insertion => insertion.timestamp < timestamp + 100))  // only return items that were inserted within 100 seconds
+
+then the interpreter can detect that insertions after 100 seconds will be ignored
+so it can return the synchronized result after 100 seconds
+kinda like how with iterables, since items are lazy evaluated, if you break out of a `for...of` loop it ignores all the rest of the elements
+	and they don't need to be computed
+
+is this even possible to detect?

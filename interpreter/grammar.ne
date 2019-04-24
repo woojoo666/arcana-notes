@@ -35,7 +35,8 @@ VarList		-> (%identifier ",":?):* %identifier					# commas optional, but no trai
 
 Statement	-> %identifier ":" Expression							# properties (TODO: support destructuring)
 			| "[" %identifier "]" ":" Expression					# dynamic keys (TODO: support destructuring)
-			| Item:+												# one or more non-comma-separated items
+			| Item:+												# one or more space-delimited list items
+			| Expression											# a single list item, can contain binary operators
 			| "tag" %tag											# declaring tags
 
 			| Object %propAccess %tag ":" Expression				# setting tags
@@ -47,9 +48,11 @@ Statement	-> %identifier ":" Expression							# properties (TODO: support destru
 			| "=>" Expression										# TODO: returns are not allowed to have commas beforehand,
 																	#       so this may need to be moved to the "Block" rule
 
-Item		-> Expression											# list items
+# TODO: update unary rules to follow the rules outlined in "Unary Operators and Ambiguity V"
+Item		-> Unary												# space-delimited list items must be unary expr (no binary ops)
 			| %identifier %period									# true statements
 			| %identifier "^^"										# shorthand property names
+			| ("..."|"…")Object										# spread operator
 
 # note: using Javascript operator precedence:
 #	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
@@ -66,7 +69,7 @@ Sum			-> Sum ("+"|"-") Product | Product
 Product		-> Product ("*"|"/"|"%") Exp | Exp
 Exp			-> Unary "**" Exp | Unary								# right associative
 
-Unary		-> ("!"|"!!"|"+"|"-") Object | Object					# ambiguous! see section "Unary Operators and Ambiguity"
+Unary		-> ("!"|"+"|"-") Unary | Object							# ambiguous! see section "Unary Operators and Ambiguity"
 
 
 Object 		-> "(" Block ")"										# creation
@@ -78,5 +81,7 @@ Object 		-> "(" Block ")"										# creation
 			| Object %propAccess %identifier						# notice, no private vars allowed
 			| Object %propAccess %tag
 			| Object "[" Block "]"									# computed property access
+
+			| Object -> "..."										# capture block
 
 			| %identifier | %string | %number
