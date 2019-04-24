@@ -18,7 +18,7 @@ let rules = {
 	rbracket: ']',
 
 	// there are 4 unary ops, !!, !, +, and -
-	// unary operators have to be preceded by whitespace/comma/openbrace, and followed by a word/openbrace
+	// unary operators have to be preceded by whitespace/operator, and followed by anything but a whitespace
 	// TODO: update unary rules to follow the rules outlined in "Unary Operators and Ambiguity V"
 	unary_op: /(?<=^|\s|\,|\(|\[)(\!\!|[!+-])(?=\w|\()/,
 

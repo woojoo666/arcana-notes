@@ -7791,6 +7791,18 @@ y=5 -2        % result: y = 3
 		1, ! ! 2, 3
 		4 + (! ! 5)   // enclose in parenthesis so now ! ops are at beginning of statement (note that + will strip the parenthesis)
 
+* note that the statement can only contain one object though
+		
+		! true | true    // illegal
+
+* this is because we can see how confusing it can get, it looks almost as if the `|` operator will go first, and the answer would be `false`
+* but in fact, since `!` has precedence, the answer will be `true`
+* thus, to prevent this confusion, you are only allowed to have a single unary object if you want to add spaces after an unary
+* this also makes the grammar much simpler, since it gets hard to encode rules for the "beginning of a statement" while maintaining unary operator precedence
+	* because a "beginning of a statement" rule would be towards the root of the tree, but unary operators are at the leaves, so trying to do both is ugly
+* if you want a binary expression and still have trailing spaces after a unary operator, you have to use braces
+
+		(! true) | true    // legal, and less confusing
 
 ### type casting?
 

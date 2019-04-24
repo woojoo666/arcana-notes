@@ -12,6 +12,21 @@ binaryTreeHeight: tree >>
 		node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // height based on heights of children
 
 	=> tree.#height   // return height of root node
+
+	// binary/unary op tests
+	1-2             // all_ops
+	1- 2            // all_ops
+	1 -2            // unary
+	1 - 2           // all_ops
+	1*-2
+	(1+2)-3
+	a | !!b
+	!!true          // unary
+	! ! true        // all_ops
+	foo(1 2)-3
+	fn(1 2)-> - 3   // all_ops
+	fn(1 2)-> -3    // unary
+	fn(1 2)->-3     // all_ops
 </textarea>
 <br>
 <button onclick="reset()"> go </button>
@@ -52,19 +67,15 @@ document.body.onload = () => {
 		lbracket: '[',
 		rbracket: ']',
 
-		// there are 4 unary ops, !!, !, +, and -
-		// unary ops can be after whitespace, openbrace, comma, operator, start-of-input
-		// unary ops cannot be after word, quote, -> operator, closed-brace, 
-		// unary operators have to be preceded by a whitespace/comma, and followed by a word/openbrace
-		// TODO: update unary rules to follow the rules outlined in "Unary Operators and Ambiguity V"
-		unary_op: /(?<=^|\W)(\!\!|[!+-])(?=\w|\()/,
+		// there are 3 unary ops: !, +, and -
+		// unary ops can be after whitespace or any operator
+		// in other words, they cannot be after a word, quote, "->", or any closed-brace (")","]","}")
+		// unary operators can be followed by anything but whitespace
+		// the first lookbehind checks for whitespace and operators, the second makes sure it isn't after a "->" operator
+		// note that the unary_op regex is not for catching unary ops at the beginning of statements, which can have whitespace
+		unary_op: /(?<=\s|[!+\-*/%<=>&|])(?<!\-\>)[!+-](?=\S)/,
 
-		bin_op: ['+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
-
-		operator:  /[\!\+\-\*\/\<\=\>\&\|]+/,  // capture all operator sequences, the grammar will detect invalid ones
-		// TODO: what about for "3*-2", the lexer will split it into "3" "*-" and "2", causing a syntax error.
-		//       Should we keep this behavior, and force the programmer to write "3 * -2" instead,
-		//       or should we maybe add special rules to interpret it the same as "3 * -2"
+		all_ops: ['!','+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
 
 		colon: ':',
 		propAccess: /\.(?=\w|\#)/,
