@@ -11,8 +11,22 @@ Video DEMO/tutorial Notes
 6. tree example
 
 
+insertion
+basically like created a dropbox for other people to put stuff in
+as far as I am aware, there are no other languages that don't support assignment, but do support insertion
+shows the difference between axis and others
+axis allows for side effects, but they have to be unordered
+pushes for unordered
+
 
 students example:
+
+notice how it doesn't execute linearly like in imperative
+instead of thinking in terms of linear execution
+(show animation of highlighting lines of code from top to bottom, like linear execution)
+we think of objects as existing in space, and they can interact with eachtoher freely
+(show animation of first, variable names spreading out across the canvas and all other syntax disappearing,
+and then rearrange the variable names and add connections/arrows depicting reads and writes)
 
 
 tree example:
@@ -29,6 +43,21 @@ we define data and relationships
 we define a bank of data
 and we can combine data together to define more data
 and we build this bank of data step by step
+
+
+why is unordered important
+imagine you give your friend a shopping list
+instead of asking your friend the order in which to buy objects
+you just ask them to buy the objects
+
+powerset example?
+
+helps for optimization
+say you actually only use certain objects from the shopping list
+and ignore other items
+the interpreter can tell the friend that they don't need to retrieve the ignored items
+
+the less you specify, the more you can optimize
 
 
 2nd video:
