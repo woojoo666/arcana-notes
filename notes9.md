@@ -7538,14 +7538,14 @@ what about `foo[bar(10)]`
 
 ### Unary Operators and Ambiguity
 
- * `a-b` can be interpretted as:
+ * `a-b` can be interpreted as:
 	* two list items with one unary operator: `a, -b`
 	* one item created from a binary operator: `a - b`
 
 * intuitively:
-	* `a-b` should be interpretted as a single item
-	* `a -b` should be interpretted as two items
-	* `a - b` should be interpretted as a single item
+	* `a-b` should be interpreted as a single item
+	* `a -b` should be interpreted as two items
+	* `a - b` should be interpreted as a single item
 
 * actually, this is how matlab/octave handles it (using [octave-online](https://octave-online.net/) to test:
 
@@ -7620,15 +7620,15 @@ then the token is parsed via these rules:
 * if there are multiple operator tokens, the first is determined by the rules above, all the rest are considered unary operators
 
 
-* hmm that means something like `[1 -+2]` would be interpretted like `[1, -2]`
+* hmm that means something like `[1 -+2]` would be interpreted like `[1, -2]`
 * and it is! tested with octave-online
 
-* what about `[1 -+ 2]`? this is also interpretted like `[1, -2]`, as predicted
+* what about `[1 -+ 2]`? this is also interpreted like `[1, -2]`, as predicted
 * because the first largest-valid operator, `-`, has no whitespace after, so it is considered a unary operator
 * and since `+` is the second successive operator it is automatically considered a unary operator
 
-* what about `[2 *- 3]`? as predicted, it is interpretted as `[-6]`, because even though `*` has no trailing whitespace,
-* 	it can't be a unary operator, so it is interpretted as a binary op
+* what about `[2 *- 3]`? as predicted, it is interpreted as `[-6]`, because even though `*` has no trailing whitespace,
+* 	it can't be a unary operator, so it is interpreted as a binary op
 
 * what about `[2!1]`? as predicted, it gives an error, since `!` has no leading whitespace it is considered a binary op, which fails
 
@@ -7683,7 +7683,7 @@ y=5 -2        % result: y = 3
 * actually, according to our rules, properties have to be preceded and followed by commas or newlines
 * so `foo: 1 -2` has to be parsed as a single property
 
-* it can still be confusing if we have expressions in space-delimited lists
+* it can still be confusing if we have expressions in space-delimited lists, aka "spaced lists"
 
 		x: (1 * (2-3) -4 *5)
 
@@ -7695,7 +7695,7 @@ y=5 -2        % result: y = 3
 
 
 * perhaps the rule we should use is,
-* space-delimited lists can only contain objects or unary expressions, eg
+* spaced lists can only contain objects or unary expressions, eg
 
 		x: (1 2 -3 4 -5)
 
@@ -7719,13 +7719,13 @@ y=5 -2        % result: y = 3
 
 * or maybe we should make it illegal to mix spaces and commas
 * eg `foo: combine(10 20 30, x: "hello", y: "world")`
-* or maybe we should make it so you can only have one space-delimited 
+* or maybe we should make it so you can only have one spaced list
 
 * or maybe we should just use brackets `[]` for lists
 * this would free up braces `()` for grouping
 * however, it would prevent one from mixing list items and properties
 
-* or maybe if you want to use binary ops in space-delimited lists, you can't use spaces
+* or maybe if you want to use binary ops in spaced lists, you can't use spaces
 * eg
 	
 		(1*2 3+4 -5)
@@ -7733,7 +7733,7 @@ y=5 -2        % result: y = 3
 ### Unary Operators and Ambiguity V - Revised Rules to Resolve Ambiguity
 
 * actually I think no matter how we design these rules it will be sorta confusing
-* whether we allow binary operators in space-delimited lists, or not
+* whether we allow binary operators in spaced lists, or not
 * or if the presence of a binary op automatically makes the entire thing an expression
 
 * either way, what's important is that it's always possible to make it unambiguous and not confusing
@@ -7748,7 +7748,7 @@ y=5 -2        % result: y = 3
 
 * this is clear and unambiguous
 
-* when it comes to space-delimited lists, I think I'll just use octave's rules
+* when it comes to spaced lists, I think I'll just use octave's rules
 * with a few small tweaks
 
 * something I don't like about octave's rules is that it depends on the operator
@@ -7781,15 +7781,17 @@ y=5 -2        % result: y = 3
 * recall that matlab/octave treats every operator after the first one as a unary operator
 * this makes sense, as you can't have multiple binary operators anyways
 
-* however, I think it looks confusing if you have unary operators with leading and trailing whitespace, that look like binary ops
+* however, I think it looks confusing if you have these "spaced unary operators", that look like binary ops
 * again, I think if it depends on spacing, it shouldn't depend on anything else
 * so if you have leading and trailing whitespace then it is a binary op
-* something like `1 !!2`, the first `!` op is unary because leading but no trailing, and all following ops cannot have whitespace otherwise they will be considered binary
-* the only time you are allowed spaces after unary ops, is at the beginning of a statement
+* something like `1 !!2`, the first `!` op is unary because leading but no trailing, and all following ops also have no trailing whitespace
+* the only time you are allowed spaces after unary ops, is at the beginning of a statement/expression
 * eg
 
 		1, ! ! 2, 3
 		4 + (! ! 5)   // enclose in parenthesis so now ! ops are at beginning of statement (note that + will strip the parenthesis)
+
+		x: ! ! 5      // can be at the beginning of an Expression too
 
 * note that the statement can only contain one object though
 		
@@ -7798,11 +7800,240 @@ y=5 -2        % result: y = 3
 * this is because we can see how confusing it can get, it looks almost as if the `|` operator will go first, and the answer would be `false`
 * but in fact, since `!` has precedence, the answer will be `true`
 * thus, to prevent this confusion, you are only allowed to have a single unary object if you want to add spaces after an unary
+* these are called **spaced-unary expressions**
 * this also makes the grammar much simpler, since it gets hard to encode rules for the "beginning of a statement" while maintaining unary operator precedence
 	* because a "beginning of a statement" rule would be towards the root of the tree, but unary operators are at the leaves, so trying to do both is ugly
-* if you want a binary expression and still have trailing spaces after a unary operator, you have to use braces
+	* put another way, when we parse unary operators at the leaves of the parse tree, it's hard to tell if we are at the beginning or middle of an expression
+* if you want a binary expression with spaced unary operators, you have to use braces
 
 		(! true) | true    // legal, and less confusing
+
+### Spaced Lists vs Comma/Newline Delimited Lists
+
+* notice that spaced-unary expressions are the only difference between space-delimited lists, and comma/newline delimited lists
+* in comma/newline delimited lists, you can have spaced-unary expressions
+
+		(- 10, - 20, - 30)
+
+* in space-delimited lists, you cannot
+
+		(- 10 - 20 - 30)   // illegal, first operator is interpreted as binary, but has no left-hand-side
+		( -10  -20  -30)   // legal
+
+### Unary Operators and Spaced Unary Objects - Mechanism Brainstorm
+
+* to summarize, there are two places we can have unary operators
+
+* inside an expression, an unary operator must:
+	1. be preceded by a whitespace or operator
+	2. have zero trailing whitespace
+
+* eg `1 -2 !!3` is interpreted as `1, -2, !(!3)`
+
+* for a "spaced-unary object", you can use spaced unary operators if there is only a single operand, eg
+
+		! ! true
+
+* for expressions, we have to detect that in the lexer, as it depends on whitespace
+* luckily it is not too hard to do so, we can use the following regex (explained in the next paragraph):
+
+```js
+unary_op: /(?<=^|\s|[!+\-*/%<=>&|])(?<!\-\>)[!+-](?=\S)/
+```
+
+* basically, use first lookahead to make sure it is after whitespace/operator, and second lookahead to make sure it _isnt_ after the `->` operator,
+* however, lookbehind isn't properly supported in many browsers, so there is another method,
+	* that is perhaps even more robust but requires some postprocessing in the lexer
+* basically, every time the lexer reaches an operator token, check if the previous token was a whitespace or operator
+* this is more robust than using a regex because we already have a well-defined set of operators in the `operators` regex of the lexer
+* we don't have to do the weird double look-behind thing
+
+* as for spaced-unary expressions, we can check that easily in the grammar
+* just use a rule like `Expression -> Unary`
+
+* though hmm I can actually detect it in the lexer using regexes
+* just check if the previous non-whitespace token was an open brace (`(` `[` or `{`), a colon `:`, a comma, a `<:`, or a newline (for non-braced blocks)
+	* actually there are a few more cases where `Expression` shows up in the grammar, check `grammar.ne`
+* being able to detect it using simple regex is advantageous, because many syntax highlighters use regex
+
+* note that with this rule, I can also easily detect spaced unary operators at the beginning of an expression, even if the expression has binary operators
+* eg something like
+
+		! true & true
+
+* we talked earlier about how such a thing can be confusing, but I also don't want to restrict the programmer too much
+
+* actually, one major complication is if-statements, because they are formatted like `if (Expression) Expression else Expression`
+* notice how here, we have an expression after a closed brace, so we could do
+	
+		if (cond) ! ! foo
+
+* but normally, after a closed brace, you are not allowed to have unary operators with trailing whitespace
+
+		(1 + 2) ! foo   // illegal, unary operator with trailing whitespace in the middle of an expression
+
+* this is a big challenge because we have to start detecting brace level
+
+		if ((((((...)))))) ! ! foo    // legal or illegal? did we close all the braces?
+
+* surprisingly, it seems like sublime-text's syntax highlighting is robust enough to tell the difference
+
+```js
+if (1+(2)) -3;   // -3 detected as a unary operator and number
+if (1+(2)  -3;   // -3 detected as a binary operator and number
+```
+
+* I checked the documentation for [syntax highlighting in sublime](http://www.sublimetext.com/docs/3/syntax.html),
+* and it seems like they use a stack method for pushing/popping "contexts", eg the "string context" or "if-else context"
+* thus, this is pretty much the same as using a grammar (since push-down automata and grammars are equivalent)
+
+* thus, it seems like I do have to use a grammar if I want to support spaced unary operators for all `Expression`s
+* however, that isn't a problem when it comes to syntax highlighting, because syntax highlighters seem to support context-free languages
+
+* still leaves the question of whether or not to allow spaced unary operators in front of any expression, or just single operand expressions
+* while it is a bit complicated to parse spaced unary operators in front of any expression, we don't want to restrict the programmer
+* what happens with something like this:
+
+		(- 2 -3)
+
+* is it a list of two items? but then it wouldn't be an expression, so you wouldn't be allowed to have spaced unary operators right?
+* what about something like
+
+		(- 2 - 3)
+
+* ambiguous, this can be interpreted as `(Unary Unary)` or `(Unary Binop Object)`
+* it gets complicated because, with our current grammar, a `Statement` can be made up of multiple `Item`s, and an `Item` can be an expression
+* so you can have multiple spaced expressions
+* and if each one of them can have spaced unary operators, you end up with ambiguity, as shown above
+
+### Unary Operators - Spaced Expressions vs Spaced Unary Objects
+
+* so I think we have to change the rules a bit
+* first, parsing spaced unary operators in front of expressions with binary operators, gets too complicated
+	* we can't do it in the lexer because of if-statements
+	* and doing it in the grammar is ugly, as mentioned earlier
+* in addition, we have to distinguish between the `Expression` objects in spaced lists, and the `Expression` objects everywhere else
+* because in spaced lists, you can have multiple spaced expressions, but they aren't allowed to turn into spaced-unary expressions
+* but everywhere else, you can turn an `Expression` into a spaced-unary object
+* thus, for spaced lists we introduce a `SpacedExpr` non-terminal
+	* these are not allowed to have spaced unary operators
+* `Statement` objects are allowed to turn into a single `SpacedUnary`, or multiple `SpacedExpr` (for lists)
+* `Expression` objects in if-statements and property definitions and such, are allowed to turn into a single `SpacedUnary` or a single `SpacedExpr`
+
+* in a `SpacedExpr`, all unary operators must:
+	1. be preceded by a whitespace or operator
+	2. have zero trailing whitespace
+
+* in a `SpacedUnary`, there can only be a single operand, but it can have spaced unary operators
+
+* notice that a single operand with no spaced unary operators, can be interpreted as both a `SpacedExpr` and a `SpacedUnary`
+
+		(-30)     // can be a SpacedExpr because the unary follows spacing rules, but can also be a SpacedUnary because there are no binary operators
+
+* technically it doesn't matter, especially because Nearley grammars are allowed to be ambiguous, but I'd still like to keep it unambiguous
+
+```
+-30+1   // Expression
+-30     // SpacedUnary or Expression
+- -30   // SpacedUnary
+- -30+1 // illegal
+```
+
+* two ways to resolve the ambiguity
+	1. separate into `UnaryExpr` (expression with one operand) and `BinExpr` (expression with multiple operands)
+	2. separate into `SpacedUnary` (has at least one spaced unary operator) and `Expression` (no spaced unary operators)
+
+* I prefer the second option, because spaced unary operators is an extra feature, so I want to keep it as separate as possible
+
+### Unary Operators - Detecting the First Unary Operator
+
+* imagine if we didn't have spaced unary operators
+* what happens with
+
+		if (cond)-30+1 else (5 - 1)
+
+* this is technically valid
+* but the `-` will be interpreted as a binary op
+* but in the grammar we have
+
+		Unary -> %unary_op Unary | Object
+
+* we can't just change it to 
+
+		Unary -> %unary_op Unary | ("!"|"+"|"-") Unary | Object
+
+* because now, while it will capture that leading binary `-` as an unary,
+	* it might also capture the second `-` as unary, and interpret `(5 - 1)` as `(5, -1)`
+
+* maybe we can just enforce leading spaces in this case as well
+
+		if (cond) -30+1 else (5 - 1)
+
+* but I think its key to note that, as of now our rules are _not_ ambiguous
+* from spacing rules, we can determine whether ops are unary or binary, and can figure out the grouping of list items, eg:
+
+		2 -3 -4 * 5 - 6 +7
+
+* becomes
+
+		{2}  {-3}  {{-4*5}-6}  {+7}
+
+* the only complication is with unary operators on the very first operand
+* even if we ignore spaced unary operators, the first unary operator doesn't have to follow spacing rules
+* it can have zero leading whitespace
+* as shown in the if-statement example earlier in this section
+* in most cases, we can check if it is at the beginning of an expression by checking for the preceding character
+* if it's not preceded by whitespace, it can be preceded by `:`, `<:`, `,`,`in`, any open bracket, or a newline
+* the only case that is not accounted for is if-statements, where the expression can directly follow the conditional block
+* the problem is, the lexer can't distinguish between a conditional block `(cond)`, and an object `(object definition)`
+* eg
+
+		if (cond)-30   // "-" is unary, start of expression
+		(1+2)-30       // "-" is binary, not start of expression
+
+* I am actually considering making conditional blocks like
+
+		if cond ? trueBranch else falseBranch
+
+* in that case, we can just check if the preceding operator is `?`
+	* sidenote: you can also use a similar syntax for ternaries, eg `someProp: cond ? trueBranch else falseBranch`
+
+* however, it's also important to note that we _can_ check if an operand is the first operand of an expression, without relying on preceding operators
+* we can do it in the grammar
+* it is just a bit ugly
+* basically, for every binary op rule that looks something like:
+
+			And -> And "&" Eq | Eq
+
+* we would have to change it to
+
+			FirstAnd -> FirstAnd & Eq | FirstEq
+			And -> And "&" Eq | Eq
+
+* in essence, we split every non-terminal into two, one that represents the beginning of the expression, and one for everywhere else
+* it is designed such that no matter how you expand `Expression` into these non-terminals,
+* you will always have exactly one `First___` non-terminal on the leftmost side
+
+* there is actually one final option for parsing `if (...) Expression` statements
+* because nested blocks are extracted and parsed separately (due to modular parsing), we are actually guaranteed that all braced blocks are only one level deep
+* so it will actually look something like
+
+		if ( BLOCK_19 ) Expression
+
+* I didn't want to leverage this fact because I wanted my grammar to be compatible with non-modular parsing (which would have arbitrarily deeply nested block)
+* however it seems like for now, this is the cleanest way to do it
+* which is important because the syntax may change, and I don't want to complicate things this early
+
+* thus, we can use a simple regex to check if the current operator is preceded by an if-statement, eg this regex `/if\s*\(.+\)/`
+* we can also check this in the lexer, by keeping track of the previous few tokens if they match the structure of an if-statement
+
+* note that we could also use this to detect spaced unary operators and convert them to regular unarys
+* this would allow us to handle leading spaced unarys even for binary expressions, eg `! ! x | y`
+* however, I still don't like the idea of the rules for unary operators changing when at the beginning vs middle of an expression
+* for now I'll still restrict spaced unary operators to single operand expressions
+* and we can always relax that restriction later
+* it's better to start with a restriction and relax it later
+* than add restrictions later (because it could prevent backward compatibility)
 
 ### type casting?
 

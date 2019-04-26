@@ -17,12 +17,15 @@ let rules = {
 	lbracket: '[',
 	rbracket: ']',
 
-	// there are 4 unary ops, !!, !, +, and -
-	// unary operators have to be preceded by whitespace/operator, and followed by anything but a whitespace
-	// TODO: update unary rules to follow the rules outlined in "Unary Operators and Ambiguity V"
-	unary_op: /(?<=^|\s|\,|\(|\[)(\!\!|[!+-])(?=\w|\()/,
+	// there are 3 unary ops: !, +, and -
+	// unary ops can be after whitespace or any operator
+	// in other words, they cannot be after a word, quote, "->", or any closed-brace (")","]","}")
+	// unary operators can be followed by anything but whitespace
+	// the first lookbehind checks for whitespace and operators, the second makes sure it isn't after a "->" operator
+	// note that the unary_op regex is not for catching unary ops at the beginning of statements, which can have whitespace
+	unary_op: /(?<=\s|[!+\-*/%<=>&|])(?<!\-\>)[!+-](?=\S)/,
 
-	operator:  /[\!\+\-\*\/\<\=\>\&\|]+/,  // capture all operator sequences, the grammar will detect invalid ones
+	all_ops: ['!','+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
 
 	colon: ':',
 	propAccess: /\.(?=\w|\#)/,

@@ -14,19 +14,26 @@ binaryTreeHeight: tree >>
 	=> tree.#height   // return height of root node
 
 	// binary/unary op tests
-	1-2             // all_ops
-	1- 2            // all_ops
-	1 -2            // unary
-	1 - 2           // all_ops
-	1*-2
-	(1+2)-3
-	a | !!b
-	!!true          // unary
-	! ! true        // all_ops
-	foo(1 2)-3
-	fn(1 2)-> - 3   // all_ops
-	fn(1 2)-> -3    // unary
-	fn(1 2)->-3     // all_ops
+	1-2             // maybe_unary
+	1- 2            // maybe_unary
+	1 -2            // unary_op
+	1 - 2           // maybe_unary
+	1*-2            // maybe_unary, unary_op
+	1 * - 2         // maybe_unary, maybe_unary
+	(1+2)-3         // maybe_unary, maybe_unary
+	-3              // unary_op
+	(-3)            // maybe_unary
+	a | !!b         // maybe_unary, unary_op, unary_op
+	!true           // unary_op
+	!!true          // unary_op, unary_op
+	! ! true        // maybe_unary, maybe_unary
+	foo(1 2)-3      // maybe_unary
+	fn(1 2)-> - 3   // maybe_unary
+	fn(1 2)-> -3    // unary_op
+	fn(1 2)->-3     // maybe_unary
+
+
+	if ( BLOCK_19 )-1+2 else-3+4    // unary_op, maybe_unary, unary_op, maybe_unary
 </textarea>
 <br>
 <button onclick="reset()"> go </button>
@@ -45,8 +52,26 @@ function reset() {
 	console.log('input: ' + input);
 }
 
+let last_token = null;
+
 function next() {
-	console.log(lexer.next())
+	let token = lexer.next();
+	console.log(token)
+
+	// TODO: add checks for beginning of expression detection
+	if (token.type == 'operator'
+			&& (last_token == null || last_token.type == 'WS' || last_token.type == 'operator')) {
+
+		token.type = 'unary_op';
+	} else if (token.text.match(/[!+\-]/)) {
+		// note that it could be unary or binary, just using this to distinguish
+		// _possible_ spaced unary ops from binary ops
+		token.type = 'maybe_unary';
+	} else {
+		token.type = 'binary_op'
+	}
+
+	last_token = token;
 }
 
 document.body.onload = () => {
@@ -67,15 +92,7 @@ document.body.onload = () => {
 		lbracket: '[',
 		rbracket: ']',
 
-		// there are 3 unary ops: !, +, and -
-		// unary ops can be after whitespace or any operator
-		// in other words, they cannot be after a word, quote, "->", or any closed-brace (")","]","}")
-		// unary operators can be followed by anything but whitespace
-		// the first lookbehind checks for whitespace and operators, the second makes sure it isn't after a "->" operator
-		// note that the unary_op regex is not for catching unary ops at the beginning of statements, which can have whitespace
-		unary_op: /(?<=\s|[!+\-*/%<=>&|])(?<!\-\>)[!+-](?=\S)/,
-
-		all_ops: ['!','+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
+		operator: ['!','+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
 
 		colon: ':',
 		propAccess: /\.(?=\w|\#)/,

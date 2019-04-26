@@ -35,8 +35,8 @@ VarList		-> (%identifier ",":?):* %identifier					# commas optional, but no trai
 
 Statement	-> %identifier ":" Expression							# properties (TODO: support destructuring)
 			| "[" %identifier "]" ":" Expression					# dynamic keys (TODO: support destructuring)
-			| Item:+												# one or more space-delimited list items
-			| Expression											# a single list item, can contain binary operators
+			| SpacedItem:+											# one or more space-delimited list items
+			| SpacedUnary											# a single spaced-unary object
 			| "tag" %tag											# declaring tags
 
 			| Object %propAccess %tag ":" Expression				# setting tags
@@ -48,8 +48,7 @@ Statement	-> %identifier ":" Expression							# properties (TODO: support destru
 			| "=>" Expression										# TODO: returns are not allowed to have commas beforehand,
 																	#       so this may need to be moved to the "Block" rule
 
-# TODO: update unary rules to follow the rules outlined in "Unary Operators and Ambiguity V"
-Item		-> Unary												# space-delimited list items must be unary expr (no binary ops)
+SpacedItem	-> Or													# note that spaced list items cannot be SpacedUnary objects
 			| %identifier %period									# true statements
 			| %identifier "^^"										# shorthand property names
 			| ("..."|"…")Object										# spread operator
@@ -57,7 +56,8 @@ Item		-> Unary												# space-delimited list items must be unary expr (no bi
 # note: using Javascript operator precedence:
 #	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
 
-Expression	-> Or													# starting from lowest precedence
+Expression	-> Or													# operator expression, starting from lowest precedence
+			| SpacedUnary											# any expression can also be a single spaced-unary object
 
 Or			-> Or "|" And | And
 And			-> And "&" Eq | Eq
@@ -69,8 +69,9 @@ Sum			-> Sum ("+"|"-") Product | Product
 Product		-> Product ("*"|"/"|"%") Exp | Exp
 Exp			-> Unary "**" Exp | Unary								# right associative
 
-Unary		-> ("!"|"+"|"-") Unary | Object							# ambiguous! see section "Unary Operators and Ambiguity"
+Unary		-> %unary_op Unary | Object
 
+SpacedUnary		-> ("!"|"+"|"-") SpacedUnary | Object
 
 Object 		-> "(" Block ")"										# creation
 			| "template":? Params:? "{" Block "}"					# creation
