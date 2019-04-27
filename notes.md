@@ -1866,9 +1866,7 @@ dynamicBind('reversedFoo', {input: 'foo'}, ['foo.length'], reverseModule);
 * thus we need a default case????
 
 
-
-* no binding means undefined value
-
+### no binding means undefined value
 
 
 * in imperative languages, we defined a bunch of statements that execute in sequence

@@ -2193,6 +2193,7 @@ the important thing is that there _is_ a designated property
 * and how it seems to clash with default values
 * important to note because, if we include currying, then accessor pattern isn't enough to represent functions using objects & property access
 * however, eventually I decide to get rid of currying and stick with default values
+	* see section "Choosing Default Values Over Currying"
 
 * go through a reduction phase
 * trying to figure out if we need both objects and functions (this was also motivated by my exploration of parametized references, but that can be ignored for now)

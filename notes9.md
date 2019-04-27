@@ -8223,3 +8223,236 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 * and we can always relax that restriction later
 * it's better to start with a restriction and relax it later
 * than add restrictions later (because it could prevent backward compatibility)
+
+### If Statements vs Ternary Expressions
+
+(continued from previous section, "Unary Operators - Detecting the First Unary Operator")
+
+* actually, I don't think there is a problem with detecting the first unary operator in if-statements
+* because actually, I think if-statements should be made up of `Statement`s, not `Expression`s
+* so the grammar rule would look like
+
+		Statement ::= if (Expression) Statement else Statement
+
+* whereas ternary expressions do use `Expression`s
+
+		Expression ::= Expression ? Expression else Expression
+
+* thus, if we had an object like so:
+
+		conditionals: cond >>
+			if (cond) foo: 10 else foo: 20  // legal
+			if (cond) 10      else 20       // resolves to statements (0: 10) or (0: 20)
+			bar: if (cond) 10 else 20       // illegal
+
+		ternaries: cond >>
+			cond ? foo: 10 else foo: 20     // illegal
+			cond ? 10      else 20          // resolves to list items
+			bar: cond ? 10 else 20          // legal
+
+* notice that `if (cond) 10 else 20` resolves into `if (cond) 0: 10 else 0: 20`, before inserting those statements into the parent object
+* whereas the ternary `cond ? 10 else 20` just returns those values to the parent object, who will assign the index dynamically like any other list item
+
+* in addition, because `if (cond) 10 else 20` is valid syntax, we can see that it actually doesn't solve our issue with detecting first unary operators
+* because you can still have `if (cond)-10`
+
+* maybe we should make it illegal to put anonymous values/expressions in if-statements, because it is frankly very confusing
+* this: `if (cond) 10 else 20`, turning into this: `if (cond) 0: 10 else 0: 20`, is very unintuitive behavior...
+
+### Inverse If Statements
+
+* maybe we can have a different format for If-statements, something like
+
+		school: "open" if (not snowing) else "closed"
+
+* this feels more natural, since in english we would say "the school is open if it is not snowing, otherwise it is closed"
+* notice how it puts focus on the "default" state of `open`
+* normally, we might do something like
+
+		school: snowing ? "closed" else "open"
+
+* we put `closed` first because that was we don't need to negate `snowing`
+* however, intuitively, the default state is actually `open`
+* so we should put focus on that, by inverting the `snowing` condition and putting it afterwards to get what we had previously:
+
+		school: "open" if (not snowing) else "closed"
+
+* this idea of putting focus on the default state, and then relegating alternate states, was an idea also explored with metaprogramming
+* in the section "Metaprogramming and Version Control, Mods, Plugins, etc",
+* we talk about how metaprogramming can be used to abstract away edge cases
+
+* so in this case, in the top-level overview of the program, you only see
+
+		school: "open"
+
+* everything else, the condition and the "else" branch, is hidden
+
+### Partial Evaluation and Partial Application
+
+* what would be cool is, if you provide some inputs for a function/object, but not all of them
+* then the result object evaluates as much as it can, and displays how the behavior depends on remaining inputs that you haven't provided yet
+* kinda like "partial evaluation"
+* for example, lets say you defined an object `weatherCond` and then extended it with the object `today`
+
+		weatherCond: snowing, temp >>
+			school: not snowing ? "open" else "closed"
+			students: school = "closed" ? "happy" else "sad"
+
+			tempSummary: temp > 95 ? "hot"
+					else temp > 75 ? "warm"
+					else temp > 65 ? "room temp"
+					else temp > 55 ? "chilly"
+					else             "cold"
+
+		today: weatherCond
+			location >>
+			snowing: false
+			temp: location = "indoors" ? 75 else 50     // indoor temperature is room temperature
+
+* then if you try to "inspect" or "print" `today`, you will see
+
+		today: location >>
+			school: "open"
+			students: "sad"
+
+			tempSummary: location = "indoors" ? "room temp" else "cold"
+
+* note that since Axis is prototypal, `today` is an object not a template,
+* and `location` has a value of `undefined`
+* so if you try to access `today.tempSummary`, it will return `"cold"` because `location = "indoors"` will evaluate to false
+
+* also note that this is different from the currying, partial application, and how Nylo handles incomplete arguments
+	* see section "Currying and Returns"
+	* also see [partial application](https://en.wikipedia.org/wiki/Partial_application)
+* because the behavior of the function isn't dependent on what values are provided
+	* this concept is discussed in section "Choosing Default Values Over Currying"
+* with currying, if some arguments are undefined, the function returns another function ( a partially evaluated version )
+* so that you can provide the remaining arguments
+* eg
+
+		fn: a b >>
+			=> a+b
+
+		x: fn(3 5)  // extracts the return value, and returns 3+5, aka 8
+		y: fn(3)    // incomplete arguments, so returns a function
+		z: y(5)     // extracs the return value, and returns 8
+
+* however in the case we are discussing, calling the function always extracts the return value, but in some cases the return value is undefined
+* and if you wanted to provide more arguments, you would have to call/clone the original function, not the extracted return value
+* though...maybe you could? cloning the extracted return value and providing arguments, could be like overriding a nested level and providing arguments
+	* mentioned in section "Implicit Inputs/Functions and Bounding Scope II"
+* eg:
+
+		foo:
+			bar:
+				result: fn(a,b)
+
+		foo(a: 10, b: 20).bar.result   // this works
+		foo.bar(a: 10, b: 20).result   // this works
+
+		foo.bar.result(a: 10, b: 20)   // so what about this?
+
+* no, you can see why it doesn't work
+* difference between function and value
+	* mentioned in a previous section, "Program vs Data"
+* `result` points to the value of `fn(a,b)`
+	* when you clone `result` you clone the value
+* `foo.bar` contains the behavior of the expression `fn(a,b)`
+	* when you clone `foo.bar` you clone the behavior, you are cloning the function call, not the function result
+
+### Partial Application and handling `undefined`
+
+(continued from previous section, "Partial Evaluation and Partial Application")
+
+* recall that in the `weatherCond` example of the previous section, we had the snippet
+
+		tempSummary: location = "indoors" ? "room temp" else "cold"
+
+* `location` is unbound, and thus `undefined`, so `location = "indoors"` will evaluate to false, and `tempSummary` will evaluate to `"cold"`
+* but it feels weird for `tempSummary` to have the value `"cold"`, even though we haven't provided a `location` yet
+* maybe we should make any function/operator that depends on `undefined`, to be undefined as well
+* this includes `=`
+* so if one input is undefined, it spreads throughout the rest of the network
+* the only way to stop the propagation is to "capture" it with a special statement `if (x = undefined)` or maybe `if (x exists)`
+* kinda like catching errors in imperative languages
+
+* we actually talked about this wayyy earlier
+* see section "no binding means undefined value" and "Undefined Inputs"
+* we even talked about it as early as section "Dangling Deep Property Bindings and Entry Nodes"
+	* I think the idea was, in a network of bindings, if a conditional binding block is disabled, then you might end up with "dangling nodes"
+	* aka nodes whose inputs aren't bound to anything, a disjoint graph
+	* by default, all of these nodes and values in this graph, would instantly become `undefined`
+	* unless there was an `if undefined` module, which can create a defined value from an undefined input
+
+* i mean this idea sort of makes sense
+* we can't evaluate `x = "something"` if `x` is undefined, because when we do end up defining`x`, we could give it the value `"something"`
+* a function doesn't know how to handle `undefined` inputs, unless it specifically addresses  `undefined` values, eg using an `if undefined` block
+
+* though at the same time, it does feel like `=` and equality is sort of special
+* if `x` is undefined, then there is no way it can `=` something that is defined
+* but what about two things that are undefined? are they equal?
+
+* in the early section "Undefined Inputs" we concluded that `undefined` should be treated like any other symbol
+* so when you do `x: undefined`, it creates a pointer to the symbol `undefined`
+* and if you do `if (x = undefined)` it simply checks for reference equality, makes sure it's pointing to the same address as `undefined`
+
+* it seems like there are two ways of thinking about `undefined` variables
+* one, is to simply treat them as a value
+* so for:
+
+		tempSummary: location = "indoors" ? "room temp" else "cold"
+
+* if you print `tempSummary`, it will print `cold` because `location` is not equal to `"indoors"`
+* but the other way is to treat them as a _potential_ value, and see what potential behaviors can come as a result
+* to treat them as a variable that doesn't have a value _yet_
+* in that case, if you print out `tempSummary`, it will print out the entire behavior `location = "indoors" ? "room temp" else "cold"`
+
+* though if you think about it, values don't have to be undefined for us to speculate about potential behavior
+* eg from the `weatherCond` example in section "Partial Evaluation and Partial Application", if we wanted to we could display `today` as
+
+		today: location >>
+			school: "open"
+			students: school = "closed" ? "happy" else "sad"
+			tempSummary: location = "indoors" ? "room temp" else "cold"
+
+* this shows the different behaviors that can occur if we override `today.school`
+* so displaying potential behavior is not dependent on which inputs are defined and which aren't
+* which inputs to evaluate, and which to keep unevaluated, is rather arbitrary
+
+### Partial Application and Symbolic Execution
+
+(continued from previous section, "Partial Application and handling `undefined`")
+
+* if you want to display potential behavior, you have to specify which variables are inputs/parameters, and will be overridden in future calls/clones
+* and instead of using the values for those variables, or using `undefined` for unbound variables, it treats the variables as "symbolic",
+	and doesn't evaluate expressions that depend on them
+* it's natural to treat all unbound variables as symbolic, but as shown in the example above, even defined values can be specified as parameters
+	* after all, any language like Axis that allows default values for parameters, shouldn't really make a distinction between defined/undefined arguments
+
+* to conclude, this is really just a neat way of displaying objects
+* the simplest two ways of displaying objects are:
+	1. the source code (don't evaluate anything)
+	2. the value (evaluate everything)
+* because Axis is prototypal, it doesn't make the distinction between defined and undefined variables, or bound/unbound variables
+* during evaluation, every variable has a value, no variable is symbolic
+* while in the source code, every variable is symbolic
+* partial application allows for some variables to be specified as symbolic, while the rest are evaluated, in order to create new source code
+
+* actually, a quick bit of research revealed that a very similar idea exists, called [Symbolic Execution](https://en.wikipedia.org/wiki/Symbolic_execution)
+* it's very similar to what I have been talking about
+* instead of evaluating a program based on values, it evaluates it based on symbols, and figures out which parts of the program are dependent on which symbols
+
+### exploring parameter declaration syntax
+
+* what if we use `::` so that we can separate the parent object that we are cloning, from the parameters
+
+		current: someModule :: location >>
+			snowing: false
+			temp: location == "inside" ? 75 else 50     // inside temperature is room temperature
+
+* this way you can put it on the top line while cloning
+* maybe we don't need both `::` and `>>`
+
+		current: someModule :: location >>
+			snowing: false
+			temp: location == "inside" ? 75 else 50     // inside temperature is room temperature
