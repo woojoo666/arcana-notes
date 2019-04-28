@@ -8259,6 +8259,76 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 * maybe we should make it illegal to put anonymous values/expressions in if-statements, because it is frankly very confusing
 * this: `if (cond) 10 else 20`, turning into this: `if (cond) 0: 10 else 0: 20`, is very unintuitive behavior...
 
+* actually I think we should make if-statement be like the spread operator
+* so something like
+
+		if (cond1):                 // note: a colon ":" in an if-statement is for specifying a block of statements, not just a single statement
+			x: 10
+			some, list, items
+		if (cond2):
+			y: 20
+			more, list, items
+
+* is the same as doing
+
+		...(cond1 ? (x: 10, some, list, items) else () )
+		...(cond2 ? (y: 20, more, list, items) else () )
+
+* notice that since we are using spread operator, the anonymous values are now being dynamically indexed
+* also notice that this means these two statements are equivalent
+		
+		if (cond) 10 else 20
+		cond ? 10 else 20
+
+* this introduces a bit of ambiguity...
+
+### If Statements vs Ternary Expressions II
+
+* to make if-statements and ternary expressions a bit more distinct, I think if-statements should only be used for blocks of statements
+* so:
+
+		if cond1:
+			x: 10
+			some, list, items
+
+		if cond2: (y: 20, more, list, items)
+
+		if cond: 10 else 20   // illegal
+
+* notice also that, we now always require a colon `:` after the condition, and the condition isn't wrapped in braces anymore
+* this actually now matches the syntax of python almost exactly
+* this also solves our problems with leading unary operators, because we don't need to detect them in if-statements anymore,
+	* because if-statements are for statement blocks, not expressions
+* it is also more consistent with for-loops, which also use a colon `:` and expect a block of statements
+
+		for x in list:
+			collector <: x
+
+* though it's interesting to note that [scala and ruby allow if-statements to be expressions too](https://stackoverflow.com/questions/160218/to-ternary-or-not-to-ternary)
+* I don't think it would be hard to just swap the keywords of a ternary statement though, just switch the grammar rule from this:
+
+		Ternary	::= Or "?" Ternary "else" Ternary        // right associative
+
+* into this:
+
+		Ternary	::= "if" "(" Ternary ")" Ternary "else" Ternary     // doesn't need associativity
+
+* one possible complication is, if you want multi-line conditionals (which is very common), then you need to wrap it in braces
+* eg (taken from my `lexer.js` code, modified for Axis)
+
+		if { expressionStartTokens.includes(first.value)  // first token must indicate start of expression
+				& second.type = 'all_ops'                 // second token must be an operator
+				& third.type != 'WS' }:                   // third token cannot be whitespace
+			newToken: second(type: unary_op)
+
+* right now we are using `{}` for grouping, but grouping syntax isn't finalized yet
+* ideally I thought we wouldn't need grouping at all but I am finding more and more cases where it seems necessary
+
+* another solution is to have `if` statements to act like operators, and strip the parenthesis around conditionals as well
+* which sorta makes sense,
+* because using a single-item list like `(a & b)` inside an if-statement `if (a & b):` doesn't really make sense anyways
+* because obviously the single-item list would be evaluated as `true`, no matter what `a` and `b` are
+
 ### Inverse If Statements
 
 * maybe we can have a different format for If-statements, something like
@@ -8286,6 +8356,14 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 		school: "open"
 
 * everything else, the condition and the "else" branch, is hidden
+
+* this could look better with chained statements too
+
+		tempSummary: "hot" 		if (temp > 95) else
+					"warm" 		if (temp > 75) else
+					"room temp" if (temp > 65) else
+					"chilly" 	if (temp > 55) else
+					"cold"
 
 ### Partial Evaluation and Partial Application
 
