@@ -4,7 +4,8 @@
 </head>
 <body>
 <textarea id="editor" style="width: 500px; height: 300px">
-binaryTreeHeight: tree >>
+<!--
+	binaryTreeHeight: tree >>
 	tag #height.           // declare a tag, which can be used to attach attributes to objects
 
 	// calculate height of all nodes
@@ -12,28 +13,27 @@ binaryTreeHeight: tree >>
 		node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1    // height based on heights of children
 
 	=> tree.#height   // return height of root node
-
+-->
 	// binary/unary op tests
-	1-2             // maybe_unary
-	1- 2            // maybe_unary
+	1-2             // operator
+	1- 2            // operator
 	1 -2            // unary_op
-	1 - 2           // maybe_unary
-	1*-2            // maybe_unary, unary_op
-	1 * - 2         // maybe_unary, maybe_unary
-	(1+2)-3         // maybe_unary, maybe_unary
+	1 - 2           // operator
+	1*-2            // operator, unary_op
+	1 * - 2         // operator, operator
+	(1+2)-3         // operator, operator
 	-3              // unary_op
-	(-3)            // maybe_unary
-	a | !!b         // maybe_unary, unary_op, unary_op
+	(-3)            // unary_op
+	a | !!b         // operator, unary_op, unary_op
 	!true           // unary_op
 	!!true          // unary_op, unary_op
-	! ! true        // maybe_unary, maybe_unary
-	foo(1 2)-3      // maybe_unary
-	fn(1 2)-> - 3   // maybe_unary
+	! ! true        // operator, operator
+	foo(1 2)-3      // operator
+	fn(1 2)-> - 3   // operator
 	fn(1 2)-> -3    // unary_op
-	fn(1 2)->-3     // maybe_unary
+	fn(1 2)->-3     // operator
 
-
-	if ( BLOCK_19 )-1+2 else-3+4    // unary_op, maybe_unary, unary_op, maybe_unary
+	if x > 3: (-1+2) else (-3+4)    // operator, unary_op, operator, unary_op, operator
 </textarea>
 <br>
 <button onclick="reset()"> go </button>
@@ -48,30 +48,64 @@ let editor = document.getElementById('editor');
 function reset() {
 	let input = editor.value;
 	lexer.reset(input);
+	lastThreeTokens = [];
 	console.log('------- lexer reset ------');
 	console.log('input: ' + input);
 }
 
-let last_token = null;
+let tokenList = []; // a filtered list of tokens for testing/inspection
+
+let lastThreeTokens = [];
+
+// these are all the tokens that can precede an expression, used for detecting leading unary operators
+const expressionStartTokens = ['(','[','{',':','<:','=>','\n',',','if','in'];
+
+// these are all the types of tokens that can precede unary operators inside an expression
+const unaryStartTokens = ['WS','operator','unary_op'];
+
+// If the previous token was an operator, checks the token before and after it.
+// Unary operators must not be followed by whitespace, and can be preceded by nothing,
+// the start of an expression, a whitespace, or an operator.
+function unaryOperatorDetection() {
+	if (lastThreeTokens.length < 2) return; // unary operator detection needs at least two tokens
+
+	let precedingToken = lastThreeTokens[2];
+	let operator = lastThreeTokens[1];
+	let followingToken = lastThreeTokens[0];
+
+	if (operator.type != 'operator') return;
+	if (followingToken.type == 'WS') return;
+
+	if (precedingToken == undefined
+			|| expressionStartTokens.includes(precedingToken.value)
+			|| unaryStartTokens.includes(precedingToken.type)) {
+		operator.type = 'unary_op';
+		console.log('previous token was a unary operator!');
+	}
+}
 
 function next() {
 	let token = lexer.next();
-	console.log(token)
+	if (!token) return false;
 
-	// TODO: add checks for beginning of expression detection
-	if (token.type == 'operator'
-			&& (last_token == null || last_token.type == 'WS' || last_token.type == 'operator')) {
-
-		token.type = 'unary_op';
-	} else if (token.text.match(/[!+\-]/)) {
-		// note that it could be unary or binary, just using this to distinguish
-		// _possible_ spaced unary ops from binary ops
-		token.type = 'maybe_unary';
-	} else {
-		token.type = 'binary_op'
+	lastThreeTokens.unshift(token);
+	if (lastThreeTokens.length > 3) {
+		lastThreeTokens.pop();
 	}
+	unaryOperatorDetection();
 
-	last_token = token;
+	if (token.type == 'operator' || token.type == 'newline' || token.type == 'comment')
+		tokenList.push(token);
+
+	console.log(token);
+
+	return true;
+}
+
+function runUntilEnd() {
+	while (next());
+
+	console.table(tokenList);
 }
 
 document.body.onload = () => {

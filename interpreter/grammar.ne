@@ -42,13 +42,16 @@ Statement	-> %identifier ":" Expression							# properties (TODO: support destru
 			| Object %propAccess %tag ":" Expression				# setting tags
 			| Object "<:" Expression								# insertion
 
-			| "if" "(" Block ")" Expression ("else" Expression):?	# conditionals
-			| "for" VarList "in" Expression ":" "{" Block "}"		# for-loop (TODO: support destructuring)
+			| "if" Expression ":" BracedBlock ("else" BracedBlock):?	# conditionals
+			| "for" VarList "in" Expression ":" BracedBlock			# for-loop (TODO: support destructuring)
 
 			| "=>" Expression										# TODO: returns are not allowed to have commas beforehand,
 																	#       so this may need to be moved to the "Block" rule
 
-SpacedItem	-> Or													# note that spaced list items cannot be SpacedUnary objects
+BracedBlock ->	"(" Block ")"             {% d => d[1] %}
+			| "{" Block "}"               {% d => d[1] %}           # "{" and "}" are for indented blocks
+
+SpacedItem	-> Ternary												# note that spaced list items cannot be SpacedUnary objects
 			| %identifier %period									# true statements
 			| %identifier "^^"										# shorthand property names
 			| ("..."|"…")Object										# spread operator
@@ -56,8 +59,11 @@ SpacedItem	-> Or													# note that spaced list items cannot be SpacedUnary
 # note: using Javascript operator precedence:
 #	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
 
-Expression	-> Or													# operator expression, starting from lowest precedence
+Expression	-> Ternary												# operator expression, starting from lowest precedence
 			| SpacedUnary											# any expression can also be a single spaced-unary object
+
+Ternary		-> Or "?" Ternary "else" Ternary						# right associative
+			| Or
 
 Or			-> Or "|" And | And
 And			-> And "&" Eq | Eq
@@ -71,7 +77,7 @@ Exp			-> Unary "**" Exp | Unary								# right associative
 
 Unary		-> %unary_op Unary | Object
 
-SpacedUnary		-> ("!"|"+"|"-") SpacedUnary | Object
+SpacedUnary	-> ("!"|"+"|"-") SpacedUnary | Object
 
 Object 		-> "(" Block ")"										# creation
 			| "template":? Params:? "{" Block "}"					# creation
