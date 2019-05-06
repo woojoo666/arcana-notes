@@ -65,6 +65,8 @@ the less you specify, the more you can optimize
 classes and templates
 state variables
 chat server example
+	for chat-server, start with pure insertion, show how you only need "time" and "order" in 2 places
+	then use state variables to show how to implicitly specify order
 
 
 
@@ -101,3 +103,31 @@ maybe also give an example of calling web APIs
 
 
 in readme, talk about how insertion allows for data mutation while prserving concurrency
+
+
+
+3rd video
+
+
+no syntax, no implementation, just talking about philosphy
+why actor-model reactive programming is different, and better, than functional reactive programming
+note that most things are functional reactive
+	angular, react, reactiveX, mapreduce, dataflow
+
+reactive is about thinking of things like dynamic persistent pieces of data
+the internet works like this
+every website, every user, is like a beacon of data
+
+but functional programming, makes it so you can only define beacons in terms of old beacons
+directed acyclic graph
+this is not realistic
+
+actor-model, allows you do define beacons that can accept data from anybody, even new beacons
+kinda like a dropbox/mailbox
+and this is actually more accurate representation of the internet
+one example might be email, anybody that knows somebody's email address can send messages to that person
+another example might be subreddits, anybody with a link to the subreddit can post to it
+another might be a instagram tag, anybody can tag an image with the tag, and it will show up in the tag feed
+
+compare actor-model to imperative and functional
+forward vs backward construction

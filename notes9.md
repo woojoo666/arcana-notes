@@ -5720,6 +5720,10 @@ candlelight
 lodestar
 
 
+revisit 5-5-2019:
+* I've decided to stick to Axis because it feels clean and simple, whereas something like Firefly, while it has personality, would probably be better suited for a product and not a language
+
+
 ### Multi-line Braced-Blocks
 
 sometimes you do want to break up a braced block into multiple lines, eg in an `if (...) else` statement
@@ -6409,7 +6413,7 @@ but this default global state makes it much easier to write in a dynamic, constr
 * this is why it's important for the IDE to subtly show implicit parenthesis, maybe by inserting slightly transparent braces before and after the block
 * that way the programmer knows exactly where the blocks are
 
-### complications with operators
+### Grouping and Unary Operators
 
 what if we wanted to do
 
@@ -8007,7 +8011,7 @@ kinda like how with iterables, since items are lazy evaluated, if you break out 
 is this even possible to detect?
 
 
-### Unary Operators and Spaced Unary Objects - Mechanism Brainstorm
+### Unary Operators and Spaced Unary Ops - Mechanism Brainstorm
 
 (continued from section "Unary Operators and Ambiguity V - Revised Rules to Resolve Ambiguity")
 
@@ -8095,7 +8099,7 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 * so you can have multiple spaced expressions
 * and if each one of them can have spaced unary operators, you end up with ambiguity, as shown above
 
-### Unary Operators - Spaced Expressions vs Spaced Unary Objects
+### Unary Operators - Spaced Expressions vs Spaced Unary Ops
 
 * so I think we have to change the rules a bit
 * first, parsing spaced unary operators in front of expressions with binary operators, gets too complicated
@@ -8136,7 +8140,7 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 
 ### Unary Operators - Detecting the First Unary Operator
 
-* imagine if we didn't have spaced unary operators
+* imagine if we didn't have spaced unary operators, and let's just focus on normal unary operators
 * what happens with
 
 		if (cond)-30+1 else (5 - 1)
@@ -8328,6 +8332,29 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 * which sorta makes sense,
 * because using a single-item list like `(a & b)` inside an if-statement `if (a & b):` doesn't really make sense anyways
 * because obviously the single-item list would be evaluated as `true`, no matter what `a` and `b` are
+* this is explored more in the later section "Grouping and Multi-Line Syntax"
+
+### Detecting Spaced Unary Operators
+
+* notice that, now that if-statements have a `:` after the operator, this also makes it easier to detect spaced unarys
+* we can actually detect it in the preprocessor, at the same time we are detecting regular spaced unary ops
+* just do a look-behind and see if it is the start of an expression (skip over operators to account for cases with multiple spaced operators)
+* note that there is nothing stopping us from allowing spaced unary operators in front of expressions with binary operators
+* earlier we discussed how if-statements make it difficult to detect in the lexer
+	* see section "Unary Operators - Spaced Expressions vs Spaced Unary Ops"
+* but now that isn't a problem
+* we can even start detecting spaced unary ops _inside_ expressions,
+* just make it so any operator after a binary op is an unary op, regardless if it has spaces or not
+* however, that doesn't change how ambiguous and confusing the syntax can become
+	* discussed in section "Unary Operators and Spaced Unary Ops - Mechanism Brainstorm"
+* for example:
+
+		(- a - b)    // even though both operators have spaces, first is detected as unary, second is detected as binary
+		(! a | b)    // ! operator has precedence so evaluated first, which might be confusing
+		(a - - b)    // first operator is detected as binary, so this becomes (a - -b)
+		(a --  b)    // first operator is detected as unary (no trailing whitespace), so this becomes (a, --b)
+
+* thus, we will stick to restricting spaced unary operators to single-operand expressions
 
 ### Inverse If Statements
 
@@ -8364,6 +8391,11 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 					"room temp" if (temp > 65) else
 					"chilly" 	if (temp > 55) else
 					"cold"
+
+* actually, [python uses this style](https://stackoverflow.com/questions/23387929/why-is-the-ternary-operator-in-python-if-else-and-not-if-then-else),
+* so it might not be as weird as I thought
+* the only difference is I wrap the condition in braces, which I actually think is better
+* discussed in the later section "If-Expressions and Ternary"
 
 ### Partial Evaluation and Partial Application
 
@@ -8534,3 +8566,456 @@ if (1+(2)  -3;   // -3 detected as a binary operator and number
 		current: someModule :: location >>
 			snowing: false
 			temp: location == "inside" ? 75 else 50     // inside temperature is room temperature
+
+### Grouping and Multi-Line Syntax
+
+* note that most language use parenthesis for grouping, eg `3 * (1 + 2)` or `(foo.items || []).length`
+* however I use `()` for defining objects
+* originally I thought a special syntax for grouping would be unnecessary, and we could handle all cases using parenthesis stripping
+	* // TODO: FIND REFERENCED SECTION
+* it's usually rather obvious if parenthesis is used for grouping, because the parse tree for the expression inside the braces,
+	* will contain an operator at the top level
+	* eg `if (a | b)` contains an operator `|` at the the top-level, so the braces are being used for grouping
+	* whereas `if (a: 10)` does not, so the braces are being used for object creation
+* this was discussed in section "Grouping and Unary Operators"
+* however, we are now also using parenthesis as a way to do multi-line expressions
+
+* thus, recently I have been finding grouping parenthesis more and more useful
+	* eg in the section "If Statements vs Ternary Expressions II"
+* and I have been using `{}` for grouping
+* which is a little unintuitive, because now I use `()` for defining objects and `{}` for grouping
+* whereas most languages do the exact opposite, `{}` for objects/classes and `()` for grouping
+
+* is there a way we can somehow leverage `()` for grouping?
+* I don't think `...()` will work because `...` is an operator so intuitively it should strip the paren, so if you do `...(a | b)` it will turn into
+
+		a ? ...a else ...b
+
+maybe use `+()`?
+
+
+but what if we have a really long expression in a ternary expression, how would we break it up
+
+		foo: cond ? some + really + long + expression + inside + the + truth + branch + of + the + ternary else false
+
+note that `cond ? (a) else b` is totally valid and different from `cond ? a else b`, so we can't really use parenthesis stripping here
+
+		if (a) ...a else ...b
+
+
+`...` for line continuation?
+eg
+
+	a & b & c ...
+		& d & e
+
+if single-line, then it's clear what the parenthesis is being used for
+
+if no operators and no ternary (which can be considered an operator), it's also unambiguous, even for multi-line statements
+
+		or(
+			a + b
+			)
+
+* it's only when you have both operators and multi-line that it becomes ambiguous
+
+		cond ? trueBranch else (some
+			& multiline
+			& false
+			& branch)
+
+* the braces could be interpretted as creating a single-item list, equivalent to:
+
+		cond ? trueBranch else (some + multiline + false + branch)
+
+* or the braces could be interpretted as purely for multi-line expression declaration, in which case it would be equivalent to:
+
+		cond ? trueBranch else some + multiline + false + branch
+
+* perhaps we can make it so that if line starts with an operator, it continues to the next line
+* though python doesn't do this, i wonder why
+
+* maybe use `...` as a line continuation indicator if it is at the end of a line
+	* [matlab does this](https://www.mathworks.com/help/matlab/matlab_prog/continue-long-statements-on-multiple-lines.html)
+* though could this be confusing if you want a capture block at the end of a line
+
+* don't forget about the `with` keyword which can help
+
+		foo: cond ? trueBranch else falseBranch with
+			trueBranch: ...
+				some
+				& multiline
+				& true
+				& branch
+			falseBranch: ...
+				some
+				& multiline
+				& false
+				& branch
+
+### If-Expressions and Ternary
+
+i'm starting to lean back towards if-statement style for ternary
+it feels natural to write
+
+		if (cond) trueBranch else falseBranch
+
+* perhaps it is because I am used to that syntax from imperative languages
+* but I think it is because of two reasons
+* first, wrapping the condition in parenthesis, helps separate it from the trueBranch and falseBranch
+* whereas with ternaries, `a ? b else c`, everything is at the same level, so it can feel a little more confusing
+* second, the keyword `if` feels more like natural english language
+* and we can see from the rise of [fluent programming](https://en.wikipedia.org/wiki/Fluent_interface) that natural language constructs are very important
+* when you see `if (sunny) goOutside else stayIndoors`, you immediately think "if it is sunny, go outside, otherwise stay indoors"
+* but with `sunny ? goOutside else stayIndoors`, it feels a lot less natural and a lot more structural,
+	* feels like "check the boolean `sunny`, and then pick one of the branches"
+
+I think wrapping the condition with braces should be required even for inverse if-statements
+
+		result: trueBranch if (cond) else falseBranch
+
+* this is actually how I was already doing it (see section "Inverse If Statements")
+* and this distinguishes it from Python style, which doesn't use braces around the condition for ternaries
+
+
+* however, switching back to 
+
+		if (cond) trueBranch else falseBranch
+
+* brings back a lot of the old issues we had with detecting leading unary operators
+	// TODO: FIND REFERENCED SECTION
+
+* lets look at what types of if-statements and if-expressions we have explored
+
+		// if-statement block
+		if (longcondition):
+			x: somelooooooooooongexpression
+		else:
+			x: anotherlongexpression
+
+		// ternary
+		x: {longcondition ?
+				somelooooooooooongexpression
+				else anotherlongexpression }
+
+		// regular if expression
+		x: if (longcondition)
+			somelooooooooooongexpression
+			else anotherlongexpression
+
+		// inverse if expression
+		x: {somelooooooooooongexpression
+				if (longcondition)
+			else anotherlongexpression }
+
+* note that inverse if is nice for else-if chaining
+
+		foo: someLongValue
+				if (someLongCondition)
+			else someLongValue
+				if (someLongCondition)
+			else someLongValue
+
+* though what are the rule for breaking an expression into multiple lines like this, do we need braces?
+* maybe we can have operators do implicit line joining
+* aka, if a line starts with an operator, it automatically interprets the current line as a continuation of the previous line
+* though note that python only does implicit line-joining for braced blocks, doesn't care about operators
+* I wonder why...
+
+* I think maybe we should allow three methods of defining conditionals:
+
+		// 1. for statements blocks
+		if (foo):
+			block of statements
+
+		// 2. for natural english, with a more prominent default case
+		x: trueBranch if (cond) else falseBranch
+
+		// 3. for structural shorthand
+		x: cond ? trueBranch else falseBranch
+
+* note that python doesn't have implicit line joining based on if a line starts/end with an operator
+* python implicit line joining only happens for braced expressions
+
+* note that inverse if-expressions help for implicit line joining
+
+		foo: someLongValue
+				if (someLongCondition)
+			else someLongValue
+				if (someLongCondition)
+			else someLongValue
+
+* notice how every line starts with an operator, `if` or `else`
+* whereas with regular if-expressions
+
+		foo: if (someLongCondition)
+				someLongValue
+			else if (someLongCondition)
+				someLongValue
+			else
+				someLongValue
+
+* where every other line doesn't start with an operator, so implicit line joining wouldn't work here
+* at least, not based purely on operators, though we could just detect that the if-expression is "incomplete" and implicitly join the next line
+
+* note that you can't have both regular and inverse if-expressions
+* becomes ambiguous
+* for example, in the code below:
+
+		someValue
+		if (cond)
+		anotherValue
+
+* if we interpret it as a regular if-expression, it becomes `someValue,   if (cond) anotherValue` (someValue becomes a list item)
+* taken as an inverse if-expression, it becomes `someValue if (cond),   anotherValue` (anotherValue becomes a list item)
+
+### If-Expressions and Nesting
+
+* note that inverse if-expressions don't work well with nesting
+* eg what if you wanted to convert this regular if-expression:
+
+		foo: if (condition1)
+				if (condition2)
+					someLongValue
+				else
+					someLongValue
+			else
+				if (condition3)
+					someLongValue
+				else
+					someLongValue
+
+* if we try to invert it:
+
+		foo:
+			someLongValue
+				if (condition2)
+			else someLongValue
+				if (condition1)
+			else
+				someLongValue
+					if (condition3)
+				else someLongValue
+
+* notice that `condition1` gets pushed to the middle
+* the order is really confusing, and there isn't a clear rule for how to indent this
+
+* exploration...
+
+		(
+			someLongValue
+				if (condition2)
+			else someLongValue
+		)
+			if (condition1)
+		else (someLongValue if (condition3) else someLongValue)
+
+		condition1 ?
+			someLongValue
+				if (condition2)
+			else someLongValue
+		else
+			someLongValue
+				if (condition3)
+			else someLongValue
+
+* note that sometimes using an if-statement-blocks instead of if-expressions can help solve these problems
+* for example, instead of doing
+
+		result:
+			input % 3 = 0 ?
+				input % 5 = 0 ?
+					'fizzbuzz'
+				else
+					'fizz'
+			else 
+				input % 5 = 0 ?
+					'buzz'
+				else
+					input
+
+* you can instead do
+	
+		if (input % 3 = 0):
+			if (input % 5 = 0):
+				result: 'fizzbuzz'
+			else
+				result: 'fizz'
+		else 
+			if (input % 5 = 0):
+				result: 'buzz'
+			else
+				result: input
+
+* note that with regular (not inverse) if-expressions, we use double-indentation if the condition has a nested if-expression
+
+		x: if (if (some long condition)
+				somevalue
+				else anothervalue)
+			somevalue
+			else anothervalue
+
+* however even this can get confusing with more complex structures, eg if we nested an expression inside one of the values:
+
+		x: if (if (some long condition)
+				somevalue
+				else anothervalue)
+			if (some long condition)
+				somevalue
+				else anothervalue
+			else anothervalue
+
+* notice how confusing it gets
+* this is because, normally with cloning/calling, every nested block adds a single level of indentation
+* so the syntax forms a visual tree
+
+		fn1
+			fn2
+				arg1
+				arg2
+			fn3
+				arg3
+
+* even when we add binary operators, binary operators can just continue onto the next line
+	* implicit line joining
+* they don't increase indentation, so it still looks relatively clean
+
+		fn1
+			fn2
+				arg1
+				arg2
+		& fn3
+			arg3
+
+* (note that instead of operators we can also use `any` or `all` or other functions, which make the hierarchy more clear)
+* but if-expressions are special because they are like a three-operand operator, but they also use indentation
+	* indentation used to separate condition from branches
+* thus, it gets confusing because visually, it is hard to tell if the indentation is for the condition, or for a nested block in a branch
+* it can be confusing even if we use double-indentation for the condition block, as shown earlier
+
+* thus, perhaps it is better if we don't indent the conditional at all
+* and we can also use `... ? ... else ...` ternary syntax, which separates the operands more simply
+	* so that we can leverage implicit line joining
+* so the earlier example would become
+
+		x: (
+				some long condition
+				? somevalue
+				else anothervalue
+			) ? (
+				some long condition
+				? somevalue
+				else anothervalue
+			) else anothervalue
+
+* hmm this is still confusing, maybe `if ... then ... else ...` would be better?
+
+		x: if (
+				if some long condition
+				then somevalue
+				else anothervalue
+			) then (
+				if some long condition
+				then somevalue
+				else anothervalue
+			) else anothervalue
+
+* well this is a little cleaner and more understandable
+
+* note that we can also use the `with` keyword
+
+		x: if (condition) trueBranch else falseBranch with
+			condition: ...
+				if (some long condition)
+					then somevalue
+					else anothervalue
+			trueBranch: ...
+				if (some long condition)
+					then somevalue
+					else anothervalue
+			falseBranch: anothervalue
+
+* notice that we actually indented the `then` and `else` statements more than the `if` statement this time
+* in this case, it improved readability and isn't confusing
+* so depending on the case, it can make sense to use indentation in multi-line if-expressions
+
+
+
+if ()
+	then 
+else if ()
+	then
+else
+	then
+
+
+... if ()
+... if ()
+... otherwise
+
+actually this is ambiguous, can be interpretted as either list items, or a single chain of if-else
+instead
+
+
+... if ()
+else ... if ()
+else ...
+
+remember that this does not work well for nesting though
+
+
+
+then and promises
+
+
+
+### revisiting local/scoped insertion and collectors
+
+* something I noticed is that, even though if-statements and for-loops declare statement blocks
+* in if-statements, those statement blocks get spread out into the parent object
+* whereas for for-loops, those statement blocks are local
+
+* in fact, in for-loops you can only clone and insert
+* can't define properties
+* what if you want to do define lists and stuff in parent
+* but too complex to use a simple map
+* you don't want to have to use multiple maps for multiple lists
+* why not a single for-loop
+* at the same time though, you don't want to use collector because that would expose it to insertion from the outside
+
+* you want to create like, a local collector
+* that accepts insertions from inside
+* but looks like a regular object from outside
+* this can be achieve through both a private collector, and a public mirror of that collector
+* but it seems like local collectors seem common enough that they should be the default
+
+* in fact, maybe all collectors should be local?
+* if you think about it, like a foreach function that does an insertion
+
+		range(1, 10).foreach x >>
+			localCollector <: 10
+
+* you don't need that to be a public collector
+* the function passed to the foreach fn, has private access to the local collector
+
+* however, in a way, the function passed to the foreach fn has just as much power as direct insertion
+* if the foreach function was malicious, and passed around the function, it could do arbitrary insertions
+
+* so using a public api to insert, has the same security concerns as having a public collector
+* so making all collectors local, just adds unnecessary restriction
+* though...i guess it could make sense
+* it isn't trying to pretend it is more secure
+* instead, making local collectors the default, would encourage scoped insertion
+* even if you pass around a function that inserts, you are explicitly passing it, explicitly public
+* whereas if all collectors were public by default, it's more implicit, implicitly public
+
+* local collectors create a difference between read and write permissions
+* public read, scoped writes
+
+* if you think about it, variable assignment in imperative languages is normally scoped
+* however, the variables also aren't public
+	* so it's more akin to a private property in my language
+* if an imperative variable is declared in a scope, you can only assign to it within the scope, but you can also only read from it in the scope
+* if you declare a public member variable, it can be read and assigned to publically
+* so I guess public/private variable declaration in imperative also doesn't distinguish between read and write permission* 
+
