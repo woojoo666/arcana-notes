@@ -8938,36 +8938,42 @@ I think wrapping the condition with braces should be required even for inverse i
 * notice that we actually indented the `then` and `else` statements more than the `if` statement this time
 * in this case, it improved readability and isn't confusing
 * so depending on the case, it can make sense to use indentation in multi-line if-expressions
+		
+		
+
+		if ()
+			then 
+		else if ()
+			then
+		else
+			then		
+		
+
+		... if ()
+		... if ()
+		... otherwise
+
+* actually this is ambiguous, can be interpretted as either list items, or a single chain of if-else
+* instead we have to go back to
+
+		... if ()
+		else ... if ()
+		else ...
+
+* remember that this does not work well for nesting though
 
 
-
-if ()
-	then 
-else if ()
-	then
-else
-	then
+* `then` and promises
+* if we do use a `if then else` structure, then note that it may conflict with other uses for `then`, eg in promises
 
 
-... if ()
-... if ()
-... otherwise
-
-actually this is ambiguous, can be interpretted as either list items, or a single chain of if-else
-instead
+* I think we should gear our if-expressions to expressions where the condition is on a single line
+* we shouldn't worry about multi-line conditions
+* if you want a multi-line condition, put it in a separate variable, or `with` keyword
 
 
-... if ()
-else ... if ()
-else ...
-
-remember that this does not work well for nesting though
-
-
-
-then and promises
-
-
+* I think for now, we should just stick to `... ? ... else ...` ternary syntax,
+* and we will think about adding if-expressions or inverse if-expressions later
 
 ### revisiting local/scoped insertion and collectors
 
@@ -9017,5 +9023,248 @@ then and promises
 	* so it's more akin to a private property in my language
 * if an imperative variable is declared in a scope, you can only assign to it within the scope, but you can also only read from it in the scope
 * if you declare a public member variable, it can be read and assigned to publically
-* so I guess public/private variable declaration in imperative also doesn't distinguish between read and write permission* 
+* so I guess public/private variable declaration in imperative also doesn't distinguish between read and write permission
+
+### Switch Statements and Cases Syntax
+
+* inverse-if looks good because it puts the values in front
+* often the conditions can be implied by the values, or they aren't as important
+* math uses this "inverse" notation when defining cases, eg [here](https://tex.stackexchange.com/questions/9065/large-braces-for-specifying-values-of-variables-by-condition)
+	* I couldn't find a formal name for this so I call it "cases notation"
+* though perhaps that is more analogous to a switch statement, because each case is unordered and specifies the full condition, no else-if mechanics
+* but it does seem like inverse if-statements can be useful for putting values in front
+* recall our weather example from earlier
+
+		tempSummary: "hot" 		if (temp > 95) else
+					"warm" 		if (temp > 75) else
+					"room temp" if (temp > 65) else
+					"chilly" 	if (temp > 55) else
+					"cold"
+
+* recall that instead of switch statements, we can use objects,
+	* eg in the coffee examples in sections "Symbol Properties - Syntax Brainstorm" and "Matchers II"
+* something like
+
+		coffee: size >>
+			capacityOptions:
+				small: 10
+				medium: 40
+				large: 90
+			capacity: capacityOptions[size]
+
+* though this is slightly different because the expressions are eagerly evaluated
+* which makes a difference if we are doing clone/calling behavior inside the case statements
+* eg:
+
+		capacityOptions:
+			small: fn1()->
+			medium: fn2()->
+			large: fn3()->
+		capacity: capacityOptions[size]
+
+* notice how with our example, all the functions are immediately called and evaluated, even though only one is accessed
+* wherease in a switch statement, only one of the functions would be called and evaluated, whichever one is being accessed
+* we can solve this like so:
+
+		capacityOptions:
+			small: fn1
+			medium: fn2
+			large: fn3
+		capacity: capacityOptions[size]()->
+
+* but this starts to get a bit more confusing
+
+* I also think it would be nice if we had values in front and conditionals after, like in mathematical cases notation
+* something like
+
+		capacityOptions: size >>
+			10    if size = small
+			40    if size = medium
+			90    if size = large
+
+
+### Dynamic Properties and "otherwise"
+
+* note that right now, for dynamic properties, they are retrieved only if none of the other matchers match
+* and you can only define one dynamic property
+* // TODO: FIND REFERENCED SECTION
+
+* thus, it works like the "otherwise" clause of [cases notation](https://tex.stackexchange.com/questions/9065/large-braces-for-specifying-values-of-variables-by-condition)
+* or like the `default` case of a switch statement
+
+* is this too restrictive?
+* maybe we should allow any number of dynamic properties
+* but if multiple dynamic properties match, then it returns `overdefined`
+* but we would also not want dynamic properties to be called if a static property matches
+* so this could get confusing
+
+
+* is `(...): ...` syntax used for destructuring, or dynamic keys?
+
+### Truth Tables and FizzBuzz
+
+* is there a cleaner way to represent truth tables?
+* eg the fizzbuzz example has 4 different states
+* traditionally it is represented by
+
+		if (x % 3 == 0) {
+			if (x % 5 == 0) {
+
+			} else {
+
+			}
+		} else {
+			if (x % 5 == 0) {
+
+			} else {
+			
+			}
+		}
+
+* but notice the duplication of `x % 5 == 0`
+
+* if we flatten it it looks like:		
+
+		divBy3: x % 3 = 0
+
+		divBy5: x % 5 = 0
+
+		if ( divBy3 &  divBy5)
+		if ( divBy3 & !divBy5)
+		if (!divBy3 &  divBy5)
+		if (!divBy3 & !divBy5)
+
+hmm...
+
+### Operators and Function Equivalents
+
+* many operators have function equivalents
+* we mentioned earlier how. unlike operators, functions always look very clear and unambiguous
+* because the syntax forms clear visual tree hierarchies
+	// TODO: FIND REFERENCED SECTION
+
+* `|` and `&` and other binary operators can start to get ugly as they wrap onto multiple lines
+* we can use `any` or `all` operator functions to turn `|` and `&` into tree hierarchies
+* eg instead of 
+
+		(someLongCondition | anotherLongCondition)
+		& aThirdLongCondition
+		| aFourthLongCondition & aFifthLongCondition
+
+* we can do
+
+		any
+			all
+				someLongCondition | anotherLongCondition
+				aThirdLongCondition
+			aFourthLongCondition & aFifthLongCondition
+
+* `with` keyword can also be an alternative
+
+		((first | second) & third) | (fourth & fifth) with
+			first: someLongCondition
+			second: anotherLongCondition)
+			third: aThirdLongCondition
+			fourth: aFourthLongCondition
+			fifth: aFifthLongCondition
+
+* `any`, `all`, `sum`, and other operator functions syntactically would be easier to use cloning, but mechanically makes more sense as functions
+* as in, it looks nice to be able to do `any(firstCond, secondCond)`, especially when `firstCond` and `secondCond` are too long to fit on one line, eg
+
+		any
+			someLongCondition
+			anotherLongCondition
+
+* however, the `any` function should act like the `|` operator, it takes in two booleans, and returns a third boolean
+* the returned boolean is distinct from the input two booleans, so `any` is more of a function than an object, just like `add` or `multiply`
+* thus, we would actually use `any` like so: `any(firstCond, secondCond)->`
+* however, that is far uglier when we want to use multiple lines
+* we would have to do something like
+
+		operatorFn(...)->
+			arg1
+			arg2
+
+* maybe we can have alternate syntax
+
+		<-someFn
+			arg1
+			arg2
+
+* note that, we could technically design `any` and `all` to actually be boolean objects themselves, instead of returning booleans
+* and they would store the two boolean inputs as private variables, and set themselves according to those inputs
+* that way, instead of calling and extracting the return value, you could just clone the `any` or `all` objects
+* instead of 
+
+		any: a, b >>
+			=> a | b
+
+* it would look like
+
+		any: boolean
+			_a, _b >>
+			_boolean_value: _a | _b
+
+* this feels rather ugly and hacky though
+* it simply makes more sense to make operator functions act like functions
+* it is syntactically uglier though
+
+* though actually, if we think about imperative code nowadays
+* it is rather rare to see function arguments wrap to multiple lines
+* most times, function arguments fit on the same line
+* so perhaps it isn't that necessary to worry about special syntax for operator functions
+
+### If-Statements vs If-Expressions, and Conditional Binds vs Multiplexors
+
+* interestingly enough, if-statement blocks vs ternary expressions, actually correspond to conditional binds vs multiplexors
+	* discussed all the way back in section "Two Types of Dynamic Bindings: Conditional Binds and Dynamic-Memory-Location Binds"
+* a if-statement block can be though of as "enabling" a set of bindings, eg
+
+		parentObj:
+			if (cond):
+				foo: "hello world"
+
+* can be thought of as a conditional bind, which binds `parentObj.foo` to `"hello world"` when `cond` is true
+* though if-statement blocks are a little more restrictive than conditional bindings
+* because they only bind properties of the parent object
+* whereas conditional binds would be able to bind anything
+
+* on the other hand, ternary expressions correspond to multiplexors pretty much exactly
+* eg
+
+		foo: cond ? a else b
+
+* is the exact same as a multiplexor, or a dynamic-memory-location binding
+
+		_mux:
+			true: a
+			false: b
+		foo: _mux[cond]
+
+### Conditionals and Information Efficiency
+
+* if statements and if expressions are actually rather long compared to other expressions
+* for example, `foo: 1+2+3` and `foo: fn(10, somevalue)` are actually more expressive than the large expression:
+
+		foo: if (somecondition)
+				somevalue
+			else
+				anothervalue
+
+* if you think about it, `foo: 1+2+3` is actually an infinite amount of if-statements
+* so even though it is way shorter and more concise, it represents a larger amount of information
+
+* with if-statements, it is a very small amount of information, a simple switch mechanism (multiplexor) with two states
+* very low level
+
+* real life systems are often not so crude
+* real life functions are continuous, not bi-state
+* state-based systems, eg TCP protocol, can be modeled as a state machine with behaviors tied to each state
+* a multi-dimensional state space
+* not as low-level as an if-statement
+
+* if-statements are good in the beginning, for quickly prototyping code and behaviors
+* but as the program gets more developed, we should strive to minimize the number of if-statements
+* and opt for more expressive constructs* 
+
 

@@ -2095,7 +2095,7 @@ so dynamic keys use `is`?
 * if the condition is a value, check if truthy
 	* otherwise, if it's a function, call it with declared inputs?
 
-### Matchers
+### Matchers II
 
 ```js
 coffee.capacity:
