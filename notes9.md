@@ -9267,4 +9267,25 @@ hmm...
 * but as the program gets more developed, we should strive to minimize the number of if-statements
 * and opt for more expressive constructs* 
 
+### Lexing Rules for Operators
 
+* currently the lexing rules for operators are:
+	* unary_op:     no trailing whitespace, preceded by operator or whitespace or start of expression
+	* spaced_unary: trailing whitespace, first non-whitespace to the left is an operator or start of expression
+	* operator:     anything else
+
+* put another way:
+
+	    [whitespace or operator or expressionstart] [unary_op] [anything but whitespace]
+
+	    [operator or expressionstart] [whitespace]* [spaced_unary] [whitespace]
+
+* notice that unary and spaced_unary operator detection is not based on the operator character,
+* purely based on whitespace rules and preceding tokens
+
+* so something in something like `! !! !1 * - 2`, the operators types will be `spaced_unary, unary_op, spaced_unary, unary_op, operator, spaced_unary`
+* recall that currently, we don't allow spaced unary operators inside expressions, so `1 * - 2` is illegal
+	// TODO: FIND REFERENCED SECTION
+* we only allow spaced unary operators if there is a single operand, so something like `! !! !1` is legal
+
+* you can find the implementation in `Lexer.js`

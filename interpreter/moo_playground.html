@@ -20,20 +20,20 @@
 	1 -2            // unary_op
 	1 - 2           // operator
 	1*-2            // operator, unary_op
-	1 * - 2         // operator, operator
+	1 * - 2         // operator, spaced_unary
 	(1+2)-3         // operator, operator
 	-3              // unary_op
 	(-3)            // unary_op
 	a | !!b         // operator, unary_op, unary_op
 	!true           // unary_op
 	!!true          // unary_op, unary_op
-	! ! true        // operator, operator
+	! ! true        // spaced_unary, spaced_unary
 	foo(1 2)-3      // operator
 	fn(1 2)-> - 3   // operator
 	fn(1 2)-> -3    // unary_op
 	fn(1 2)->-3     // operator
 
-	if x > 3: (-1+2) else (-3+4)    // operator, unary_op, operator, unary_op, operator
+	if (x > 3): (-1+2) else (-3+4)    // operator, unary_op, operator, unary_op, operator
 </textarea>
 <br>
 <button onclick="reset()"> go </button>
@@ -61,7 +61,7 @@ let lastThreeTokens = [];
 const expressionStartTokens = ['(','[','{',':','<:','=>','\n',',','if','in'];
 
 // these are all the types of tokens that can precede unary operators inside an expression
-const unaryStartTokens = ['WS','operator','unary_op'];
+const unaryStartTokens = ['WS','operator','unary_op', 'spaced_unary'];
 
 // If the previous token was an operator, checks the token before and after it.
 // Unary operators must not be followed by whitespace, and can be preceded by nothing,
@@ -84,6 +84,28 @@ function unaryOperatorDetection() {
 	}
 }
 
+let tokens = [];
+// note that "currentToken" may be whitespace, but "tokens" array does not include whitespace
+function spacedUnaryDetection (currentToken, tokens) {
+	if (tokens.length < 1) return; // needs at least one token
+
+	let precedingToken = tokens[tokens.length-2];
+	let operator = tokens[tokens.length-1];
+
+	if (operator.type != 'operator') return;
+	if (currentToken.type != 'WS') return;
+
+	if (precedingToken == undefined
+			|| expressionStartTokens.includes(precedingToken.value)
+			|| unaryStartTokens.includes(precedingToken.type)) {
+		operator.type = 'spaced_unary';
+	}
+}
+
+function lastToken() {
+	return tokens[tokens.length-1];
+}
+
 function next() {
 	let token = lexer.next();
 	if (!token) return false;
@@ -93,11 +115,26 @@ function next() {
 		lastThreeTokens.pop();
 	}
 	unaryOperatorDetection();
+	spacedUnaryDetection(token, tokens);
 
 	if (token.type == 'operator' || token.type == 'newline' || token.type == 'comment')
 		tokenList.push(token);
 
 	console.log(token);
+
+	switch (token.type) {
+		case 'WS':
+		case 'comment': return true; // ignore whitespace and comments
+
+		case 'newline':
+			if (this.blockType == 'Braces') return true;    // ignore newlines in braced blocks
+			if (tokens.length == 0) return true;       // ignore leading newlines
+			if (lastToken().type == 'newline') return true; // ignore multiple newlines
+			if (lastToken().type == 'comma') return true;   // newlines are ignored after commas
+			break;
+	}
+
+	tokens.push(token);
 
 	return true;
 }

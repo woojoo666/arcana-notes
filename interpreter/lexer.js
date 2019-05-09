@@ -35,7 +35,7 @@ let rules = {
 const expressionStartTokens = ['(','[','{',':','<:','=>','\n',',','if','in'];
 
 // these are all the types of tokens that can precede unary operators inside an expression
-const unaryStartTokens = ['WS','operator','unary_op'];
+const unaryStartTokens = ['WS','operator','unary_op','spaced_unary'];
 
 class Lexer {
 	
@@ -70,11 +70,37 @@ class Lexer {
 		}
 	}
 
+	// note that "currentToken" may be whitespace, but "tokens" array does not include whitespace
+	spacedUnaryDetection (currentToken, tokens) {
+		if (tokens.length < 1) return; // needs at least one token
+
+		let precedingToken = tokens[tokens.length-2];
+		let operator = tokens[tokens.length-1];
+
+		if (operator.type != 'operator') return;
+		if (currentToken.type != 'WS') return;
+
+		if (precedingToken == undefined
+				|| expressionStartTokens.includes(precedingToken.value)
+				|| unaryStartTokens.includes(precedingToken.type)) {
+			operator.type = 'spaced_unary';
+		}
+	}
+
+	// lexing rules for operators:
+	//   unary_op:     no trailing whitespace, preceded by operator or whitespace or start of expression
+	//   spaced_unary: trailing whitespace, first non-whitespace to the left is an operator or start of expression
+	//   operator:     anything else
+	// put another way:
+	//     [whitespace or operator or expressionstart] [unary_op] [anything but whitespace]
+	//     [operator or expressionstart] [whitespace]* [spaced_unary] [whitespace]
+	// notice that unary and spaced_unary operator detection is not based on the operator character,
+	// purely based on whitespace rules and preceding tokens.
 	run () {
 		this.initLexer();
 
 		let tokens = [];
-		let lastThreeTokens = []; // lastThreeTokens includes whitespace tokens, used for unary operator detection
+		let lastThreeTokens = []; // lastThreeTokens includes whitespace tokens, used for unary operator detection. First token is current token
 
 		function lastToken () {
 			if (tokens.length <= 0) return null;
@@ -87,6 +113,8 @@ class Lexer {
 				lastThreeTokens.pop();
 			}
 			this.unaryOperatorDetection(lastThreeTokens);
+
+			this.spacedUnaryDetection(token, tokens);
 
 			switch (token.type) {
 				case 'WS':
