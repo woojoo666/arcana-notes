@@ -20,6 +20,7 @@ let rules = {
 	operator: ['!','+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
 
 	colon: ':',
+	ternary: '?',
 	propAccess: /\.(?=\w|\#)/,
 	period: '.',
 	newline: { match: /\n/, lineBreaks: true },
@@ -32,7 +33,7 @@ let rules = {
 
 // these are all the tokens that can precede unary operators at the start of an expression,
 // used for detecting leading unary operators
-const expressionStartTokens = ['(','[','{',':','<:','=>','\n',',','if','in'];
+const expressionStartTokens = ['(','[','{',':','<:','=>','\n',',','if','in','?','else'];
 
 // these are all the types of tokens that can precede unary operators inside an expression
 const unaryStartTokens = ['WS','operator','unary_op','spaced_unary'];

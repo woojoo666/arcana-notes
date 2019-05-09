@@ -29,4 +29,5 @@ test('detect unary operators in expressions', () => {
 	expect(getOperatorTypes('fn(1 2)->-3')).toEqual(['operator']);
 
 	expect(getOperatorTypes('if (x > 3): (-1+2) else (-3+4)')).toEqual(['operator', 'unary_op', 'operator', 'unary_op', 'operator']);
+	expect(getOperatorTypes('! x ? ! x else ! x')).toEqual(['spaced_unary', 'spaced_unary', 'spaced_unary']);
 });
