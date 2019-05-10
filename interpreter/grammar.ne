@@ -1,20 +1,12 @@
+# indent-width: 4 (for vertical alignment)
+
 @{%
-import { Lexer } from './lexer.js';
-
-const lexer = new Lexer('', null).initLexer().moo;
+const lexerWrapper = (typeof module === 'object' && module.exports)
+						? require('./lexerWrapper.js')
+						: window.lexerWrapper;
+console.log(lexerWrapper);
 %}
-
-# Pass your lexer object using the @lexer option:
-@lexer lexer
-
-Block -> Prop "," Block          {% d => [d[0], ...d[2]] %}  # flattens the tree of arrays
-	| Prop:?                      {% d => d[0] ? d : [] %}   # if empty, return empty array
-Prop -> Key ":" Val              {% d => ({type:'property', key: d[0], val: d[2]}) %}
-Key -> [a-z]:+                   {% d => d[0].join("") %}
-Val -> [a-z]:+                   {% d => d[0].join("") %}
-	| "(" Block ")"               {% d => d[1] %}
-	| "{" Block "}"               {% d => d[1] %}            # "{" and "}" are for indented blocks
-
+@lexer lexerWrapper
 
 # Note that some things are either impossible to check in the grammar (due to modular parsing), or just more difficult.
 # So we defer some of these checks to post-grammar parsing.
@@ -23,10 +15,10 @@ Val -> [a-z]:+                   {% d => d[0].join("") %}
 #	parameters can be declared inside or outside the block, but not both
 #	braced blocks and indented blocks have different rules for where the "template" keyword can go
 #	nested blocks with special restrictions, eg:
-#		in conditionals, the braced block actually has to be a one-item list
 #		for bracket property access, the bracket block actually has to be a one-item list
 #		for object destructuring, 
 #	private identifiers can't be used in property access, eg `foo._bar`
+#   when stripping parenthesis, the block inside must be a single-item list
 
 Block 		-> Params:? (Statement (","|"\n")):* Statement:?		# note: trailing commas allowed
 
@@ -54,7 +46,7 @@ BracedBlock ->	"(" Block ")"             {% d => d[1] %}
 SpacedItem	-> Ternary												# note that spaced list items cannot be SpacedUnary objects
 			| %identifier %period									# true statements
 			| %identifier "^^"										# shorthand property names
-			| ("..."|"…")Object										# spread operator
+			| ("..."|"…") Object										# spread operator
 
 # note: using Javascript operator precedence:
 #	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
@@ -77,7 +69,7 @@ Exp			-> Unary "**" Exp | Unary								# right associative
 
 Unary		-> %unary_op Unary | Object
 
-SpacedUnary	-> ("!"|"+"|"-") SpacedUnary | Object
+SpacedUnary	-> %unary_op:* %spaced_unary %unary_op:* Object         # at least one spaced_unary, and exactly one operand
 
 Object 		-> "(" Block ")"										# creation
 			| "template":? Params:? "{" Block "}"					# creation
@@ -89,6 +81,6 @@ Object 		-> "(" Block ")"										# creation
 			| Object %propAccess %tag
 			| Object "[" Block "]"									# computed property access
 
-			| Object -> "..."										# capture block
+			| "..."													# capture block
 
 			| %identifier | %string | %number

@@ -1,5 +1,6 @@
-import { moo } from './mooModule.js';
+import { importCommonJS } from './utils.js';
 
+const moo = importCommonJS('moo', 'node_modules/moo/moo.js')
 let rules = {
 	WS:      /[^\S\n]+/,
 	comment: /\/\/.*?$/,
@@ -17,6 +18,10 @@ let rules = {
 	lbracket: '[',
 	rbracket: ']',
 
+	// these token types are assigned dynamically in the Lexer,
+	// but we need to specify their names here so the grammar can detect them
+	unary_op: [],
+	spaced_unary: [],
 	operator: ['!','+','-','**','*','/','%','<=','>=','<','>','==','=','!=','!==','&','|'],
 
 	colon: ':',
@@ -142,4 +147,4 @@ class Lexer {
 	}
 }
 
-export { Lexer };
+export { Lexer, rules };

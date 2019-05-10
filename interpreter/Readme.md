@@ -1,3 +1,13 @@
+### Compile Grammar
+
+Make sure you have nearley installed
+
+	npm install -g nearley
+
+Then use
+
+	nearleyc grammar.ne -o grammar.js
+
 ### Run
 
 Because the interpreter uses ES6 modules, you can't just open the HTML file. First open a webserver using
@@ -23,3 +33,9 @@ Tests are written using the [Jest](https://jestjs.io/) testing framework. All te
 and run tests using
 
 	npm test
+
+or to run an individual test file
+
+	npm test -- <filename>
+
+note that you only need the prefix, so to run `lexer.test.js` use `npm test -- lexer`

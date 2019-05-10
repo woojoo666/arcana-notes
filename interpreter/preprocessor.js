@@ -1,6 +1,6 @@
 // PreProcessor and Block Classes
 
-import { matchAll } from './matchAllPolyfill.js';
+import { matchAll } from './utils.js';
 
 // notice that indentation regexes include lines with zero indentation
 const indentRegex = /\n([^\S\n]*)(?=\S)/;  // [^\S\n] matches all whitespace except newlines. you can also use (?!\n)\s
