@@ -1,9 +1,20 @@
 <html>
 <head>
 	<script src="node_modules/nearley/lib/nearley.js"></script>
-	<!--script src="grammar.js"></script-->
+	<script src="node_modules/moo/moo.js" ></script>
+	<script src="lexerWrapper.js" type="module" defer></script>
+	<script src="grammar.js" defer></script>
 	<!--script src="parser.js"></script-->
-	<!--script src="node_modules/moo/moo.js"></script-->
+	<script type="module" defer>
+		import { importCommonJS } from './utils.js';
+
+		let grammar = importCommonJS('grammar');
+
+		const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
+		parser.lexer.setBlockType('Indent');
+		parser.feed('test');
+		console.log(parser.results);
+	</script>
 </head>
 <body>
 <script>
@@ -29,14 +40,6 @@
 
 
 
-</script>
-<script type="module">
-	import { grammar } from './grammarModule.js';
-
-	const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
-	parser.lexer.setBlockType('Indent');
-	parser.feed('test');
-	console.log(parser.results);
 </script>
 <!--script src="tests.js"></script-->
 <script type="module">

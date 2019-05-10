@@ -18,22 +18,13 @@ const matchAll = (text, pattern) => ({
 	}
 });
 
-// synchronous XMLHttpRequest + eval() is the only way I can find to load files synchronously
-// to explain why we need this, see [this SO question](https://stackoverflow.com/q/56069232/1852456)
-function loadScriptSync(file) {
-	var req = new XMLHttpRequest();
-	req.open('GET', file, false);
-	req.send(null);
-	eval.call(window, req.responseText); // call eval() with `window` as the scope, so `moo.js` loads correctly
-}
-
 // Utility function for retrieving commonJS or browser objects from ES6 modules
-function importCommonJS (name, filename) {
-	filename = filename || name + '.js';
+function importCommonJS (name) {
 	if (typeof module === 'object' && module.exports) {
 		return require(name);
 	} else { // if we aren't in Node.js, assume we are in the browser
-		loadScriptSync(filename);
+		if (!window[name])
+			throw Error('please include the script for ' + name + ' in your html');
 		return window[name];
 	}
 }

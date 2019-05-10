@@ -1,6 +1,7 @@
 import { importCommonJS } from './utils.js';
 
-const moo = importCommonJS('moo', 'node_modules/moo/moo.js')
+const moo = importCommonJS('moo');
+
 let rules = {
 	WS:      /[^\S\n]+/,
 	comment: /\/\/.*?$/,
