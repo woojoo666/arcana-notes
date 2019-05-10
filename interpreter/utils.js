@@ -24,7 +24,7 @@ function loadScriptSync(file) {
 	var req = new XMLHttpRequest();
 	req.open('GET', file, false);
 	req.send(null);
-	eval(req.responseText);
+	eval.call(window, req.responseText); // call eval() with `window` as the scope, so `moo.js` loads correctly
 }
 
 // Utility function for retrieving commonJS or browser objects from ES6 modules
@@ -33,7 +33,7 @@ function importCommonJS (name, filename) {
 	if (typeof module === 'object' && module.exports) {
 		return require(name);
 	} else { // if we aren't in Node.js, assume we are in the browser
-		loadScriptSync.call(window, filename);
+		loadScriptSync(filename);
 		return window[name];
 	}
 }
