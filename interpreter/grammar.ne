@@ -4,7 +4,6 @@
 const lexerWrapper = (typeof module === 'object' && module.exports)
 						? require('./lexerWrapper.js')
 						: window.lexerWrapper;
-console.log(lexerWrapper);
 %}
 @lexer lexerWrapper
 
@@ -20,19 +19,19 @@ console.log(lexerWrapper);
 #	private identifiers can't be used in property access, eg `foo._bar`
 #   when stripping parenthesis, the block inside must be a single-item list
 
-Block 		-> Params:? (Statement (","|"\n")):* Statement:?		# note: trailing commas allowed
+Block 		-> Params:? (Statement (","|"\n")):* Statement:?		{% ([parameters,middle,last]) => ({type:'block', parameters, statements: last ? [...middle,last] : last}) %} # trailing commas allowed
 
-Params		-> VarList ">>"
-VarList		-> (%identifier ",":?):* %identifier					# commas optional, but no trailing commas allowed
+Params		-> VarList ">>"											{% ([varlist]) => varlist %}
+VarList		-> (%identifier ",":?):* %identifier					{% ([middle,last]) => [...middle.map(([x])=>x.value),last.value] %} # commas optional, but no trailing commas allowed
 
-Statement	-> %identifier ":" Expression							# properties (TODO: support destructuring)
+Statement	-> %identifier ":" Expression							{% ([token, ,value]) => ({type:'property', key: token.value, value}) %} # (TODO: support destructuring)
 			| "[" %identifier "]" ":" Expression					# dynamic keys (TODO: support destructuring)
-			| SpacedItem:+											# one or more space-delimited list items
+			| SpacedItem:+											{% ([items]) => ({type:'subList', items}) %} # one or more space-delimited list items
 			| SpacedUnary											# a single spaced-unary object
 			| "tag" %tag											# declaring tags
 
 			| Object %propAccess %tag ":" Expression				# setting tags
-			| Object "<:" Expression								# insertion
+			| Object "<:" Expression								{% ([target, ,value]) => ({type:'insertion', target, value}) %}
 
 			| "if" Expression ":" BracedBlock ("else" BracedBlock):?	# conditionals
 			| "for" VarList "in" Expression ":" BracedBlock			# for-loop (TODO: support destructuring)
@@ -51,36 +50,51 @@ SpacedItem	-> Ternary												# note that spaced list items cannot be SpacedU
 # note: using Javascript operator precedence:
 #	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
 
-Expression	-> Ternary												# operator expression, starting from lowest precedence
-			| SpacedUnary											# any expression can also be a single spaced-unary object
+# the following rules are for expressions and operators, starting from lowest precedence
+# note that any expression can also be a single spaced-unary object
+Expression	-> Ternary												{% id %}
+			| SpacedUnary											{% id %}
 
-Ternary		-> Or "?" Ternary "else" Ternary						# right associative
-			| Or
+Ternary		-> Or "?" Ternary "else" Ternary						{% ([condition, ,trueBranch, ,falseBranch]) => ({type:'ternary',condition,trueBranch,falseBranch}) %} # right associative
+			| Or													{% id %}
 
-Or			-> Or "|" And | And
-And			-> And "&" Eq | Eq
+# TODO: we might be able to convert each operator to be like `Or -> (And "|"):* And`
+# that way operator precedence can be handled in post-processing, and we only have a single rule for each operator
 
-Eq			-> Eq ("=="|"="|"!=="|"!=") Compare | Compare
-Compare		-> Compare ("<="|">="|"<"|">") Sum | Sum
+Or			-> Or "|" And											{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+			| And													{% id %}
+And			-> And "&" Eq											{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+			| Eq													{% id %}
 
-Sum			-> Sum ("+"|"-") Product | Product
-Product		-> Product ("*"|"/"|"%") Exp | Exp
-Exp			-> Unary "**" Exp | Unary								# right associative
+Eq			-> Eq ("=="|"="|"!=="|"!=") Compare						{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+			| Compare												{% id %}
+Compare		-> Compare ("<="|">="|"<"|">") Sum						{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+			| Sum													{% id %}
 
-Unary		-> %unary_op Unary | Object
+Sum			-> Sum ("+"|"-") Product								{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+			| Product												{% id %}
+Product		-> Product ("*"|"/"|"%") Exp							{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+			| Exp													{% id %}
+Exp			-> Unary "**" Exp										{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}	# right associative
+			| Unary													{% id %}
+
+Unary		-> %unary_op Unary										{% ([op,value]) => ({type:'unaryop',operator: op.value,value}) %}
+			| Object												{% id %}
 
 SpacedUnary	-> %unary_op:* %spaced_unary %unary_op:* Object         # at least one spaced_unary, and exactly one operand
 
-Object 		-> "(" Block ")"										# creation
-			| "template":? Params:? "{" Block "}"					# creation
-			| Object "(" Block ")"									# cloning
-			| Object "(" Block ")" "->"								# calling
-			| Object "template":? "{" Block "}"						# cloning
+Object 		-> "(" Block ")"										{% ([ ,block, ]) => ({type:'create',block}) %}
+			| "template":? Params:? "{" Block "}"					{% ([templ,parameters, ,block, ]) => ({type:'create',block,template: !!templ,parameters}) %}
+			| Object "(" Block ")"									{% ([source, ,block, ]) => ({type:'clone',source,block}) %}
+			| Object "template":? "{" Block "}"						{% ([source,templ, ,block, ]) => ({type:'clone',source,block,template: !!templ}) %}
 
-			| Object %propAccess %identifier						# notice, no private vars allowed
+			| Object "->"											{% ([source]) => ({type:'callResult',source}) %} # calling
+			| Object %propAccess %identifier						{% ([source, ,key]) => ({type:'memberAccess',source,key}) %}
 			| Object %propAccess %tag
 			| Object "[" Block "]"									# computed property access
 
 			| "..."													# capture block
 
-			| %identifier | %string | %number
+			| %identifier											{% ([token]) => ({type:'reference', name: token.value}) %}
+			| %string												{% ([token]) => ({type: 'string', value: token.value}) %}
+			| %number												{% ([token]) => ({type: 'number', value: token.value}) %}

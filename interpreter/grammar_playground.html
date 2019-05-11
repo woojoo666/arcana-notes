@@ -1,12 +1,25 @@
 <html>
 <head>
 	<script src="node_modules/nearley/lib/nearley.js"></script>
-	<script src="grammar.js"></script>
-	<script src="parser.js"></script>
-	<script src="node_modules/moo/moo.js"></script>
+	<script src="node_modules/moo/moo.js" ></script>
+	<!-- see here(https://stackoverflow.com/a/56070428/1852456) why we use "defer" for the following scripts-->
+	<script src="lexerWrapper.js" type="module" defer></script>
+	<script src="grammar.js" defer></script>
+	<!--script src="parser.js"></script-->
 </head>
 <body>
-<script>
+<script type="module" defer>
+import { grammar } from './grammarModule.js';
+
+function parse(text) {
+	console.log('PARSING: ' + text);
+	const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
+	parser.lexer.setBlockType('Indent');
+	parser.feed(text);
+	console.log(parser.results);
+}
+
+parse('x y >> foo: bar, num: -1+x*2/y');
 </script>
 </body>
 </html>
