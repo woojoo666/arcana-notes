@@ -9289,3 +9289,69 @@ hmm...
 * we only allow spaced unary operators if there is a single operand, so something like `! !! !1` is legal
 
 * you can find the implementation in `Lexer.js`
+
+### Type System is just a form of Constraint System
+
+* types are just a way of enforcing constraints
+* but types are a specific type of constraint, a hierarchal tree form
+
+* but you can have many different types of constraint systems
+* eg CSS constrains HTML elements to 2D space
+	* and you can make elements align to their container, or stack side by side (flexbox), etc
+
+* Axis tries to avoid tree hierarchies, which are often unnecessarily restricting approximations
+* Axis treats all constraint systems the same, and doesn't enforce any of them by default
+
+### Anatomy of a Module II - Insertions as Backward References
+
+* objects are defined solely by the child objects that they create
+* properties are just references to child objects
+	* they let an external object read from a child object
+* and insertions are just backward-references to child objects
+	* they send a child object to an external object
+
+* this is different from what we defined earlier in "Anatomy of a Module"
+* because in that section, we said that the "behavior" of a module includes the child objects, and the insertions
+* but now I realize that insertions are just backward references
+
+* this is important because, before, I thought about insertions almost like cloning
+* as if there was an `insert()` function
+* recall that, for cloning, if it fails, it returns `undefined`
+* even if you had something like
+
+		foo:
+			console.log("hello")
+
+* if `console` didn't exist, the whole thing would return `undefined`, and it would appear as an `undefined` list item
+* I thought that insertion might work the same way, every insertion would also be a list item, and if it failed it would return `undefined`
+	* though I don't think I wrote this thought down anywhere
+* however, if we think about insertions as backward references, then it doesn't make sense to have them be list-items as well
+* they should act like properties, and properties aren't list items
+
+* shows how symmetric properties and insertions are
+
+* previously we talked about how insertions and properties are different, asymmetric
+* eg insertions are unnamed, properties are named, etc
+	// TODO: FIND REFERENCED SECTION
+* but maybe we could imagine an even more symmetric system/language
+* where every object only has one reference, one property (like functional langs, where functions have a single return value)
+* that way, when you reference an object, you can only retrieve one value, so reads are unnamed
+* for every object, you can only clone it (and provide "arguments"), or read the value
+* this would turn property access and dynamic properties, into syntax shorthand for a special argument, eg `_return`
+* so instead of:
+
+		someObject.someProperty
+
+* you would do something like
+
+		someObject(_return: "someProperty")->
+
+* this sorta makes sense, because after all, after we added dynamic properties, property access started acting like function calling
+
+* actually we already sort of talked about these concepts in "Asymmetry Between Property Access and Insertion II - named reads vs anonymous writes"
+* insertions are "named" as well, because the collectors are named
+* naming is just a way for the programmer to specify bindings
+
+* how does cloning and combining and merging fit into this
+* if there are no properties, how does combining work?
+* how do you specify "arguments"? what even are "arguments"?

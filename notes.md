@@ -3933,6 +3933,11 @@ vvvv move this to philosophy section? vvvv
 25. when we declare or extend objects, we define behavior that should be duplicated
 	* section: "Defining Behavior That Should be Duplicated"
 25. modifications "Actor Model vs Functional - Modifications and State", "Referential Transparency"
+25. objects solely defined by the child objects that they create (//TODO: FIND REFERENCED SECTION)
+	* properties are just references to child objects
+	* insertions are just backward-references to child objects
+	* we also talked about this a bit when talking about templates? // TODO: FIND REFERENCED SECTION
+	* section: "The Nature of Objects - Insertions as Backward References"
 
 ### Implementation Rules
 
