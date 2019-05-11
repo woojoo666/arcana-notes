@@ -11,15 +11,17 @@
 <script type="module" defer>
 import { grammar } from './grammarModule.js';
 
-function parse(text) {
+function parse(text, blockType) {
 	console.log('PARSING: ' + text);
 	const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
-	parser.lexer.setBlockType('Indent');
+	parser.lexer.setBlockType(blockType);
 	parser.feed(text);
 	console.log(parser.results);
 }
 
-parse('x y >> foo: bar, num: -1+x*2/y');
+parse('x y >> foo: bar, num: -1+x*2/y', 'Indent');
+parse('x y >> foo: bar\n num: -1+x*2/y', 'Indent');
+parse('x y >> foo: bar\n num: -1+x*2/y', 'Braces'); // this should fail
 </script>
 </body>
 </html>
