@@ -9355,3 +9355,43 @@ hmm...
 * how does cloning and combining and merging fit into this
 * if there are no properties, how does combining work?
 * how do you specify "arguments"? what even are "arguments"?
+
+### combiners and symmetry
+
+using diagram-syntax, it is a lot more intuitive to represent cloning in terms of a source + arguments
+but in the interpreter, it seems cleaner to implement it using a combiner, source1, and source2 (treat arguments as another source)
+
+the same is true for functional
+it is intuitive to represent it syntactically as fn(arg)
+
+cloning is kinda like gene splicing (mentioned earlier // TODO: FIND REFERENCED SECTION)
+functions aren't symmetric though
+but is cloning really symmetric?
+cloning arguments are passed to the source
+but it's not like the source passes arguments to the arguments
+
+actually clone arguments aren't some secret data passed to the source like previously thought
+// TODO: FIDN REFERENCED SECTION
+they are passed to the combiner
+so only the child object can see it
+though the child object can pass it back to the source (if that is part of it's behavior)
+
+however it can be made symmetric
+we could design it so you can specify parameters in the arguments
+eg `srcObj(a b >> result: a+b)`
+and it pulls them from the source (from the source's list items)
+however that is pretty weird and unintuitive syntactically
+but it does show that it can be symmetric
+
+can functional be made symmetric too?
+in a sense, if you had a function `plus3()` and the argument `5`
+`5` is a function as well, in church numerals
+if we think in terms of concepts/relationships
+`plus3` is just as much of a "concept" as `5`
+so when you combine the concept of `plus3` and `5`, it doesn't matter what order you combine them
+however, you do have to specify _how_ they are being combined
+for example, for `divide => a => b => result`, the first argument goes to the numerator, the second argument goes to the denominator
+they have to go to specified locations for the function to make sense
+also sort of like meiosis and gene splicing, where the two sides have to combine at specific places
+also like how in my language, you have to specify what properties each argument goes to
+
