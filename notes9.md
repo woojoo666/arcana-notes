@@ -9383,6 +9383,10 @@ and it pulls them from the source (from the source's list items)
 however that is pretty weird and unintuitive syntactically
 but it does show that it can be symmetric
 
+in addition, the fact that the arguments override the source (and not the other way around) makes it asymmetric
+but we discussed this issue, along with possible ways to make it symmetric, in a previous section
+// TODO: FIND REFERENCED SECTION
+
 can functional be made symmetric too?
 in a sense, if you had a function `plus3()` and the argument `5`
 `5` is a function as well, in church numerals
@@ -9398,7 +9402,7 @@ also like how in my language, you have to specify what properties each argument 
 it's also rather fitting that an actor-model language, one that mimics independent organisms
 uses a mechanism similar to meiosis when creating new objects
 
-### interpreter mechanism brainstorm
+### interpreter mechanism and implementation brainstorm
 
 * everything is eagerly evaluated for now,
 	* except for conditional branches, which are lazy evaluated
@@ -9461,7 +9465,7 @@ uses a mechanism similar to meiosis when creating new objects
 * nothing is defined, because the definitions are cyclic
 * you aren't allowed to have feedback in the ancestry graph
 * even though you can have feedback in the dependency graph
-* eg in the feedback examples shown earlier
+* eg in the feedback examples shown earlier (// TODO: FIND REFERENCED SECTION)
 
 		output: input | output
 
@@ -9471,7 +9475,7 @@ uses a mechanism similar to meiosis when creating new objects
 
 * so the ancestry graph doesn't have feedback, `output` is defined in terms of `or`, which is already defined
 * none of the earlier examples of feedback had ancestry feedback either
-* eg the units example
+* eg the units example (// TODO: FIND REFERENCED SECTION)
 			
 		distance:
 			km: m*1000
@@ -9480,3 +9484,75 @@ uses a mechanism similar to meiosis when creating new objects
 			mm: m/1000
 
 * notice how all ancestors are `*`, `/` and `|`, so no ancestry feedback
+
+###  interpreter mechanism and implementation brainstorm II
+
+* note that a node listens to another node only if it:
+	1. is a clone of that node
+	2. gets its value from that node, eg `bar: (x: a+b), foo: bar.x` will make `foo` listen to the `+` node of `a+b`
+		* notice that `foo` listens directly to `a+b`, not to `bar` or `bar.x`, this is similar to the idea of alias binding
+			// TODO: FIND REFERENCED SECTION
+
+* it gets a little complicated with if-statement blocks
+* because listeners get attached/detached depending on if a conditional block is enabled
+* instead, we can convert if-statement blocks to ternary expressions
+* eg something like
+
+		if (cond):
+			foo: "hello"
+			bar: 20
+		else:
+			foo: "world"
+
+* gets converted into
+
+		foo: cond ? "hello" else "world"
+		bar: cond ? 20 else undefined
+
+* this way we don't have to worry about attaching or detaching listeners
+* anybody reading/cloning foo, just had to listen to the ternary node
+* I call this **conditional-block-transform**
+
+
+* can we find a simpler, less "dynamic" way of creating and evaluating all the nodes
+* instead of recursing deeper and deeper and slowly growing our graph, and dynamically creating nodes if they aren't created yet
+* it's important to note that, even during runtime, we may have to create new nodes
+	* eg, if a ternary switches to a branch that calls a function
+* however, it doesn't seem like during runtime, we ever have to clone a node that hasn't been created yet
+* creating nodes seems like more of a set-up thing
+* so can we do all the node creation in an initial pass, and then all the evaluation follows the same mechanism that it does during runtime?
+
+* case study:
+
+		a: b.c
+		b: (c: 10)
+
+* first, we evaluate `a` because it is the first property of the root block
+* it references `b.c`, both of which haven't been created yet
+* hmm, maybe we can create all the root nodes, without evaluating them yet
+* then, we first evaluate `a`, which attaches a listener to `memberAccess(b, "c")`
+* then, we evaluate `b`, which creates `(c: 10)`
+* this also updates all listeners to `memberAccess(b, "c")`, which updates `a`
+
+* so it seems like what we need to do, is simply, for each block (starting from root block)
+	1. create nodes for all the properties
+	2. evaluate all properties from first to last
+	3. if any properties create a new block, do the same thing
+* and this process is followed during runtime as well
+
+* notice that we have slightly changed the way we treat member access, compared to what we talked about earlier in this section
+* earlier we said that, in `bar: (x: a+b), foo: bar.x`, `foo` will listen to the `+` node of `a+b`
+* however, it now seems like `foo` should listen to `memberAccess(bar, "x")`, which then listens to the `+` node
+
+* but note that these `memberAccess` nodes actually only get updated once
+* initially `memberAccess(bar,"x")` will give undefined, but when it is evaluated it will return the `+` node
+* and then it will never change
+* (conditional blocks can cause `memberAccess` nodes to update, but not if we do conditional-block-transform mentioned earlier)
+* so maybe it would be better to just skip these `memberAccess` nodes
+* after all, properties are static, they don't change, so there's no need to treat it as dynamic like the other nodes
+* however, this means that for something like `foo: a.b.c.d`, we would have to start evaluating `a` to figure out what `.b` points to,
+* and then start evaluating `b` to figure out what `.c` points to, etc
+* so we can't do this block-by-block create-then-evaluate mechanism anymore
+* if there are deep property accesses, we would need to eagerly start evaluating them
+
+* also note that `memberAccess` could change due to dynamic properties...
