@@ -9395,3 +9395,88 @@ they have to go to specified locations for the function to make sense
 also sort of like meiosis and gene splicing, where the two sides have to combine at specific places
 also like how in my language, you have to specify what properties each argument goes to
 
+it's also rather fitting that an actor-model language, one that mimics independent organisms
+uses a mechanism similar to meiosis when creating new objects
+
+### interpreter mechanism brainstorm
+
+* everything is eagerly evaluated for now,
+	* except for conditional branches, which are lazy evaluated
+* for a given node, child nodes can be created and evaluated in any order,
+* but it is most efficient to create them from the leaves and recurse to higher nodes.
+* So for `x: mult(sum(a,b),div(c,d))`, the child nodes are `mult`, `sum`, and `div`,
+* and we should create `sum` and `div` before `mult`
+
+* first let's look at functional, which is a bit simpler
+* also, for now doesn't have to be reactive or persistent, just evaluate every call/clone once
+
+* for functional, the way it works is:
+* first, recall that all functions are defined at root level,
+* so first build the scope, a list of all function names and their ASTs
+* then start from the program's return value (should be a single function call), and work backwards
+* for every function call, first evaluate the parameters
+* then, after getting the parameters, evaluate the body of the function (the AST)
+
+* for my language, every property in a block needs to be evaluated
+* there is no "start" point, that we can start from and work backwards like functional
+* however, there's also no order we need to follow when evaluating properties
+* so just choose any property and start evaluating
+* when you're done, choose one of the remaining properties and evaluate, and so on
+
+* start from root block
+* add all property names to scope
+* start from first property, and start evaluating the value
+* every time you evaluate something, you create a new `Node`
+* for every object clone, first evaluate the arguments object
+	* but while doing so, inherit the scope of the source object
+	* so if it encounters a scoped var, first look for it in arguments object scope,
+	* but then look for it in source scope
+	* and lastly check the cloner's surrounding scope
+* when you encounter a scoped var that has a `Node` and is done evaluating, just get it's value
+* when you encounter a scoped var that doesn't have a `Node`, create one and evaluate it
+* if you encounter a scoped var that has a `Node`, but isn't finished evaluating, register a listener
+* this should take care of feedback
+
+* to turn it into reactive/persistent, instead of retrieving values instead attach listeners
+
+### Ancestry Graph and Feedback
+
+* note that it seems like, since for every clone we first evaluate the arguments object
+* but that arguments object could also be a clone of something, eg `result: fn.apply(args), args: x(10)`
+* so it will keep recursing deeper until it finds an object that isn't a clone of anything, no ancestors
+* a "root" object, almost like the Adam and Eve of the program
+* but what if there are no root objects? eg:
+
+		a: clone(src: b, args: c)
+		b: clone(src: c, args: a)
+		c: clone(src: a, args: b)
+
+* even something like
+
+		a: b(c)
+		b: c(a)
+		c: a(b)
+
+* I don't think this works
+* nothing is defined, because the definitions are cyclic
+* you aren't allowed to have feedback in the ancestry graph
+* even though you can have feedback in the dependency graph
+* eg in the feedback examples shown earlier
+
+		output: input | output
+
+* notice that this is equivalent to
+
+		output: or(input, output)->
+
+* so the ancestry graph doesn't have feedback, `output` is defined in terms of `or`, which is already defined
+* none of the earlier examples of feedback had ancestry feedback either
+* eg the units example
+			
+		distance:
+			km: m*1000
+			m: km/1000 | cm*100 | mm*1000
+			cm: m/100
+			mm: m/1000
+
+* notice how all ancestors are `*`, `/` and `|`, so no ancestry feedback
