@@ -2,6 +2,7 @@ import { Lexer, rules } from './lexer.js';
 
 // wrap my Lexer class to conform to Nearley lexer interface (see https://nearley.js.org/docs/tokenizers)
 // included an additional method, "setBlockType", which should be called before reset()
+// this is a bit of a hack though, see https://github.com/kach/nearley/issues/436
 const lexerWrapper = {
 	setBlockType (blockType) {
 		this.blockType = blockType;

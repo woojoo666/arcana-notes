@@ -19,7 +19,7 @@ function parse(text, blockType) {
 	console.log(parser.results);
 }
 
-parse('x y >> foo: bar, num: -1+x*2/y', 'Indent');
+parse('x y >> foo: bar, num: -1+x*2/y, result: sum(a:10,b:20)', 'Indent');
 parse('x y >> foo: bar\n num: -1+x*2/y', 'Indent');
 parse('x y >> foo: bar\n num: -1+x*2/y', 'Braces'); // this should fail
 </script>

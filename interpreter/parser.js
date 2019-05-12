@@ -1,3 +1,4 @@
+import { grammar } from './grammarModule.js';
 
 // --------------------------- PARSER ----------------------------
 
@@ -29,3 +30,5 @@ function parse (text, blockType) {  // TODO: when we write our tokenizer, change
 		console.log("Error at character " + err.offset);
 	}
 }
+
+export { parse };
