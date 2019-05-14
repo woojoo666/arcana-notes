@@ -9443,6 +9443,9 @@ uses a mechanism similar to meiosis when creating new objects
 
 * to turn it into reactive/persistent, instead of retrieving values instead attach listeners
 
+* note that we might be able to treat property access `.` as a binary operation
+* in other words, the `MemberAccessNode` should extend `BinopNode`
+
 ### Ancestry Graph and Feedback
 
 * note that it seems like, since for every clone we first evaluate the arguments object
@@ -9556,3 +9559,149 @@ uses a mechanism similar to meiosis when creating new objects
 * if there are deep property accesses, we would need to eagerly start evaluating them
 
 * also note that `memberAccess` could change due to dynamic properties...
+* also important to note that, often numeric indices are from dynamic properties
+* eg, in something like `foo: (...inputArray, 10, 20), bar: foo[3]`
+* we have no idea what `foo[3]` is going to be unless we evaluate `inputArray` first, and count how many list items `inputArray` has
+* which kinda shows that spread operator has to use dynamic properties to work
+
+###  interpreter mechanism and implementation brainstorm III - Statically Resolving Member Access
+
+(continued from previous section)
+
+* how did we implement the reactive "interpreter" back when we were implementing `Wijit`?
+* if you look at the very first section, "Structure", as well as `databindingtests - DOMstate.html`, you can see that we used two structures
+* the first, `values`, just stored the values of each object, eg `foo.bar` would be stored at `values.foo.bar`
+* the second, `bindings`, stored the listeners and their eval functions for each object
+	* so if `foo.bar` updates `x.y`, then `bindings.foo.bar` stores the evaluation function for `x.y`, and if `foo.bar` changes,
+	* it triggers this eval function, and re-evaluates `x.y` (which in turn triggers the eval functions stored at `bindings.x.y`, and so on)
+* hmm what happens if we have multiple paths that resolve to the same object?
+* eg, if we have `bind(DOMstate.root, 'x = a ? b : c');`
+* then if `a` is true, `x` and `b` point to the same thing
+* so if `b` changes, will `x` change to reflect it?
+* yes, because the expression `x = a ? b : c` will cause `x` to be re-evaluated if `a`,`b`, or `c` change
+* even if `b.prop` changes, `x` will change since it is just a pointer to `b`
+
+* but what if we did `bind(DOMstate.root, 'x = a.b.c');`?
+* if you look at `followPath(path, obj, createifneeded)`, it seems like it will follow the path `a.b.c`,
+* and dynamically create nodes in `bindings` if they don't exist yet
+* so this seems like the dynamic recursive method
+* though actually, all it does is create the path and then attach listeners, but it doesn't start evaluating `a` or `a.b` or `a.b.c`
+* so later if you bind `a` or `a.b`. or `a.b.c`, that is when it will evaluate those values, and trigger the listener
+* so maybe it is more similar to the block-by-block method, where you attach listeners to `memberAccess` nodes,
+	* that get triggered when the node is finally evaluated?
+* except it's not creating `memberAccess` nodes, it's just directly creating the nodes under `a` and `a.b`
+
+* so I guess the way it works is
+* for every block, queue all the properties for creation + evaluation
+* when creating + evaluating a property, if the property is already created, start evaluation
+* during evaluation, if we reference properties that don't exist yet, create them as empty nodes
+* though is this necessary? why not just return `undefined`, why create these empty nodes
+* what if we do `x: a.b.c` but `a` is never defined, then we will perpetually have these empty nodes wasting memory
+* well they aren't exactly empty, they store listeners, the triggers to re-evaluate `x`
+* but if we listen to `memberAccess` nodes, then when `a` gets defined, it will re-evaluate `x` to listen for `a.b`,
+	* and then when `b` gets defined, it will listen for `a.b.c`, etc
+* for `memberAccess` method, we would have 3 stacked listeners, `memberAccess(memberAccess(memberAccess(scope, "a"), "b"), "c")`
+* which is pretty similar to listening for `a.b.c` directly, attaching a listener to the empty path "a.b.c" 
+* because if you listen for "a.b.c", you will have to listen for `a`, `a.b`, and `a.b.c` anyways
+
+* only at the beginning do we have to parse ASTs
+* during runtime, we only deal with nodes
+* perhaps we should parse all ASTs first, and then queue clones and creations for runtime
+
+* while parsing the ASTs, we can directly create nodes for each property
+* so if we have something like
+
+		{type: "property", key: "foo", value: {
+			type: "ternary",
+			condition: { type: "reference", name: "a" },
+			trueBranch: { type: "reference", name: "b" },
+			falseBranch: { type: "reference", name: "c" }
+			}
+		}
+
+* then it would turn into
+
+		PropertyNode { key: "foo", value: Ternary { 
+			condition: Node { key: "a" value: ... },           <--- also resolve references using nodes from scope
+			trueBranch: Node { key: "b" value: ... },
+			falseBranch: Node { key: "c" value: ... },
+			}}
+
+* note that there is no evaluation
+* we are just converting all ASTs to nodes, and resolving scope references
+* because we need to resolve scope references, we need to go block-by-block
+* the only time we can't go block by block is when it comes to these member accesses, which we are trying to resolve ahead of time
+* hmm but what if the object we are accessing is a clone
+
+		foo: a.b.c
+		a: sourceObj(b: (c: 10))
+
+* we can't resolve the member acceses without evaluating
+* well I guess we kind of can, we can see from the arguments that `a.b.c` will be `10`
+* is this always possible?
+* what about
+
+		foo: a.b.c
+		a: cond ? x else y
+
+* it seems like we do have to evaluate the ternary, in order to resolve `a.b.c`
+* the tree looks like `memberAccess(memberAccess(ternary(cond,x,y), "b"), "c")`
+* so `ternary` needs to be resolved first
+* and every time `ternary` changes, `memberAccess` will change as well
+* so this seems like a case where `memberAccess` might update multiple times
+
+* ternary and if-statements shouldn't be anything special though
+* recall from our exploration of functional langs, that if-expressions can be represented using functional
+	// TODO: FIND REFERENCED SECTION
+* to use the same method, we turn something like
+
+		cond ? trueBranch else falseBranch
+
+* turns into
+
+		// define booleans in terms of functions
+		True: trueFn, falseFn >>
+			result: trueFn
+		False: trueFn, falseFn >>
+			result: falseFn
+
+		ternaryOp: cond, trueBranch, falseBranch >>
+			=> cond(trueBranch, falseBranch).result
+
+* now ternaries are reduced to cloning and property access
+* which means everything (ignoring insertion) can be reduced to cloning and property access
+* so as long as we can implement both of those without `memberAccess` nodes, then we never need `memberAccess` nodes
+* and we already talked about how to do it
+* any time we access a member of a clone, we can analyze whether that property is coming from the source or the arguments object
+* however, at that point, aren't we basically evaluating the cloning operation?
+
+* also, if we want to statically resolve the property access of `cond(trueBranch, falseBranch).result` (from the ternary example above)
+* then we have to know what `cond` is, we have to evaluate `cond`
+* for example, if we had `cond: isPrime(3**7+5)`, then we have to evaluate it to figure out what `cond` is, so we can analyze the cloning 
+
+* not to mention, if `cond` is an input to the program, we can't evaluate it statically beforehand
+
+* this sort of starts to show that the functional, recursive way of interpretting a program,
+* relies strongly on evaluating a function's dependencies before evaluating the function
+* we would be able to skip these `memberAccess` nodes, if we could fully evaluate the source/parent of the member access
+* in fact, we could skip all nodes, and store nothing in memory, and just spit out the result, if we could fully evaluate all dependencies
+* however, the only time an object's members can be statically resolved, is if it is a root object (not a clone of anything)
+* eg in the example from earlier, `bar: (x: a+b), foo: bar.x`, where `bar` is a root object so `bar.x` can be statically resolved
+* actually, some clones can be statically resolved as well, eg if it is a clone of a root object
+* `bar: (x: a+b), zed: bar(x: 10), foo: zed.x`
+* in fact, it seems like what is happening, is that as long as the source of the clone is not dependent on program inputs, aka static, then it can be statically resolved
+* which seems pretty obvious in retrospect
+* essentially what we are doing, is doing static analysis of the program, evaluating as much as we can beforehand (like removing `memberAccess` nodes) to save memory
+
+* in functional, we start from output and go backwards, evaluating dependencies first, so that we can discard them after evaluating their values
+* but that assumes that we _can_ evaluate dependencies fully
+* however, in reactive programming, where inputs can change, we can't always know what the value of a dependency will end up being
+* so either, we maintain intermediate values, to speed up re-evaluation (an "incremental" system)
+* or we just re-evaluate the entire thing whenever values change
+
+* for now I am going with the incremental model, because that feels more natural for a reactive language
+* which basically means, we are storing `memberAccess` nodes
+* so the system is
+	1. convert ASTs to nodes
+	2. evaluate
+* we won't worry about optimizing evaluation order yet
