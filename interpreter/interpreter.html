@@ -2,6 +2,7 @@
 <head>
 	<script src="node_modules/nearley/lib/nearley.js"></script>
 	<script src="node_modules/moo/moo.js" ></script>
+	<!-- see here(https://stackoverflow.com/a/56070428/1852456) why we use "defer" for the following scripts-->
 	<script src="lexerWrapper.js" type="module" defer></script>
 	<script src="grammar.js" defer></script>
 	<!--script src="parser.js"></script-->
@@ -42,6 +43,11 @@
 
 </script>
 <!--script src="tests.js"></script-->
+<script type="module">
+	import { Interpreter } from './interpreter.js';
+
+	new Interpreter('x y >> foo: bar\n bar: -1+x*2/y').interpretTest('Indent');
+</script>
 <script type="module">
 	import { PreProcessor, Block } from './preprocessor.js';
 

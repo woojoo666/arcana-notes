@@ -33,60 +33,62 @@ Notice that it is recursive, so every object node contains child object nodes,
 
 // see section "interpreter mechanism and implementation brainstorm" to see how all this works
 
-// override properties in the source node with arguments, and re-evaluate
-function clone (sourceNode, argumentsNode) {
-
-}
-
-// Scope leverages the javascript prototypal inheritance system
-class Scope {
-	// appends the variables to the scope
-	constructor (variables) {
-		this.vars = variables;
-	}
-	extend (variables) {
-
-		var newScope = Object.create(this.scope); // leverage javascript inheritance for scopes
-		for (let v of variables) {
-			this[v.name] = v.value;
-		}
-	}
-	resolve (name) {
-		return this.
-	}
-}
-
-function NodeFactory (syntaxNode, scope) {
+function NodeFactory (syntaxNode) {
 	switch (syntaxNode.type) {
-		case 'block': return Node(syntaxNode, scope);
-		case 'binop': return BinopNode(syntaxNode, scope);
-		case 'unary': return UnaryNode(syntaxNode, scope);
-		case 'memberAccess': return MemberAccessNode(syntaxNode, scope);
-		case 'reference': return scope.resolve(syntaxNode.value);
-		case 'string': return StringNode(syntaxNode);
-		case 'number': return NumberNode(syntaxNode);
+		case 'block': return new ObjectNode(syntaxNode);
+		case 'binop': return new BinopNode(syntaxNode);
+		case 'unaryop': return new UnaryNode(syntaxNode);
+		case 'memberAccess': return new MemberAccessNode(syntaxNode);
+		case 'reference': return new ReferenceNode(syntaxNode);
+		case 'string': return new StringNode(syntaxNode);
+		case 'number': return new NumberNode(syntaxNode);
 	}
 	throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
 }
 
-// represents an object, with properties and insertions
 class Node {
-	constructor (syntaxNode, scope) {
+	constructor (syntaxNode) {
 		this.listeners = [];
 		this.syntaxNode = syntaxNode;
-		this.children = [];
-		this.properties = [];
-		this.insertions = [];
 
-		this.scope = Object.create(this.scope); // leverage javascript inheritance for scopes
-		for (var prop in properties) {
-
+		if (new.target === Node) {
+			throw Error('Do not instantiate the abstract Node class');
 		}
+	}
+	addListener (listener) {
+		if (this.listeners.indexOf(listener) < 0)
+			this.listeners.push(listener);
+	}
+	removeListener (listener) {
+		// TODO
+	}
+	// sets the value
+	evaluate () {
+		throw Error("Unimplemented Node.evaluate() function");
+	}
+	update () {
+		const oldValue = this.value;
+		this.evaluate();
+		if (this.value != oldValue) {	
+			for (listener of this.listeners) {
+				listener.update();
+			}
+		}
+	}
+}
 
-		for (statement of syntaxNode.statements) {
+// represents an object, with properties and insertions
+class ObjectNode extends Node {
+	constructor (syntaxNode) {
+		super();
+		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
+		this.properties = []; // static properties
+		this.insertions = []; // TODO
+
+		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
 				case 'property':
-					this.properties[statement.key] = NodeFactory(statement.value, scope);
+					this.properties[statement.key] = NodeFactory(statement.value);
 					break;
 				case 'insertion':
 					throw Error('Unimplemented insertion handling'); // TODO
@@ -94,44 +96,82 @@ class Node {
 			}
 		}
 	}
-	addListener (listener) {
-		this.listeners.push(listener);
-	}
-	removeListener (listener) {
-		// TODO
-	}
 
-	// returns a value
-	evaluate () {
-		throw Error("unknown evaluate function");
-	}
-	update () {
+	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
+	resolveReferences (scope) {
+		// TODO: we don't need to store scope, it is only used to resolve references before runtime.
+		//       Might be helpful for debugging though
+		this.scope = Object.create(scope); // leverage javascript inheritance & prototype tree for scopes
 
-		for (listener of this.listeners) {
-			listener.update();
+		for (const [key, valueNode] of Object.entries(this.properties)) {
+			this.scope[key] = valueNode;
 		}
+
+		for (const valueNode of Object.values(this.properties)) {
+			valueNode.resolveReferences(this.scope);
+		}
+	}
+}
+
+// Right now when we resolve references, ReferenceNodes basically become like proxies,
+// forwarding values and updates. It's possible that during reference resolution, we just
+// get rid of these intermediate reference nodes, but I can't find a clean way to do so.
+class ReferenceNode extends Node {
+	constructor (syntaxNode) {
+		super();
+		this.targetName = syntaxNode.name;
+	}
+	resolveReferences (scope) {
+		this.target = scope[this.targetName];
+		if (this.target)
+			this.target.addListener(this);
+		else
+			console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`)
+	}
+	evaluate () {
+		this.value = this.target.evaluate();
 	}
 }
 
 // TODO: can we represent Node as simply a CloneNode without a source?
 class CloneNode extends Node {
-	constructor(syntaxNode, scope) {
+	constructor(syntaxNode) {
+		super();
+		this.source = NodeFactory(syntaxNode.source);
+		this.arguments = NodeFactory(syntaxNode.block);
+	}
+	resolveReferences (scope) {
+		this.source.resolveReferences(scope);
+		this.arguments.resolveReferences(scope);
+	}
 
+	evaluate () {
+		throw Error('Unimplemented CloneNode.evaluate()'); // TODO
 	}
 }
 
 // TODO: short circuit for boolean ops?
+// TODO: should we make operators extend regular objects, with properties and a _return property?
+//       Right now we are directly returning the evaluated value.
 class BinopNode extends Node {
-	constructor (syntaxNode, scope) {
-		super(syntaxNode);
+	// TODO: support more than 2 operands?
+	constructor (syntaxNode) {
+		super();
+		this.operands = [NodeFactory(syntaxNode.left), NodeFactory(syntaxNode.right)];
+		this.operator = syntaxNode.operator;
+	}
+
+	resolveReferences (scope) {
+		for (const operand of this.operands) {
+			operand.resolveReferences(scope);
+		}
 	}
 
 	evaluate () {
-		let left = this.syntaxNode.left.value;
-		let right = this.syntaxNode.right.value;
+		let left = this.operands[0].value;
+		let right = this.operands[1].value;
 
-		switch (this.syntaxNode.operator) {
-			case '!': return left ! right;
+		switch (this.operator) {
 			case '+': return left + right;
 			case '-': return left - right;
 			case '**': return left ** right;
@@ -148,35 +188,61 @@ class BinopNode extends Node {
 			case '!==': return left !== right;
 			case '&': return left && right;
 			case '|': return left || right;
-			default: throw Error(`interpreter error: unknown syntax operator "${operator}".`);
+			// we should never get here because unknown binary operators should be caught in the parser
+			default: throw Error(`Interpreter error: unknown binary operator "${operator}".`);
 		}
 	}
 }
 
-// should act like a binop node
-class MemberAccessNode extends BinopNode {
-	constructor (syntaxNode, scope) {
-
+// should act like a binop node?
+class MemberAccessNode extends Node {
+	constructor (syntaxNode) {
+		super();
+		this.source = NodeFactory(syntaxNode.source);
+		this.key = syntaxNode.key;
 	}
-
+	resolveReferences (scope) {
+		this.source.resolveReferences(scope);
+	}
 	evaluate () {
-
+		if (this.source.properties === undefined) {
+			throw Error('Interpreter error: trying to access property of a non-object.')
+		}
+		return this.source.properties[this.key];
 	}
 }
 
 class UnaryNode extends Node {
+	constructor (syntaxNode) {
+		super();
+		this.operand = NodeFactory(syntaxNode.value);
+		this.operator = syntaxNode.operator;
+	}
+	resolveReferences (scope) {
+		this.operand.resolveReferences(scope);
+	}
+	evaluate () {
+		switch (this.operator) {
+			case '!': return ! this.operand.value;
+			case '+': return + this.operand.value;
+			case '-': return - this.operand.value;
+			// we should never get here because unknown unary operators should be caught in the parser
+			default: throw Error(`Interpreter error: unknown unary operator "${operator}".`);
+		}
+	}
 }
 
 class StringNode extends Node {
-	
+	resolveReferences (scope) {}  // do nothing
 }
 
 class NumberNode extends Node {
-	
+	resolveReferences (scope) {}  // do nothing
 }
 
 class Interpreter {
 
+	// todo: rename source to something better, like sourceText or rawCode
 	constructor (source) {
 		this.source = source;
 	}
@@ -199,8 +265,8 @@ class Interpreter {
 	parseBlockRecursive (block, scope) {
 		let blockString = block.getBlockString();
 
-		let AST = parse(blockString, block.blockType);
-		let scope = ...; // TODO
+		// let AST = parse(blockString, block.blockType);
+		// let scope = ...; // TODO
 
 		for (let child of block.children) {
 			this.parseBlockRecursive(child);
@@ -209,7 +275,12 @@ class Interpreter {
 		return this;
 	}
 
-	interpretBlock(AST, scope) {
-		
+	interpretTest(blockType) {
+		const AST = parse(this.source, blockType);
+		const root = NodeFactory(AST);
+		root.resolveReferences({});  // start with empty scope
+		console.log(root);
 	}
 }
+
+export { Interpreter };

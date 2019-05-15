@@ -5,7 +5,7 @@ const moo = importCommonJS('moo');
 let rules = {
 	WS:      /[^\S\n]+/,
 	comment: /\/\/.*?$/,
-	number:  /[0-9]+/,
+	number:  /[0-9]+/, // TODO: support decimal numbers
 	string:  /"(?:\\["\\]|[^\n"\\])*"/,
 	params: '>>',
 	return: '=>',
