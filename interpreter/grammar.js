@@ -40,7 +40,7 @@ var grammar = {
     {"name": "Statement$ebnf$2", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "Statement", "symbols": [{"literal":"if"}, "Expression", {"literal":":"}, "BracedBlock", "Statement$ebnf$2"]},
     {"name": "Statement", "symbols": [{"literal":"for"}, "VarList", {"literal":"in"}, "Expression", {"literal":":"}, "BracedBlock"]},
-    {"name": "Statement", "symbols": [{"literal":"=>"}, "Expression"]},
+    {"name": "Statement", "symbols": [{"literal":"=>"}, "Expression"], "postprocess": ([ ,value]) => ({type:'property', key: '_return', value})},
     {"name": "BracedBlock", "symbols": [{"literal":"("}, "Block", {"literal":")"}], "postprocess": d => d[1]},
     {"name": "BracedBlock", "symbols": [{"literal":"{"}, "Block", {"literal":"}"}], "postprocess": d => d[1]},
     {"name": "SpacedItem", "symbols": ["Ternary"]},

@@ -36,7 +36,8 @@ Statement	-> %identifier ":" Expression							{% ([token, ,value]) => ({type:'pr
 			| "if" Expression ":" BracedBlock ("else" BracedBlock):?	# conditionals
 			| "for" VarList "in" Expression ":" BracedBlock			# for-loop (TODO: support destructuring)
 
-			| "=>" Expression										# TODO: returns are not allowed to have commas beforehand,
+			| "=>" Expression										{% ([ ,value]) => ({type:'property', key: '_return', value}) %} 
+																	# TODO: returns are not allowed to have commas beforehand,
 																	#       so this may need to be moved to the "Block" rule
 
 BracedBlock ->	"(" Block ")"             {% d => d[1] %}
