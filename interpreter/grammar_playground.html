@@ -17,10 +17,13 @@ function parse(text, blockType) {
 	parser.lexer.setBlockType(blockType);
 	parser.feed(text);
 	console.log(parser.results);
+	console.log(JSON.stringify(parser.results, null, 4));
 }
 
 parse('x y >> foo: bar, num: -1+x*2/y, result: sum(a:10,b:20)', 'Indent');
-parse('x y >> foo: bar\n num: -1+x*2/y', 'Indent');
+parse('x y >> foo: a ? b else c\n num: -1+x*2/y', 'Indent');
+
+console.log("next test should fail");
 parse('x y >> foo: bar\n num: -1+x*2/y', 'Braces'); // this should fail
 </script>
 </body>

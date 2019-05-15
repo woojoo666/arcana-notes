@@ -9705,3 +9705,164 @@ uses a mechanism similar to meiosis when creating new objects
 	1. convert ASTs to nodes
 	2. evaluate
 * we won't worry about optimizing evaluation order yet
+
+
+### optimization as a property
+
+* you can say
+
+		(1 2 3 4 5 6 7 8 9, _listtype: linkedlist )
+
+* if you aren't doing any indexed accesses
+* this is better than using Types as an optimization, eg
+
+		LinkedList(1 2 3 4 5 6 7 8 9)
+
+* because you can only have one type
+* but you might want to have multiple optimization
+
+### react stuffs
+
+* was learning react
+* one example from [this tutorial at 1:24:28](https://youtu.be/Ke90Tje7VS0?t=5068) was
+
+		class Counter extends Component {
+			state = {
+				value: this.props.value
+			}
+			...
+		}
+
+		class Counters extends Component {
+			state = {
+				counters: [
+					...
+				]
+			}
+
+			render() {
+				return (
+					<div>
+						{this.state.counters.map(counter => (
+							<Counter key={counter.id} value={counter.value} selected={true} />
+						))}
+					</div>
+				)
+			}
+		}
+
+* so it seems like what is happening, is that
+* we pass in values from `this.state.counters` into the `<Counter>` components via these `key=value` properties
+* and then we get the `Counter` component initializes its state by accessing these properties from `this.props`
+* but this feels very ugly
+* we are going from the javascript domain `this.state.counters`, into the html domain `key=value`
+* and then back to the javascript domain `this.props`, and then finally to html in the render function
+* but if we are already in the javascript domain, why are we initializing state via the html domain?
+* why not use javascript's built-in way to initialize state, constructors?
+* eg something like this in the `Counters` component:
+
+		class Counter extends Component {
+			constructer (value, selected) {                          // define constructor
+				this.state.value = value;
+			}
+			state = { }
+			...
+		}
+
+		class Counters extends Component {
+			...
+
+			render() {
+				return (
+					<div>
+						{this.state.counters.map(counter => (
+							<Counter(counter.value, true) />        // call constructor
+						))}
+					</div>
+				)
+			}
+		}
+
+* we can even pass in named parameters to be more explicit, eg
+
+		<Counter(value: counter.value, selected: true) />
+
+* because javascript already supports this
+* this isn't directly related to Axis, but i just wanted to rant about this issue
+
+### interpreter - scope and resolving references
+
+* first, I think it's important to note that scope is a static thing
+* just a convenient way for the programmer to create references to other variables
+* but it shouldn't change during runtime, or it can get confusing
+* thus, because it is static
+* scoping should be resolved before runtime
+* and during runtime, there are no scopes, it is just a graph of nodes/actors
+
+
+* so right now, before runtime, we need to:
+* convert AST to nodes, and resolve variables references from scope
+* however, note that if we have something like this
+
+		foo:
+			a: b+c
+			b: 10
+			c: 20
+
+* when we are trying to resolve the references in `b+c`, we haven't created the nodes for `b` and `c` yet
+
+		a:
+			a1:
+				a2: ...
+		b:
+			b1:
+				b2: ...
+		c:
+			c1:
+				c2: ...
+
+* to convert the AST to nodes in a simple recursive way, we simply recurse into nested structures
+* so we go `a` -> `a1` -> `a2`
+* but in order to resolve references in a nested scope, we have to already have nodes for all properties in the parent scope
+* so really, the order has to be
+	1. create nodes for `a`, `b`,`c`, put into scope
+	2. carry scope and create node for `a1`, and put into scope
+	3. carry scope and create node for `a2`, and put into scope
+	4. backtrack back to (a,b,c) scope, and carry (a,b,c) scope to `b1`
+	5. create node for `b1`, and put into scope
+	6. ...etc
+* it's not quite depth-first or breadth-first
+* notice that, at the first layer, we create nodes for `a` `b` and `c`,
+* but then we only go into `a`, and save `b` and `c` for later
+* it is a weird sort of recursion, where we start creating the nodes for `b` and `c`, but then we go back to `a` and save `b` and `c` for later
+
+* it's weird because it seems natural to create a node and also resolve references inside that node during its creation
+* but instead, we have to first create empty nodes for all siblings, and then go into each sibling and start resolving references
+
+* actually one really simple way to achieve this, is to simply first convert all nodes without resolving any references
+* and then do a second pass to resolve references
+* in fact, we actually might be able to create nodes directly inside the grammar post-processor, instead of creating syntax object intermediates
+	* eg instead of creating `{type: binop, ...}` we create `BinopNode(...)`
+
+* another way is to do two passes in each scope, eg
+		
+		function createNodes(block, oldScope):
+			propNodes = []
+			for (property in block)
+				propNodes += new Node(property)
+			scope = oldScope + propNodes
+			for (propNode in propNodes)
+				...convert syntax nodes to interpreter nodes...
+				...and resolve references while doing so...
+				if (syntaxNode is 'create' or 'clone')
+					nestedBlock = new Node(syntaxNode)
+					createNodes(nestedBlock, scope)      // for nested blocks, recursive call
+
+* what's ironic is that it might actually be cleaner to implement this in Axis
+* because we wouldn't have to worry about this weird execution order
+
+* I like the first method better, where we do two giant passes
+* one to turn the AST into nodes, and one to resolve references
+* because while the second method is more modular and decentralized, the first method feels simpler
+* and I'd also like to be able to see the entire node graph, before references are resolved
+	* for debugging purposes

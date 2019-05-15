@@ -38,11 +38,61 @@ function clone (sourceNode, argumentsNode) {
 
 }
 
+// Scope leverages the javascript prototypal inheritance system
+class Scope {
+	// appends the variables to the scope
+	constructor (variables) {
+		this.vars = variables;
+	}
+	extend (variables) {
+
+		var newScope = Object.create(this.scope); // leverage javascript inheritance for scopes
+		for (let v of variables) {
+			this[v.name] = v.value;
+		}
+	}
+	resolve (name) {
+		return this.
+	}
+}
+
+function NodeFactory (syntaxNode, scope) {
+	switch (syntaxNode.type) {
+		case 'block': return Node(syntaxNode, scope);
+		case 'binop': return BinopNode(syntaxNode, scope);
+		case 'unary': return UnaryNode(syntaxNode, scope);
+		case 'memberAccess': return MemberAccessNode(syntaxNode, scope);
+		case 'reference': return scope.resolve(syntaxNode.value);
+		case 'string': return StringNode(syntaxNode);
+		case 'number': return NumberNode(syntaxNode);
+	}
+	throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
+}
+
+// represents an object, with properties and insertions
 class Node {
-	constructor (syntaxNode) {
+	constructor (syntaxNode, scope) {
 		this.listeners = [];
 		this.syntaxNode = syntaxNode;
 		this.children = [];
+		this.properties = [];
+		this.insertions = [];
+
+		this.scope = Object.create(this.scope); // leverage javascript inheritance for scopes
+		for (var prop in properties) {
+
+		}
+
+		for (statement of syntaxNode.statements) {
+			switch (statement.type) {
+				case 'property':
+					this.properties[statement.key] = NodeFactory(statement.value, scope);
+					break;
+				case 'insertion':
+					throw Error('Unimplemented insertion handling'); // TODO
+					break;
+			}
+		}
 	}
 	addListener (listener) {
 		this.listeners.push(listener);
@@ -63,9 +113,16 @@ class Node {
 	}
 }
 
+// TODO: can we represent Node as simply a CloneNode without a source?
+class CloneNode extends Node {
+	constructor(syntaxNode, scope) {
+
+	}
+}
+
 // TODO: short circuit for boolean ops?
-class BinopNode {
-	constructor (syntaxNode) {
+class BinopNode extends Node {
+	constructor (syntaxNode, scope) {
 		super(syntaxNode);
 	}
 
@@ -97,14 +154,25 @@ class BinopNode {
 }
 
 // should act like a binop node
-class MemberAccessNode {
-	constructor (syntaxNode) {
+class MemberAccessNode extends BinopNode {
+	constructor (syntaxNode, scope) {
 
 	}
 
 	evaluate () {
 
 	}
+}
+
+class UnaryNode extends Node {
+}
+
+class StringNode extends Node {
+	
+}
+
+class NumberNode extends Node {
+	
 }
 
 class Interpreter {
@@ -125,7 +193,10 @@ class Interpreter {
 		parseBlockRecursive(preprocessor.rootBlock);
 	}
 
-	parseBlockRecursive (block) {
+	// note: actually, modular recursive parsing is only used to localize syntax errors
+	//       so after it gets to the interpreter, all the ASTs should be merged together
+	//       so the interpreter can interpret the entire program, and so we can resolve scoping
+	parseBlockRecursive (block, scope) {
 		let blockString = block.getBlockString();
 
 		let AST = parse(blockString, block.blockType);
