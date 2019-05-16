@@ -33,6 +33,9 @@ Notice that it is recursive, so every object node contains child object nodes,
 
 // see section "interpreter mechanism and implementation brainstorm" to see how all this works
 
+// TODO: I think a cleaner way to implement the interpreter, is to have the grammar post-processors
+//       create Nodes directly, and then in the interpreter, just call rootNode.clone().
+
 function NodeFactory (syntaxNode, parent) {
 	switch (syntaxNode.type) {
 		case 'block': return new ObjectNode(syntaxNode, parent);
@@ -42,6 +45,8 @@ function NodeFactory (syntaxNode, parent) {
 		case 'reference': return new ReferenceNode(syntaxNode, parent);
 		case 'string': return new StringNode(syntaxNode, parent);
 		case 'number': return new NumberNode(syntaxNode, parent);
+		case 'create': return NodeFactory(syntaxNode.block, parent); // 'create' nodes contain a 'block' node
+		case 'clone': return new CloneNode(syntaxNode, parent);
 	}
 	throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
 }
@@ -78,6 +83,9 @@ class Node {
 	evaluate () {
 		throw Error(`Unimplemented ${this.constructor.name}.evaluate() function`);
 	}
+	clone (parent) {
+		throw Error(`Unimplemented ${this.constructor.name}.clone() function`);
+	}
 	update () {
 		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
 		const oldValue = this.value;
@@ -95,7 +103,7 @@ class ObjectNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
 		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
-		this.properties = []; // static properties
+		this.properties = {}; // static properties
 		this.insertions = []; // TODO
 		this.value = false; // see ObjectNode.evaluate() for why we do this
 
@@ -110,11 +118,24 @@ class ObjectNode extends Node {
 			}
 		}
 	}
-	// ObjectNode updates should _always_ trigger MemberAccessNodes to update. So we simply
-	// toggle this.value to always trigger the listeners. Note that each MemberAccessNode.update()
-	// will check if its specific member has changed, before propagating the update further.
+	clone (parent) {
+		let newNode = new ObjectNode({statements: []}, parent); // use a dummy syntaxNode
+		for (const [key, valueNode] of Object.entries(this.properties)) {
+			newNode.properties[key] = valueNode.clone(newNode);
+		}
+		// TODO: clone insertions
+		return newNode;
+	}
 	evaluate() {
-		return !this.value;
+		return this.properties; // the value of an object node is its properties
+	}
+	// ObjectNode updates should _always_ trigger MemberAccessNodes to update. So we simply
+	// manually trigger the listeners. Note that each MemberAccessNode.update()
+	update () {
+		this.value = this.evaluate();
+		for (const listener of this.listeners) {
+			listener.update();
+		}
 	}
 	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
 	resolveReferences (scope) {
@@ -140,6 +161,9 @@ class ReferenceNode extends Node {
 		super(syntaxNode, parent);
 		this.targetName = syntaxNode.name;
 	}
+	clone (parent) {
+		return new ReferenceNode({name: this.targetName}, parent); // use a dummy syntaxNode
+	}
 	// Reference resolution happens at the end of a cloning operation.
 	// So we also use it to trigger evaluation, because the Reference nodes
 	// are at the "leaves" of the clone, so the evaluation will ripple all the
@@ -154,24 +178,55 @@ class ReferenceNode extends Node {
 		this.update();
 	}
 	evaluate () {
-		return this.target && this.target.evaluate();
+		return this.target && this.target.value;
 	}
 }
 
 // TODO: can we represent Node as simply a CloneNode without a source?
+// Note: don't confuse CloneNode and clone(), they are completely separate things.
+// CloneNodes represent the clone operation in the language. clone() is a function
+// used in the interpreter to create a copy of a Node.
 class CloneNode extends Node {
-	constructor(syntaxNode) {
+	constructor(syntaxNode, parent) {
 		super(syntaxNode, parent);
+		if (!syntaxNode) return; // a hack for cloning
 		this.source = NodeFactory(syntaxNode.source, this);
 		this.arguments = NodeFactory(syntaxNode.block, this);
+	}
+	clone (parent) {
+		const newNode = new CloneNode(undefined, parent);
+		newNode.source = this.source.clone();
+		newNode.arguments = this.arguments.clone();
+		return newNode;
 	}
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
 		this.arguments.resolveReferences(scope);
 	}
-
+	// TODO: I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
+	// TODO: this is all really hack, I'm not sure if it will handle certain edge cases like, if a node
+	//       inside the sourceObject changes (but not the sourceObject itself), will it update the corresponding
+	//       node inside the cloned object?
 	evaluate () {
-		throw Error('Unimplemented CloneNode.evaluate()'); // TODO
+		// get the values at the source and arguments nodes
+		const sourceObject = this.source.value;
+		const argumentsObject = this.arguments.value;
+
+		const combined = new ObjectNode({statements: []}, null); // temporary object node, so don't attach listeners?
+		for (const [key, valueNode] of Object.entries(argumentsObject)) {
+			combined.properties[key] = valueNode.clone(combined);
+		}
+
+		// inherit properties from source if they aren't already in arguments
+		for (const [key, valueNode] of Object.entries(sourceObject)) {
+			if (combined.properties[key] === undefined) {
+				combined.properties[key] = valueNode.clone(combined);
+			}
+		}
+
+		combined.resolveReferences({}); // start with empty scope
+
+		return combined.properties;
 	}
 }
 
@@ -182,6 +237,7 @@ class BinopNode extends Node {
 	// TODO: support more than 2 operands?
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
+		if (!syntaxNode) return; // a hack for cloning
 		this.operands = [NodeFactory(syntaxNode.left, this), NodeFactory(syntaxNode.right, this)];
 		this.operator = syntaxNode.operator;
 	}
@@ -191,7 +247,12 @@ class BinopNode extends Node {
 			operand.resolveReferences(scope);
 		}
 	}
-
+	clone(parent) {
+		const newNode = new BinopNode(null, parent);
+		newNode.operands = this.operands.map(operand => operand.clone(newNode));
+		newNode.operator = this.operator;
+		return newNode;
+	}
 	evaluate () {
 		let left = this.operands[0].value;
 		let right = this.operands[1].value;
@@ -227,26 +288,40 @@ class BinopNode extends Node {
 class MemberAccessNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
+		if (!syntaxNode) return; // a hack for cloning
 		this.source = NodeFactory(syntaxNode.source, this);
 		this.key = syntaxNode.key;
+	}
+	clone (parent) {
+		const newNode = new MemberAccessNode(null, parent);
+		newNode.source = this.source.clone(newNode);
+		newNode.key = this.key;
+		return newNode;
 	}
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
 	}
 	evaluate () {
 		// TODO: if source is an Undefined object, then member access should return Undefined
-		if (this.source.properties === undefined) {
+		if (this.source.value === undefined) {
 			throw Error('Interpreter error: trying to access property of a non-object.')
 		}
-		return this.source.properties[this.key];
+		return this.source.value[this.key];
 	}
 }
 
 class UnaryNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
+		if (!syntaxNode) return; // a hack for cloning
 		this.operand = NodeFactory(syntaxNode.value, this);
 		this.operator = syntaxNode.operator;
+	}
+	clone (parent) {
+		const newNode = new UnaryNode(null, parent);
+		newNode.operand = this.operand.clone(newNode);
+		newNode.operator = this.operator;
+		return newNode;
 	}
 	resolveReferences (scope) {
 		this.operand.resolveReferences(scope);
@@ -273,6 +348,9 @@ class StringNode extends Node {
 	// TODO: maybe we should override update() to not do anything, because NumberNodes never change?
 	//       would be a slight optimization.
 
+	clone (parent) {
+		return new StringNode(this.syntaxNode, parent);
+	}
 	// StringNodes act like references to global Number objects, so just like ReferenceNodes,
 	// they call update() during reference resolution to trigger the initial evaluation pass.
 	resolveReferences (scope) {
@@ -290,6 +368,9 @@ class NumberNode extends Node {
 	// TODO: maybe we should override update() to not do anything, because NumberNodes never change?
 	//       would be a slight optimization.
 
+	clone (parent) {
+		return new NumberNode(this.syntaxNode, parent);
+	}
 	// NumberNodes act like references to global Number objects, so just like ReferenceNodes,
 	// they call update() during reference resolution to trigger the initial evaluation pass.
 	resolveReferences (scope) {
