@@ -33,23 +33,32 @@ Notice that it is recursive, so every object node contains child object nodes,
 
 // see section "interpreter mechanism and implementation brainstorm" to see how all this works
 
-function NodeFactory (syntaxNode) {
+function NodeFactory (syntaxNode, parent) {
 	switch (syntaxNode.type) {
-		case 'block': return new ObjectNode(syntaxNode);
-		case 'binop': return new BinopNode(syntaxNode);
-		case 'unaryop': return new UnaryNode(syntaxNode);
-		case 'memberAccess': return new MemberAccessNode(syntaxNode);
-		case 'reference': return new ReferenceNode(syntaxNode);
-		case 'string': return new StringNode(syntaxNode);
-		case 'number': return new NumberNode(syntaxNode);
+		case 'block': return new ObjectNode(syntaxNode, parent);
+		case 'binop': return new BinopNode(syntaxNode, parent);
+		case 'unaryop': return new UnaryNode(syntaxNode, parent);
+		case 'memberAccess': return new MemberAccessNode(syntaxNode, parent);
+		case 'reference': return new ReferenceNode(syntaxNode, parent);
+		case 'string': return new StringNode(syntaxNode, parent);
+		case 'number': return new NumberNode(syntaxNode, parent);
 	}
 	throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
 }
 
+let idCounter = 0;
+
 class Node {
-	constructor (syntaxNode) {
+	constructor (syntaxNode, parent) {
+		this.id = idCounter++;
 		this.listeners = [];
 		this.syntaxNode = syntaxNode;
+		// TODO: a special Undefined object for representing undefined values
+		this.value = undefined; // initialize all nodes to undefined.
+
+		if (parent) {
+			this.addListener(parent);
+		}
 
 		if (new.target === Node) {
 			throw Error('Do not instantiate the abstract Node class');
@@ -62,15 +71,19 @@ class Node {
 	removeListener (listener) {
 		// TODO
 	}
+	resolveReferences (scope) {
+		throw Error(`Unimplemented ${this.constructor.name}.resolveReferences() function`);
+	}
 	// sets the value
 	evaluate () {
-		throw Error("Unimplemented Node.evaluate() function");
+		throw Error(`Unimplemented ${this.constructor.name}.evaluate() function`);
 	}
 	update () {
+		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
 		const oldValue = this.value;
-		this.evaluate();
+		this.value = this.evaluate();
 		if (this.value != oldValue) {	
-			for (listener of this.listeners) {
+			for (const listener of this.listeners) {
 				listener.update();
 			}
 		}
@@ -79,16 +92,17 @@ class Node {
 
 // represents an object, with properties and insertions
 class ObjectNode extends Node {
-	constructor (syntaxNode) {
-		super();
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
 		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
 		this.properties = []; // static properties
 		this.insertions = []; // TODO
+		this.value = false; // see ObjectNode.evaluate() for why we do this
 
 		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
 				case 'property':
-					this.properties[statement.key] = NodeFactory(statement.value);
+					this.properties[statement.key] = NodeFactory(statement.value, this);
 					break;
 				case 'insertion':
 					throw Error('Unimplemented insertion handling'); // TODO
@@ -96,7 +110,12 @@ class ObjectNode extends Node {
 			}
 		}
 	}
-
+	// ObjectNode updates should _always_ trigger MemberAccessNodes to update. So we simply
+	// toggle this.value to always trigger the listeners. Note that each MemberAccessNode.update()
+	// will check if its specific member has changed, before propagating the update further.
+	evaluate() {
+		return !this.value;
+	}
 	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
 	resolveReferences (scope) {
 		// TODO: we don't need to store scope, it is only used to resolve references before runtime.
@@ -117,28 +136,34 @@ class ObjectNode extends Node {
 // forwarding values and updates. It's possible that during reference resolution, we just
 // get rid of these intermediate reference nodes, but I can't find a clean way to do so.
 class ReferenceNode extends Node {
-	constructor (syntaxNode) {
-		super();
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
 		this.targetName = syntaxNode.name;
 	}
+	// Reference resolution happens at the end of a cloning operation.
+	// So we also use it to trigger evaluation, because the Reference nodes
+	// are at the "leaves" of the clone, so the evaluation will ripple all the
+	// way to the root.
 	resolveReferences (scope) {
 		this.target = scope[this.targetName];
 		if (this.target)
 			this.target.addListener(this);
 		else
-			console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`)
+			console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
+
+		this.update();
 	}
 	evaluate () {
-		this.value = this.target.evaluate();
+		return this.target && this.target.evaluate();
 	}
 }
 
 // TODO: can we represent Node as simply a CloneNode without a source?
 class CloneNode extends Node {
 	constructor(syntaxNode) {
-		super();
-		this.source = NodeFactory(syntaxNode.source);
-		this.arguments = NodeFactory(syntaxNode.block);
+		super(syntaxNode, parent);
+		this.source = NodeFactory(syntaxNode.source, this);
+		this.arguments = NodeFactory(syntaxNode.block, this);
 	}
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
@@ -155,9 +180,9 @@ class CloneNode extends Node {
 //       Right now we are directly returning the evaluated value.
 class BinopNode extends Node {
 	// TODO: support more than 2 operands?
-	constructor (syntaxNode) {
-		super();
-		this.operands = [NodeFactory(syntaxNode.left), NodeFactory(syntaxNode.right)];
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
+		this.operands = [NodeFactory(syntaxNode.left, this), NodeFactory(syntaxNode.right, this)];
 		this.operator = syntaxNode.operator;
 	}
 
@@ -194,17 +219,22 @@ class BinopNode extends Node {
 	}
 }
 
-// should act like a binop node?
+// TODO: should act like a binop node?
+// TODO: currently, it's possible for there to be tons of member access nodes with the same source & key.
+//       For example, if we had `a: foo.x, b: foo.x, c: foo.x, d: foo.x ...`. If the object changes,
+//       all of these member access nodes will be triggered, even though we technically only need to trigger
+//       one of them. Is there a better system?
 class MemberAccessNode extends Node {
-	constructor (syntaxNode) {
-		super();
-		this.source = NodeFactory(syntaxNode.source);
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
+		this.source = NodeFactory(syntaxNode.source, this);
 		this.key = syntaxNode.key;
 	}
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
 	}
 	evaluate () {
+		// TODO: if source is an Undefined object, then member access should return Undefined
 		if (this.source.properties === undefined) {
 			throw Error('Interpreter error: trying to access property of a non-object.')
 		}
@@ -213,9 +243,9 @@ class MemberAccessNode extends Node {
 }
 
 class UnaryNode extends Node {
-	constructor (syntaxNode) {
-		super();
-		this.operand = NodeFactory(syntaxNode.value);
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
+		this.operand = NodeFactory(syntaxNode.value, this);
 		this.operator = syntaxNode.operator;
 	}
 	resolveReferences (scope) {
@@ -233,11 +263,44 @@ class UnaryNode extends Node {
 }
 
 class StringNode extends Node {
-	resolveReferences (scope) {}  // do nothing
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
+		this.value = syntaxNode.value; // StringNodes never need to be re-evaluated
+	}
+	evaluate (scope) { return this.value }  // this.value will never change
+	// TODO: maybe we should override update() to not do anything, because NumberNodes never change?
+	//       would be a slight optimization.
+
+	// StringNodes act like references to global String objects, aka act like ReferenceNodes,
+	// so see NumberNode why this function is implemented like it is.
+	resolveReferences (scope) {
+		this.update(); // TODO: remove this. This is just to print the console.log statement for debugging
+		for (const listener of this.listeners) {
+			listener.update();
+		}
+	}
 }
 
 class NumberNode extends Node {
-	resolveReferences (scope) {}  // do nothing
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
+		this.value = syntaxNode.value; // NumberNodes never need to be re-evaluated
+	}
+	evaluate (scope) { return this.value }  // this.value will never change
+	// TODO: maybe we should override update() to not do anything, because NumberNodes never change?
+	//       would be a slight optimization.
+
+	// NumberNodes act like references to global Number objects, so just like ReferenceNodes,
+	// they call update() during reference resolution to trigger the initial evaluation pass.
+	// However, note that in order for the listeners to be triggered, the value has to change.
+	// But the value of a NumberNode never changes. So instead, we simulate it changing by
+	// manually calling the listeners.
+	resolveReferences (scope) {
+		this.update(); // TODO: remove this. This is just to print the console.log statement for debugging
+		for (const listener of this.listeners) {
+			listener.update();
+		}
+	}
 }
 
 class Interpreter {

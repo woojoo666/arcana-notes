@@ -46,7 +46,8 @@
 <script type="module">
 	import { Interpreter } from './interpreter.js';
 
-	new Interpreter('x y >> foo: bar\n bar: -1+x*2/y').interpretTest('Indent');
+	new Interpreter('foo: bar\n bar: -1+x*2/y, x: 10, y: 20').interpretTest('Indent');
+	console.log('answer should contain: foo.value = 0, bar.value = 0, x.value = 10, y.value = 20');
 </script>
 <script type="module">
 	import { PreProcessor, Block } from './preprocessor.js';

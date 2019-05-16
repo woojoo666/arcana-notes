@@ -9866,3 +9866,114 @@ uses a mechanism similar to meiosis when creating new objects
 * because while the second method is more modular and decentralized, the first method feels simpler
 * and I'd also like to be able to see the entire node graph, before references are resolved
 	* for debugging purposes
+
+### Member Access Nodes and Alias Bindings
+
+* I think these member access nodes are actually analogous to the alias bindings idea I had earlier
+
+
+// TODO: FINISH THIS
+
+### Interpreter Implementation - Cloning
+
+* for cloning, we want to create a clone of all nested nodes
+* not just direct children
+* for example, take a look at
+
+		foo: list >>
+			a: 5, b: 6
+			x: concat((1 2) list (a b))
+		bar: foo(list: (3 4), a: 10)
+
+* notice that we aren't just creating a clone of `concat`
+* we are also cloning `(a b)`, because the values for `a` and `b` changed
+* so we need to create a new `(a b)` that points to the new `a` and `b`
+
+* we also want to clone these nodes in terms of the new scope
+
+* put in terms of the interpreter
+* we take the source node, and traverse through nested children, cloning every one
+* until we get to a reference node, where we clone the reference node and stop
+* then, we do a second pass to resolve these references in terms of the new scope
+
+* notice that the reference nodes are the "leaves" of the source object graph
+* they represent where the cloning stops
+
+* so apply this to the example above, when we do `foo(list: (3 4), a: 10)`:
+* it will clone `concat`, `(1 2)`, `list`, `(a b)`, and the arguments object `((1 2) list (a b))`
+* it will create a new scope, with the new `a`,`b`,`x`, and `list`
+* lastly, it will resolve the cloned objects with the new scope
+
+### Resolving References and the Initialization Pass
+
+* the last thing the interpreter has to do,
+* is after converting the AST and creating all the bindings and resolving references,
+* it has to initialize all nodes to their initial values
+* an initialization pass
+* now as long as the listeners and bindings are attached correctly,
+* we can just call update() on all the nodes in any order we want,
+* and the bindings will ensure that the graph will always converge to the same value
+	* assuming no complex feedback
+* however, to avoid extraneous updates, we would want to only update constants
+	* Numbers, Strings, etc
+* which will propagate the update throughout the rest of the graph
+	* note that nodes are initialized with value `undefined`,
+	* so if the update doesn't reach them, that means their value doesn't depend on any values,
+	* so their value should stay `undefined`
+	* though what about special things like `properties.length`?
+
+* but actually, we can take advantage of reference resolution
+* because we resolve references in a second pass at the end
+* we can use that pass to call update() on Number and String nodes
+
+* in addition, note that for cloning, these references are also at the leaves of the cloned graph
+* so we should also call update() on reference nodes
+* which will trigger the intiailization pass, and propagate it through the cloned graph
+
+* in fact, this makes sense because, Number and String nodes are really just references to core library objects
+* recall that in functional, Numbers can be represented using Church Numerals,
+	* which are just a bunch of normal functions defined via a "successor" function
+* so likewise, we can think of Numbers and Strings as just objects/concepts defined in the global scope that
+* that everybody can use
+
+* in addition, when we initially interpret a program, we are actually cloning the entire program
+* so cloning and interpretting work the same way
+* they both follow this mechanism of (1) create nodes and (2) resolve references + initialize
+* only difference is that the interpreter creates nodes from the AST, cloning creates nodes from the source nodes
+
+### Resolving References and the Initialization Pass II
+
+* to summarize the way the initialization pass works is
+* because reference resolution happens at the end of cloning / interpretting
+* we use it to trigger evaluation, updating all the reference nodes
+* and because the Reference nodes are at the "leaves" of the clone
+* the updates will ripple all the way through the graph till it reaches the root
+
+* the way the pass works is
+* resolveReference() is called on the root
+* object nodes (inc. binary, unary, ternary, etc) will propagate resolveReference() to child nodes
+* all the way till they reach reference nodes
+
+* reference nodes (inc. number, string, etc) will resolve using the scope,
+* and then start an update() pass
+* which will traverse backwards until it reaches the root
+
+* notice that it doesn't matter what order the properties are defined
+* eg in this example:
+
+		bar: 10
+		foo: bar
+
+* the resolution pass will resolve `bar:10` first, then will resolve `foo:bar` with bar's value
+* if we reorder the properties:
+
+		foo: bar
+		bar: 10
+
+* the resolution pass will resolve `foo:bar` first, but `bar` doesn't have a value yet
+* so `foo` will still have `undefined` value
+* however, remember that it also attaches listener to `bar`
+	* because that's part of reference resolution, `foo` should update every time `bar` updates
+* next, the resolution pass will resolve `bar:10` second,
+* which will trigger the listener and update `foo:bar`
+
