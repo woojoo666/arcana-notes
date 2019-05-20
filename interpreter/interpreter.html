@@ -44,10 +44,24 @@
 </script>
 <!--script src="tests.js"></script-->
 <script type="module">
-	import { Interpreter } from './interpreter.js';
+	import { Interpreter, NumberNode } from './interpreter.js';
 
-	new Interpreter('foo: (bar: -1+x*2/y, x: 10, y: 20), clone: foo(x: 12)').interpretTest('Indent');
-	console.log('answer should contain: foo.bar.value = 0, clone.bar.value = 0.19999999999999996, foo.x.value = 10, clone.x.value = 12');
+	const inputScope = {
+		input: new NumberNode({value: 20}, null),
+	}
+
+	inputScope.input.update(); // initialize number node
+
+	const testCode = 'foo: (bar: -1+x*2/y, x: 10, y: input), clone: foo(x: 15)';
+	const output = new Interpreter(testCode).interpretTest(inputScope, 'Indent');
+	console.log('answer should contain: foo.bar = 0, clone.bar = 0.5, foo.x = 10, clone.x = 15');
+	console.assert(output.properties.foo.properties.bar.value == 0, 'ERROR');
+	console.assert(output.properties.clone.value.properties.bar.value == 0.5, 'ERROR');
+	inputScope.input.syntaxNode.value = 10;
+	inputScope.input.update();
+	console.log('answer should update to: foo.bar = 1, clone.bar = 2, foo.x = 10, clone.x = 15');
+	console.assert(output.properties.foo.properties.bar.value == 1, 'ERROR');
+	console.assert(output.properties.clone.value.properties.bar.value == 2, 'ERROR');
 </script>
 <script type="module">
 	import { PreProcessor, Block } from './preprocessor.js';

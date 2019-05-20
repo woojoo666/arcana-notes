@@ -99,6 +99,10 @@ class Node {
 }
 
 // represents an object, with properties and insertions
+// TODO: right now an ObjectNode listens to changes to any property nodes,
+//       and will trigger all memberAccess nodes listening. This means that,
+//       if you have a giant tree of object nodes, a change in one of the leaves
+//       will trigger the entire tree to update. This would not be necessary with alias binding...
 class ObjectNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
@@ -132,6 +136,7 @@ class ObjectNode extends Node {
 	// ObjectNode updates should _always_ trigger MemberAccessNodes to update. So we simply
 	// manually trigger the listeners. Note that each MemberAccessNode.update()
 	update () {
+		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
 		this.value = this.evaluate();
 		for (const listener of this.listeners) {
 			listener.update();
@@ -161,24 +166,52 @@ class ReferenceNode extends Node {
 		super(syntaxNode, parent);
 		this.targetName = syntaxNode.name;
 	}
-	clone (parent) {
-		return new ReferenceNode({name: this.targetName}, parent); // use a dummy syntaxNode
+	// Note that a cloned reference node will point to the original target.
+	// The function resolveReferences() will rebind the target if necessary.
+	clone (parent, scope) {
+		let newNode = new ReferenceNode({name: this.targetName}, parent); // use a dummy syntaxNode
+		newNode.target = this.target; // preserve the original target
+		// TODO: feels ugly to manually add listeners here, esp. if the target is inside the source.
+		//       For example, if we have `source: (x: 10, y: x)`, then during cloning,
+		//       the cloned reference clone.y will point to source.x. Only during reference resolution,
+		//       will the reference be updated to point to clone.x. Can we guarantee that this always happens?
+		this.target.addListener(newNode);
+		return newNode;
 	}
 	// Reference resolution happens at the end of a cloning operation.
 	// So we also use it to trigger evaluation, because the Reference nodes
 	// are at the "leaves" of the clone, so the evaluation will ripple all the
 	// way to the root.
+	// Note that resolveReferences() is also used to override references in a clone operation.
 	resolveReferences (scope) {
-		this.target = scope[this.targetName];
-		if (this.target)
-			this.target.addListener(this);
-		else
-			console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
-
-		this.update();
+		if (scope[this.targetName]) {
+			if (this.target) {
+				this.target.removeListener(this); // unbind from old target
+			}
+			this.target = scope[this.targetName];
+			if (this.target) {
+				this.target.addListener(this);
+			} else {
+				console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
+			}
+		}
+		this.update(); // TODO: do we need to update() if target doesn't change?
 	}
 	evaluate () {
 		return this.target && this.target.value;
+	}
+	// Tweak the update() function so that we always update if the target is an ObjectNode
+	// TODO: this feels hacky...
+	update () {
+		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
+		console.log(`target is of type: ${this.target.constructor.name}`); // for debugging
+		const oldValue = this.value;
+		this.value = this.evaluate();
+		if (this.value != oldValue || this.target.constructor.name == 'ObjectNode') {	
+			for (const listener of this.listeners) {
+				listener.update();
+			}
+		}
 	}
 }
 
@@ -195,8 +228,8 @@ class CloneNode extends Node {
 	}
 	clone (parent) {
 		const newNode = new CloneNode(undefined, parent);
-		newNode.source = this.source.clone();
-		newNode.arguments = this.arguments.clone();
+		newNode.source = this.source.clone(newNode);
+		newNode.arguments = this.arguments.clone(newNode);
 		return newNode;
 	}
 	resolveReferences (scope) {
@@ -208,25 +241,30 @@ class CloneNode extends Node {
 	//       inside the sourceObject changes (but not the sourceObject itself), will it update the corresponding
 	//       node inside the cloned object?
 	evaluate () {
-		// get the values at the source and arguments nodes
-		const sourceObject = this.source.value;
-		const argumentsObject = this.arguments.value;
+		// TODO: right now assumes that source is a reference, and arguments is a block
+		const sourceProps = this.source.value;
+		const argumentProps = this.arguments.properties;
 
 		const combined = new ObjectNode({statements: []}, null); // temporary object node, so don't attach listeners?
-		for (const [key, valueNode] of Object.entries(argumentsObject)) {
+		for (const [key, valueNode] of Object.entries(argumentProps)) {
 			combined.properties[key] = valueNode.clone(combined);
 		}
 
 		// inherit properties from source if they aren't already in arguments
-		for (const [key, valueNode] of Object.entries(sourceObject)) {
+		for (const [key, valueNode] of Object.entries(sourceProps)) {
 			if (combined.properties[key] === undefined) {
 				combined.properties[key] = valueNode.clone(combined);
+			} else {
+				// we still have to clone source properties that don't appear in the child object
+				valueNode.clone(combined);
 			}
 		}
 
-		combined.resolveReferences({}); // start with empty scope
+		const childScope = combined.properties;
 
-		return combined.properties;
+		combined.resolveReferences(childScope); // start with empty scope
+
+		return combined;
 	}
 }
 
@@ -413,12 +451,16 @@ class Interpreter {
 		return this;
 	}
 
-	interpretTest(blockType) {
+	// pass in a scope, a dictionary of named Node objects that you provide.
+	// This will allow you provide "input" arguments to the program, and change them
+	// dynamically to see how they affect the program output.
+	interpretTest(scope, blockType) {
 		const AST = parse(this.source, blockType);
 		const root = NodeFactory(AST);
-		root.resolveReferences({});  // start with empty scope
+		root.resolveReferences(scope);  // start with empty scope
 		console.log(root);
+		return root;
 	}
 }
 
-export { Interpreter };
+export { Interpreter, NumberNode };
