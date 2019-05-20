@@ -10543,3 +10543,98 @@ it is actually fully secure
 
 		_temp: a+b
 		foo(result: _temp) // secure, no way for a rebind attack
+
+
+### Member Access and Alias Bindings
+
+
+
+there are actually only three types of nodes
+object/clone nodes
+reference nodes
+member nodes
+
+every object has three things
+child objects
+references
+property access
+
+
+
+
+cloning
+if foo is clone of bar
+then if bar.a.b changes
+it doesn't need to update entire foo
+just foo.a.b
+alias bindings?
+
+
+
+
+
+spread operator, dynamic properties, and multiple inheritance
+
+
+
+
+a: (b: (c: (d: input)))
+foo: a.b.c.d
+
+
+foo: memberAccess(a, "b")
+		memberAccess(^, "c")
+			memberAccess(^, "d")
+
+static vs dynamic reference
+
+static references are reference nodes, references to scope
+resolved at the end of cloning
+
+foo is a dynamic reference
+when input changes, it changes foo, and rebinds the dynamic reference
+member nodes are dynamic reference nodes
+
+
+before, the listener graph was static
+foo listened to a chain of member access nodes
+
+
+maybe static references can be implemented as member access as well
+memberAccess(scope, key)
+
+
+note that ternary is like member access
+also dynamic reference
+in fact, remember that it is short for
+cond(trueBranch, falseBranch).result
+so it is member access actually
+
+a: (b: (c: cond ? (d: 10) else (d: input)))
+foo: a.b.c.d
+
+nodes:
+* let a = RefNode(scope, 'a')
+* let b = RefNode(a, 'b')
+* let c = RefNode(b, 'c')
+* let t = ternary(cond, (d: 10), (d: input))
+* let d = RefNode(c, 'd')
+* let cond = RefNode(scope, 'cond')
+* let input = RefNode(scope, 'input')
+
+if `cond` changes, it rebinds RefNode `d`, which re-evaluates foo
+
+if `input` changes, it re-evaluates foo
+
+
+
+
+* member access nodes simply rebind
+* they have two listeners,
+* one listener listens to source object, and re-evaluates if source changes
+* evaluate() resolves the member access, and retrieves the value from the target
+* and attaches the second listener to the target
+* so if the target changes, it updates the value
+
+* so if source changes, re-binds target
+* if target changes, retrieves new value of target

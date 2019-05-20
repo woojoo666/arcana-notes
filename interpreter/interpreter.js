@@ -74,12 +74,17 @@ class Node {
 			this.listeners.push(listener);
 	}
 	removeListener (listener) {
-		// TODO
+		// removes all instances of listener
+		const index = this.listeners.indexOf(listener)
+		if (index > 0) {
+			this.listeners.splice(index, 1);
+		}
 	}
 	resolveReferences (scope) {
 		throw Error(`Unimplemented ${this.constructor.name}.resolveReferences() function`);
 	}
-	// sets the value
+	// sets the value.
+	// Value should always be an ObjectNode or CloneNode (TODO: make sure this is followed for all Nodes) 
 	evaluate () {
 		throw Error(`Unimplemented ${this.constructor.name}.evaluate() function`);
 	}
@@ -99,22 +104,21 @@ class Node {
 }
 
 // represents an object, with properties and insertions
-// TODO: right now an ObjectNode listens to changes to any property nodes,
-//       and will trigger all memberAccess nodes listening. This means that,
-//       if you have a giant tree of object nodes, a change in one of the leaves
-//       will trigger the entire tree to update. This would not be necessary with alias binding...
+// Note that ObjectNodes never update, so they should listen to nobody, and have no listeners.
+// This is why we pass "null" as the "parent" argument in calls to clone() and NodeFactory()
 class ObjectNode extends Node {
+	// TODO: since objects never update(), we don't need to pass in "parent" because there should be no listeners
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
 		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
 		this.properties = {}; // static properties
 		this.insertions = []; // TODO
-		this.value = false; // see ObjectNode.evaluate() for why we do this
+		this.value = this;    // ObjectNode are the only nodes where we initialize value at beginning, so cloning doesn't break
 
 		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
 				case 'property':
-					this.properties[statement.key] = NodeFactory(statement.value, this);
+					this.properties[statement.key] = NodeFactory(statement.value, null);
 					break;
 				case 'insertion':
 					throw Error('Unimplemented insertion handling'); // TODO
@@ -123,24 +127,17 @@ class ObjectNode extends Node {
 		}
 	}
 	clone (parent) {
-		let newNode = new ObjectNode({statements: []}, parent); // use a dummy syntaxNode
+		let newNode = new ObjectNode({statements: []}, null); // use a dummy syntaxNode
 		for (const [key, valueNode] of Object.entries(this.properties)) {
-			newNode.properties[key] = valueNode.clone(newNode);
+			newNode.properties[key] = valueNode.clone(null);
 		}
 		// TODO: clone insertions
 		return newNode;
 	}
+	// the value of an object node is itself. Note that this means an object node never calls update(),
+	// which is fine.
 	evaluate() {
-		return this.properties; // the value of an object node is its properties
-	}
-	// ObjectNode updates should _always_ trigger MemberAccessNodes to update. So we simply
-	// manually trigger the listeners. Note that each MemberAccessNode.update()
-	update () {
-		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
-		this.value = this.evaluate();
-		for (const listener of this.listeners) {
-			listener.update();
-		}
+		return this;
 	}
 	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
 	resolveReferences (scope) {
@@ -189,29 +186,17 @@ class ReferenceNode extends Node {
 				this.target.removeListener(this); // unbind from old target
 			}
 			this.target = scope[this.targetName];
-			if (this.target) {
+			if (this.target && !(this.target instanceof ObjectNode)) {
+				// we only need to add a listener if the target is not an ObjectNode
 				this.target.addListener(this);
 			} else {
 				console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
 			}
 		}
-		this.update(); // TODO: do we need to update() if target doesn't change?
+		this.update();
 	}
 	evaluate () {
 		return this.target && this.target.value;
-	}
-	// Tweak the update() function so that we always update if the target is an ObjectNode
-	// TODO: this feels hacky...
-	update () {
-		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
-		console.log(`target is of type: ${this.target.constructor.name}`); // for debugging
-		const oldValue = this.value;
-		this.value = this.evaluate();
-		if (this.value != oldValue || this.target.constructor.name == 'ObjectNode') {	
-			for (const listener of this.listeners) {
-				listener.update();
-			}
-		}
 	}
 }
 
@@ -241,19 +226,19 @@ class CloneNode extends Node {
 	//       inside the sourceObject changes (but not the sourceObject itself), will it update the corresponding
 	//       node inside the cloned object?
 	evaluate () {
-		// TODO: right now assumes that source is a reference, and arguments is a block
-		const sourceProps = this.source.value;
-		const argumentProps = this.arguments.properties;
+		// get the values at the source and arguments nodes
+		const sourceObject = this.source.value;
+		const argumentsObject = this.arguments.value;
 
 		const combined = new ObjectNode({statements: []}, null); // temporary object node, so don't attach listeners?
-		for (const [key, valueNode] of Object.entries(argumentProps)) {
-			combined.properties[key] = valueNode.clone(combined);
+		for (const [key, valueNode] of Object.entries(argumentsObject.properties)) {
+			combined.properties[key] = valueNode.clone(null);
 		}
 
 		// inherit properties from source if they aren't already in arguments
-		for (const [key, valueNode] of Object.entries(sourceProps)) {
+		for (const [key, valueNode] of Object.entries(sourceObject.properties)) {
 			if (combined.properties[key] === undefined) {
-				combined.properties[key] = valueNode.clone(combined);
+				combined.properties[key] = valueNode.clone(null);
 			} else {
 				// we still have to clone source properties that don't appear in the child object
 				valueNode.clone(combined);
@@ -318,16 +303,25 @@ class BinopNode extends Node {
 	}
 }
 
-// TODO: should act like a binop node?
-// TODO: currently, it's possible for there to be tons of member access nodes with the same source & key.
-//       For example, if we had `a: foo.x, b: foo.x, c: foo.x, d: foo.x ...`. If the object changes,
-//       all of these member access nodes will be triggered, even though we technically only need to trigger
-//       one of them. Is there a better system?
+// See section "Member Access and Alias Bindings" to see how this works
+// Notice the similarity to a ReferenceNode.
+// MemberAccessNodes are basically ReferenceNodes that can rebind to new targets.
+// TODO: I wonder if we can leverage this similarity. Instead of having nodes listen directly
+//       to the MemberAccessNode, we can have the MemberAccessNode generate a ReferenceNode to the target,
+//       and have nodes listen to that. Then, if the target changes, the MemberAccessNode creates a new
+//       ReferenceNode, and migrates all listeners from the previous ReferenceNode to the new one.
 class MemberAccessNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
 		if (!syntaxNode) return; // a hack for cloning
-		this.source = NodeFactory(syntaxNode.source, this);
+		const self = this;
+		// a fake node to listen to source changes and forward updates to updateTarget()
+		this.sourceListener = {
+			update() {
+				self.updateTarget();
+			}
+		}
+		this.source = NodeFactory(syntaxNode.source, this.sourceListener);
 		this.key = syntaxNode.key;
 	}
 	clone (parent) {
@@ -339,12 +333,31 @@ class MemberAccessNode extends Node {
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
 	}
-	evaluate () {
+	evaluateTarget() {
 		// TODO: if source is an Undefined object, then member access should return Undefined
 		if (this.source.value === undefined) {
 			throw Error('Interpreter error: trying to access property of a non-object.')
 		}
-		return this.source.value.properties[this.key].value;
+		return this.source.value.properties[this.key];
+	}
+	// re-evaluate and re-bind target
+	updateTarget () {
+		console.log(`updating target for MemberAccessNode with id ${this.id}`); // for debugging
+		const oldTarget = this.target;
+		this.target = this.evaluateTarget();
+		if (this.target != oldTarget) {	
+			if (oldTarget) {
+				oldTarget.removeListener(this); // unbind from old target
+			}
+			if ( !(this.target instanceof ObjectNode)) {
+				// we only need to add a listener if the target is not an ObjectNode
+				this.target.addListener(this);  // bind to new target
+			}
+			this.update(); // target changed so re-evaluate value
+		}
+	}
+	evaluate () {
+		return this.target && this.target.value;
 	}
 }
 
