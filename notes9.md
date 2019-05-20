@@ -2979,6 +2979,8 @@ so this actually should work...right?
 
 * note that these two examples would be equivalent in imperative langs like javascript
 * doesn't matter if you call inside or outside a function, it will always just pass the result value into the function
+* but in Axis, it matters where you declare the behavior
+* this is explored more in the later section, "Pass-By-Behavior"
 
 ### exploring a template-based language
 
@@ -9356,7 +9358,7 @@ hmm...
 * if there are no properties, how does combining work?
 * how do you specify "arguments"? what even are "arguments"?
 
-### combiners and symmetry
+### Combiners and Symmetry
 
 using diagram-syntax, it is a lot more intuitive to represent cloning in terms of a source + arguments
 but in the interpreter, it seems cleaner to implement it using a combiner, source1, and source2 (treat arguments as another source)
@@ -9977,3 +9979,567 @@ uses a mechanism similar to meiosis when creating new objects
 * next, the resolution pass will resolve `bar:10` second,
 * which will trigger the listener and update `foo:bar`
 
+
+### Cloning and Resolving References
+
+* take a look at the following example
+
+		sourceScope:
+			x: 10
+			y: 20
+			source:
+				result: x+y
+				z: 30
+		argumentsScope:
+			x: 11
+			z: 31
+			clone: sourceScope.source(y: 21, addedProp: z)
+
+* notice that, the clone contains three references, `x`,`y`, and `z`
+* since `x` was not overridden in the cloning, `x` still refers to the original `x` in the source scope
+* `y` was overridden, so `y` is updated to refer to the new `y` (and `result` updates accordingly)
+* `z` refers to the `z` in the arguments scope, and will continue to do so
+
+* notice that, `source` used to refer to `y` from the source declaration scope, but during cloning it is updated to reference the `y` in the clone
+* however, even though the arguments reference `z` from the arguments declaration scope, it is _not updated_ to the `z` in the clone
+
+* at least, this is how I have been thinking about cloning and resolving references up till now
+
+* however, this is actually kind of weird
+* because now, the code for the clone references a `z`, which doesn't point to the `z` in the clone
+* so if you inspect the clone, it looks really weird
+* even weirder, is if you simply override the clone again, providing the same value for `z`, eg:
+	
+		secondClone: clone(z: clone.z)
+
+* now it will update the reference to the new `z`
+
+* actually, even in Java inheritance, we can refer to methods of the parent class, from the child class
+* eg
+
+		class Person {
+			public void sayHello() {
+				System.out.println("hello");
+			}
+		}
+		class Student extends Person {
+			public void greetTeacher() {
+				sayHello();
+				System.out.println("sensei");
+			}
+		}
+
+* however, note that in python, you have to use `self`, even if referring to methods in the same class
+
+		class Person:
+			def sayHello(self):
+				print("hello")
+			def sayHello2(self):
+				self.sayHello()
+
+		class Student(Person):
+			def greetTeacher(self):
+				self.sayHello()
+				print("sensei")
+
+* javascript works the same way, you have to use `this` to reference methods
+
+* however, in all Java, Python, and Javascript, there is no asymmetry like I currently have in Axis
+* method references inside a child class always refer to the methods of that class,
+	* regardless of whether they are defined in the child or inherited from the parent
+* so perhaps Axis should work the same way
+* that is, if a property is defined in the source but not the arguments,
+	* and the arguments reference that variable name, 
+	* then it will reference that property from the source
+* so in the example at the top of the section,
+* the reference to `z` inside `combined` will now refer to `combined.z`, not `argumentsScope.z`
+* I call this, "child scope for arguments", because it is resolving references in the arguments using the scope of the child (and only resolves the remaining references via argument scope)
+
+* this is a bit weird because now we have to worry about properties in the source, when defining the arguments
+* which can be especially confusing if you have a dynamic source:
+
+		fn: cond ? gn else hn
+		y: 3
+		console.log(fn(x: y*10))   // does gn contain y? does hn contain y?
+
+* on the other hand, note that if we have arguments reference the child scope,
+* we only have to worry about direct properties of the source
+	* we don't have to worry about variables in the source scope, or nested inside the source
+* eg
+
+		sourceScope:
+			x: 10
+			source:
+				nested:
+					x: 11
+		argumentsScope:
+			x: 12
+			clone: sourceScope.source(result: x)
+
+* in the above example, even if we used child scope for arguments,
+* because `x` isn't a property of `source`,
+* the `x` reference will pull from `argumentsScope` instead
+
+* instead of using child scope for arguments, note that we can explicitly reference it like so
+
+		source: (x: 10)
+		someclone: source(result: someclone.x * 2)
+
+* the `someclone.x` is analogous to the `self.x` in Python or `this.x` in javascript
+* though it results in slightly different behavior than using child scope for arguments
+* for example, it prevents overriding in nested scopes
+
+		source: (x: 10)
+		someclone: 
+			foo:
+				bar: someclone.x * 2
+		clone1: someclone(x: 10)      // this will change bar
+		clone2: someclone.foo(x: 10)  // this will not change bar
+
+* whereas, if we used child scope for arguments, it would allow overriding in nested scopes
+
+* I think while using child scope for arguments might be more symmetric,
+* sticking with only arguments scope would be more consistent and less confusing
+* after all, when you create objects, you only reference the surrounding scope
+* so when cloning, it also feels natural for it to only reference the surrounding scope
+
+* however, maybe we can do both!
+* by default, it only uses argument scope for resolving argument references
+* but you use a `this` keyword to refer to the child scope
+
+* after all, recall that scoping is an approximation
+	// TODO: FIND REFERENCED SECTION
+* and it is just a mechanism for specifying bindings
+	// TODO: FIND REFERENCED SECTION
+* though to fully understand scoping, we have to implement it...(see next section)
+
+* `_parent` object that is inherited
+how does cloning work?
+
+### Implementing Scope - Flattening Nested Structures
+
+* to fully understand scoping, we have to implement it
+* so first, how would it work if we didn't have scoping?
+* instead, we define bindings directly
+* this is easy to show in diagram syntax, we just bind objects together
+* and we don't need variable names anymore
+* however, we do need to specify properties
+* these are important for cloning, since the arguments will override the source at these properties
+* they define a mapping between values of the arguments and inputs/values of the source
+	* mentioned in section "Combiners and Symmetry"
+
+* we also can defined children, child behaviors that are spawned by the module/object
+* but aren't these nested objects?
+* wouldn't nesting introducing scoping?
+* but then how else do we define "child" objects/behaviors?
+
+* in fact, the whole idea of "child" behaviors sort of bothers me
+* because these children can only have one parent
+* and that naturally introduces a tree-like hierarchy
+
+* actually, maybe we don't need nesting to define "child" behaviors
+* and we can have children with multiple parents (sorta, you'll see)
+* we only need cloning/combining
+* so something like this:
+
+		collector.
+		parent:
+			x: 10, y: 20
+			child:
+				collector <: x+y
+
+* can be flattened and converted into this:
+
+		collector.
+		childTemplate: template
+			collector <: this.x + this.y
+		args: template
+			x: parent.x, y: parent.y
+		parent:
+			x: 10, y: 20
+			child: combine{childTemplate, args}
+
+* notice how all objects are defined at the root scope
+* there are no objects defined within another object
+* `child` has been extracted out, and made a template that `parent` can clone
+* however, `parent` has to pass in the arguments `x` and `y`
+* but it can't do so using `childTemplate(x: 10, y: 20)`,
+	* because that would be defining a nested object, the arguments object `(x: 10, y: 20)`
+* so instead, we define another object at root scope, `args`, and use that
+* thus, every object only contains either references, or clone operations
+
+* notice how, following this method, `childTemplate` can be cloned by other objects too
+* so this is the "multiple parents" idea I mentioned earlier
+* when you flatten the structure out, there is no hierarchy anymore
+* and objects don't have parents anymore
+
+* there is one last thing
+* notice the `this.x` and `this.y`
+* this is because, we can't just have static references/bindings
+* in order for cloning to be useful, we have to have some references rebind to the new object
+* combiners need to do two things:
+	1. merge properties
+	2. rebind references
+* the child's behavior should be dependent on its own properties
+* think of how useless functions would be if they didn't depend on their arguments
+* or how useless reproduction would be if the baby's behavior didn't depend on its own DNA
+
+* thus, we use the `this` keyword to specify dynamic references to the object itself
+* `this` is the only reference that the combiner will re-bind after cloning
+
+### Implementing Scope - Resolving References
+
+* now let's implement scoping
+* every object can have a `parentScope` property, that specifies a parent scope
+* when you create an object, you can optionally provide a parent scope
+* and that would be analogous to nesting
+* every object also has a `scope` property, that contains the variables in scope
+* this `scope` property is generated by combining `parentScope` with the properties of the object
+* references to scoped variables, would just pull from this `scope` property
+* so something like:
+
+		foo:
+			x: 10
+			bar:
+				zed:
+					y: x
+
+* can be flattened into
+
+		foo: (bar: _bar, x: 10)
+		_bar: (parentScope: foo.scope, zed: _zed)
+		_zed: (parentScope: _bar.scope, y: this.scope.x)
+
+* (note: the `scope` properties are explained later)
+* note that `y: x` turns into `y: this.scope.x`
+* we don't reference `foo.x` directly, because if `_zed` is every cloned,
+* we want to be able to override `x` and have the reference rebind
+
+* also remember that, while it may look like we are using scoping when making references like `foo.scope`
+* but these are actually static bindings
+* we can get rid of all these variable names if we used a diagram syntax and drew in bindings directly
+* but since we are using text syntax, we use variable names instead
+
+* so where are these `scope` properties coming from
+* the `scope` property can actually be statically generated
+* the interpreter just takes all the static properties of the object, copies them to a set,
+* and combines them with the parent scope
+* so for something like
+
+		foo: (parentScope: _bar.scope, a: 10, b: 20, c: this.scope.zed)
+
+* it creates something like
+
+		_directProps: (a: foo.a, b: foo.b, c: foo.c)     // generated statically
+		_scope: combine{foo.parentScope, _directProps}
+		foo: (parentScope: _bar.scope, a: 10, b: 20, c: _scope.zed)
+
+### Implementing Scope - Child Scope vs Arguments Scope
+
+* now what about child scope and arguments scope?
+* exploring some examples
+
+		// should order matter?
+		(x: 10, y: 20)(result: x+y)
+		(result: x+y)(x: 10, y: 20)
+
+* another example:
+
+		x: 10
+		args: (y: x*2)
+		source: (z: y+2, x: 0)
+
+		args2: args(x: 12)
+
+		clone: combine{source, args}
+		clone2: combine{source, args2}
+
+* on one hand, the reference to `x` in `args` should be `this.scope.x`
+* that way, `args2` will rebind it correctly
+* on the other hand, when we do `combine{source, args}`, if we want arguments scope, then it shouldn't be rebound
+
+* it seems like there needs to be an order when using argument scope
+
+		x: 10
+		w: -2
+		source: (z: y+2, x: 0, w: 0)
+		args1: (y: x*w)
+		args2: (x: 12)
+
+		clone: combine{source, args1}
+		clone2: combine{clone, args2}
+
+* if you inspect `clone`, the `x` refers `x: 10`, so maybe it looks like a reference to `arguments.scope.x`
+	* same with `w`
+* however, `y` refers to `this.scope.y`, and thus gets rebound to the value `x*w` aka -20
+* if you inspect `clone2`, then `x` now refers to a different `arguments.scope.x`, namely the scope of `args2`
+* however, `w` still refers to the old `arguments.scope.w`, namely the scope of `args1`
+* `y` refers to the scope of `args1`
+* and `z` still refers to the scope of `this.scope.z`
+* so now there are two different `arguments`, so perhaps we need to refer to them as `arguments[1]` and `arguments[2]`
+* `arguments[1]` is the older one, so that is for `w`, aka `arguments[1].scope.w`
+* as for `x`, that refers to `arguments[2].scope.x`
+* the way it works is, if a higher level `arguments` object overrides a variable, it rebinds all lower level references to that new variable
+* however, higher level references will never reference lower level arguments
+* this is quite weird though...
+
+
+* in addition, remember how in `clone`, `z` refers to `this.scope.z`
+* what if we now use `clone` as arguments, aka
+
+		clone3: combine{source, clone}
+
+* in other words
+
+		x: 10
+		w: -2
+		source: (z: y+2, x: 0, w: 0)
+
+		clone: source(y: x*w)
+		clone3: source(...clone)
+
+* what about
+
+		clone: source(y: x*w)
+		clone2: clone(...source)
+
+### Implementing Scope - Child Scope vs Arguments Scope II
+
+* actually, perhaps I'm overcomplicating it
+* the simple rule for arguments scope is: references from the source get re-bound, references from the arguments don't get re-bound
+* in other words, the behavior of properties defined in the arguments, will not change during cloning
+* but the behavior of the source might
+
+* earlier when I was talking about argument levels and `arguments[1]` and `arguments[2]`
+* that is also not necessary
+* during a cloning, for a given property of the source, either it gets overriden or stays the same
+* if it gets overriden, all references from the source get re-bound
+
+* I guess whats weird is that, if we go back to the example from earlier (slightly modified)
+
+		x: 10
+		w: -2
+		source: (z: y+2, x: 0, w: 0)
+
+		clone1: source(y: x*w)
+		clone2: clone(x: 12)
+
+* in `clone1`, the `x` refers to the outer `x: 10`, and likewise for the `w`
+* they don't refer to the `x: 0` and `w: 0` properties of the clone object itself
+* however, in `clone2`, `x` gets overridden to `x: 12`
+* so on one hand, in `clone1`, the `x` feels more like a value being passed in,
+	* because it references the outer `x` and not the `x` in the object itself
+* however, during creation of `clone2`, it acts more like a reference because it is re-bound
+
+
+* I think this idea of "value" vs "reference" is important
+* it's actually more of a distinction between "static" and "dynamic"
+* a "dynamic" reference is one that changes when you clone it, a reference to the current scope, that will get re-bound which each clone
+* a "static" reference is one that doesn't change when you clone it, a direct reference to the outer scope
+	* though note that it changes if you clone the outer scope
+
+* so looking at the last example, the one comparing `clone1` and `clone2`, we can see how it gets confusing when using argument scope for arguments
+* because a reference can seem both static and dynamic at the same time
+* eg, the reference to `x` in `clone1` is static because it references the outer `x` and not the `x` in the object itself
+* but it also seems dynamic because in `clone2` the `x` gets re-bound
+* so maybe this is not how it should work
+
+* this implies that we should use child scope for arguments
+* dynamic references by default
+* and if you want a static reference, you can specify one directly
+* eg `clone1: source(y: outer.x * outer.w)`
+* you can also explicitly specify a dynamic reference, `clone1: source(y: this.x * this.w)`
+* though that is optional
+* what you can't do, is have this dual dynamic/static behavior that we were ending up with when using argument scope
+
+### Child Scope vs Arguments Scope - Passing in Values vs Behaviors
+
+* this difference between "static" and "dynamic" is made more clear in the diagram syntax
+* if you did something like `foo(a+b)`
+* notice that, even this could possibly be affected by properties of `foo`
+* eg, if we had
+
+		a: 10, b: 20
+		foo: (a: 1, b: 2)
+		foo(a+b)    // this would use the a and b of foo's scope, not the outer scope's a and b
+
+* in diagram syntax, the way this would look is, we are adding the behavior `plus(a,b)` to the object `foo`
+* the `plus` object would be declared inside `foo`
+* whereas, if we only wanted to pass the value of `a+b`, we would declare the `plus` object outside, and then pass only the output value into `foo`
+* using text syntax, that would look like
+
+		a: 10, b: 20
+		foo: (a: 1, b: 2)
+		_sum: a+b
+		foo(_sum)    // passes in the value of a+b
+
+* so it seems like the difference is, are we passing in _values_, or extending _behavior_?
+* if we are passing in values, it is static, won't change during cloning
+* if we are passing in behaviors, it is affected by cloning, and any pre-existing properties of the source scope
+* we can think of this as "pass-by-value" vs _"pass-by-behavior"_
+
+* in diagram syntax, distinguishing the two is easy, we either put the `plus` operation outside or inside the arguments
+* perhaps we can differentiate the two in text syntax as well, like how imperative languages do it
+
+		foo(a+b)   // pass in values
+		foo{result: a+b}  // pass in behavior
+
+* or maybe we can "pre-evaluate" values within behavior definitions, eg
+
+		foo
+			x: a+b     // pass in behavior
+			y: {a+b}   // pass in values
+
+* this sort of makes sense because we were exploring curly braces for grouping (see section "Grouping and Multi-Line Syntax")
+* though using `{}` for both grouping, and pre-evaluation, may run into conflicts
+
+* perhaps we should make anonymous arguments (unnamed arguments) follow pass-by-value by default
+
+* I'll have to explore this more later
+* but I think what's important to note is
+* passing in values, is something that we can do without a specific syntax for it
+* we can do it by directly referencing the outer variable, or using escape operator `^`, as shown in the previous section
+* but for a completely equivalent analog, we use something like the form shown earlier:
+
+		_sum: a+b
+		foo(_sum)    // passes in the value of a+b, instead of passing in the behavior "a+b"
+
+* I call this "pass-by-value form"
+
+* thus, by default, we should follow pass-by-behavior
+* so we should use child scope for arguments
+* and we can always emulate argument scope using the pass-by-value form shown above
+
+### Pass-By-Behavior
+
+(continued from previous section)
+
+* I think it's important to clarify what "pass-by-behavior" actually is
+* we talked about similar concepts earlier, in section "Defining Behavior That Should be Duplicated"
+* where we mentioned how, anything in the arguments is behavior that should be duplicated
+
+* in the previous section "Implementing Scope", we showed what nesting object definitions actually means
+* and this applies for arguments as well
+
+		example
+
+* however, it's important to note that it doesn't just clone the template
+* it also rebinds it to the current scope
+* in essence, it create the behavior within its environment
+
+* in functional, you can either define a function, or call one
+* and when you call a function, you can only pass in references to other functions
+* but when you define a function, you can call other functions within the body
+* in Axis, cloning an object is more akin to defining a function
+* you can clone other objects within the cloning operation
+
+### Implementing Scope - Security and Privacy
+
+* let's do some security checks
+* can outsiders access private scoped vars?
+
+
+
+* what about privacy?
+* if you flatten it, it exposes child objects and argument objects to the world?
+
+
+
+another one of my concerns
+if by default
+
+by default a lot of people will make internal properties public
+why not
+
+		someLibFn:
+			...
+		_myprivatescope:
+			a: 10
+			b: 20
+			publisher <: someLibFn(a, b)
+
+problem is, that is now a possible attack vector
+if somebody can guess those property names, they can extract their values by overriding one of your sources
+eg
+
+		secretLogger: collector
+		someLibFn:
+			secretLogger <: a
+		_myprivatescope:
+			a: 10
+			b: 20
+			publisher <: someLibFn(input: a+b)
+
+
+I call this a "rebind attack", because it tries to gain more info by rebinding references
+there is no way to fully thwart an attacker
+because no matter which nested node you reference
+they can always override it
+eg if you had
+
+		_myprivatescope:
+			foo:
+				bar:
+					baz:
+						a: 10
+						b: 20
+						publisher <: someLibFn(input: foo.bar.baz.a+foo.bar.baz.b)
+
+		secretLogger: collector
+		someLibFn:
+			secretLogger <: foo: ...
+
+(tho more useful if you override a collector)
+
+making everything private is a hassle
+
+use `^` to escape, easy way to static
+prevent rebind attacks
+another way is to reference private vars
+
+still, perhaps arguments scope is a good compromise
+seeing as people can still use `this.varname` or `^varname` to either achieve dynamic or static bind explicitly
+
+arguments scope isn't invincible either
+for example, even for object creation
+can be attacked via cloning
+
+		_myprivatescope:
+			foo:
+				bar:
+					baz:
+						a: 10
+						b: 20
+						publisher <: (input: foo.bar.baz.a+foo.bar.baz.b)
+
+		publisher[0](foo: ...)
+
+// TODO: FIND REFERENCED SECTION
+
+but it's easy to force no-cloning on an item
+	// TODO: FIND REFERENCED SECTION
+much harder to prevent attacks on child scope
+because every cloned 3rd party lib is susceptible
+
+arguments scope is a way of saying
+by default, use static scope to prevent attacks
+but it gets cloned, they can start using dynamic references
+
+
+though if you can specify a no-cloning flag
+then you can also specify a "escape" flag that escapes all references and makes them static
+
+enforcing no-cloning is a bad way to enforce privacy
+sometimes people clone just to add tags and such
+as long as all your references are static
+then you guarantee prevent information leak
+
+
+note that using pass-by-value form
+mentioned in the previous section, "Child Scope vs Arguments Scope - Passing in Values vs Behaviors"
+it is actually fully secure
+
+		foo(result: a+b)   // insecure, prone to rebind attack
+
+		_temp: a+b
+		foo(result: _temp) // secure, no way for a rebind attack
