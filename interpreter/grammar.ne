@@ -90,7 +90,7 @@ Object 		-> "(" Block ")"										{% ([ ,block, ]) => ({type:'create',block}) %
 			| Object "template":? "{" Block "}"						{% ([source,templ, ,block, ]) => ({type:'clone',source,block,template: !!templ}) %}
 
 			| Object "->"											{% ([source]) => ({type:'callResult',source}) %} # calling
-			| Object %propAccess %identifier						{% ([source, ,key]) => ({type:'memberAccess',source,key}) %}
+			| Object %propAccess %identifier						{% ([source, ,token]) => ({type:'memberAccess',source,key:token.value}) %}
 			| Object %propAccess %tag
 			| Object "[" Block "]"									# computed property access
 

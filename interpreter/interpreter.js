@@ -344,7 +344,7 @@ class MemberAccessNode extends Node {
 		if (this.source.value === undefined) {
 			throw Error('Interpreter error: trying to access property of a non-object.')
 		}
-		return this.source.value[this.key];
+		return this.source.value.properties[this.key].value;
 	}
 }
 
