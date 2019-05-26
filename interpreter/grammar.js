@@ -18,7 +18,7 @@ var grammar = {
     {"name": "Block$ebnf$2", "symbols": ["Block$ebnf$2", "Block$ebnf$2$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "Block$ebnf$3", "symbols": ["Statement"], "postprocess": id},
     {"name": "Block$ebnf$3", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "Block", "symbols": ["Block$ebnf$1", "Block$ebnf$2", "Block$ebnf$3"], "postprocess": ([parameters,middle,last]) => ({type:'block', parameters, statements: last ? [...middle.map(x=>x[0]),last] : last})},
+    {"name": "Block", "symbols": ["Block$ebnf$1", "Block$ebnf$2", "Block$ebnf$3"], "postprocess": ([parameters,middle,last]) => ({type:'block', parameters, statements: last ? [...middle.map(x=>x[0]),last] : middle.map(x=>x[0])})},
     {"name": "Params", "symbols": ["VarList", {"literal":">>"}], "postprocess": ([varlist]) => varlist},
     {"name": "VarList$ebnf$1", "symbols": []},
     {"name": "VarList$ebnf$1$subexpression$1$ebnf$1", "symbols": [{"literal":","}], "postprocess": id},

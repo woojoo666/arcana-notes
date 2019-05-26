@@ -19,7 +19,7 @@ const lexerWrapper = (typeof module === 'object' && module.exports)
 #	private identifiers can't be used in property access, eg `foo._bar`
 #   when stripping parenthesis, the block inside must be a single-item list
 
-Block 		-> Params:? (Statement (","|"\n")):* Statement:?		{% ([parameters,middle,last]) => ({type:'block', parameters, statements: last ? [...middle.map(x=>x[0]),last] : last}) %} # trailing commas allowed
+Block 		-> Params:? (Statement (","|"\n")):* Statement:?		{% ([parameters,middle,last]) => ({type:'block', parameters, statements: last ? [...middle.map(x=>x[0]),last] : middle.map(x=>x[0])}) %} # trailing commas allowed
 
 Params		-> VarList ">>"											{% ([varlist]) => varlist %}
 VarList		-> (%identifier ",":?):* %identifier					{% ([middle,last]) => [...middle.map(([x])=>x.value),last.value] %} # commas optional, but no trailing commas allowed
