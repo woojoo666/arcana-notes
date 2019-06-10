@@ -7,10 +7,16 @@ class IDE extends React.Component {
 	}
 
 	handleChange (event) {
-		this.setState({ rawCode: event.target.value });
+		const rawCode = event.target.value;
+		this.setState({ rawCode });
 
-		const output = new Interpreter(this.state.rawCode).interpretTest({}, 'Indent');
-		this.setState({ output });
+		try {
+			const output = new Interpreter(rawCode).interpretTest({}, 'Indent');
+			this.setState({ output });
+		} catch (e) {
+			console.log("Runtime error.");
+			console.log(e);
+		}
 	}
 
 	render () {
