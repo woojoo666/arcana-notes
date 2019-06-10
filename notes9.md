@@ -6397,6 +6397,12 @@ but this default global state makes it much easier to write in a dynamic, constr
 * if you declare an object to be a collector, you have to account for all insertions to it
 * that's the whole point of a collector
 
+revisit 6/3/2019
+* actually, there is an important aspect of referential transparency we are missing
+* we should be able to replace a reference with its value and obtain the same behavior
+* however, this is not true, because referencing an object is different from nesting an object
+* see previous section "Defining Behavior That Should be Duplicated"
+* in addition, see the later section "Referential Transparency II - Referencing vs Nesting" for more
 
 ### Multi-Line Expressions Allow for Imperative-Style Braced Blocks
 
@@ -10638,3 +10644,729 @@ if `input` changes, it re-evaluates foo
 
 * so if source changes, re-binds target
 * if target changes, retrieves new value of target
+
+
+
+
+### Interpreter Implementation - Reference Resolution and Initial Pass Revisited
+
+* the core node types should be: Clone Nodes and Member Access Nodes (and possibly insertion nodes when we get to that)
+* however we have 4 main nodes: Object Nodes, Clone Nodes, Reference Nodes, and Member Access Nodes
+
+* note that Object Nodes can be thought of as Clone Nodes where the source is `()`
+* and Reference nodes can be thought of as Member Access Nodes where the source is `scope`
+
+
+* right now we are calling update() in every reference node during `resolveReferences()`
+* in addition, object nodes never update and never trigger updates
+* two problems:
+	1. in `foo: (a: ...).a`, the object node needs to trigger the member access node to be evaluated
+		* same with something like `foo: (a: 10)(b: 20)`, both object nodes need to trigger the clone node to evaluate
+	2. in something like `foo: 10, bar: foo+1`, as long as the reference to `foo` is resolved first, then it doesn't need to call update()
+		* because when the reference to `10` is resolved second, it will update `foo` and trigger `bar` to update
+
+* the optimal rules for binding are:
+* references to the external scope should trigger the initial evaluation pass
+* object creation counts as a reference to the external object `()`
+	* because object creation is like cloning `()` with arguments
+
+* in order to convert reference nodes to member access nodes,
+* we would need to create persistent scope nodes for every scope,
+	* so that the member access nodes can listen to them
+* however, note that scoping is static, so reference nodes are bound once and then never need to rebind (unlike many member access nodes)
+* so having each object keep a reference to the scope seems unnecessary
+* the way we use currently, is in a "resolution pass" we dynamically construct the scope and create bindings, but then the scope is discarded afterwards
+* 
+
+* maybe should be based on static
+* detect static references and resolve them beforehand
+
+* actually no that doesn't work
+* eg `foo: a.b.c` might be static, but we can't resolve it because if we clone the parent of `foo` and overrride `a`
+* the overriding won't work properly if `foo` is statically bound to the original `a.b.c`
+
+
+* object nodes are clone nodes with empty
+* so the evaluation function actually handles the reference resolution
+
+
+* no we still need a separate way of creating/defining objects
+* eg if we represented `foo: (a: 10)` with a clone operation `foo: ()(a: 10)`
+* notice how we still have object creation for the arguments to the clone op
+* and we can continue this expansion infinitely
+* eg `(args)` => `()(args)` => `()()(args)` => `()()()(args)` ...
+* infinite recursion
+
+* in Axis, you define objects at the top level
+* object definitions can contain references to other objects, and 3 operations: cloning, insertion, property access
+* scope is built on top of this top level definition system
+
+* this actually does help explain certain things
+* if all objects are defined at top level
+* then nested object creation is actually a reference to an external object
+* so those references would trigger evaluation
+* _nested object creation is shorthand for a defining an external object, and cloning it with the current scope_
+
+* this is actually slightly different from the mechanism discussed in section "Implementing Scope - Resolving References"
+* because in that section, we turned this:
+
+		foo:
+			x: 10
+			bar:
+				zed:
+					y: x
+
+* into this:
+
+		foo: (bar: _bar, x: 10)
+		_bar: (parentScope: foo.scope, zed: _zed)
+		_zed: (parentScope: _bar.scope, y: this.scope.x)
+
+* however, the problem with this is that, `foo` only contains a reference to `_bar`, and `_bar` contains a direct reference to `foo`
+* so if `foo` is cloned, the clone will reference the same `_bar`, which still points to the old `foo`, not the clone
+* instead, we want the cloning to create a clone of `_bar` as well, made with the new scope
+* so actually, the flattened structure should be more like:
+
+		foo: ( bar: combine{_bar, (parentScope: this.scope)}, x: 10 )
+		_bar: ( zed: combine{_zed, (parentScope: this.scope)} )
+		_zed: ( y: this.scope.x )
+
+* notice how, instead of having `_bar` and `_zed` reference their parent scopes directly
+* instead, the parent scope clones the child and passes its scope in
+* so `foo` clones `_bar` and passes its scope in, and `_bar` clones `_zed` and passes its scope in
+* this way, if we do `fooClone: foo(x: 12)`, then the cloning operation will clone `_bar` and pass in `fooClone`'s scope
+
+* note that `(parentScope: this.scope)` actually needs to be top-level as well:
+* how would we do this?
+* maybe
+
+		foo: (bar: combine{_bar, foo_scope}, x: 10)
+		foo_scope: (parentScope: foo.scope)
+
+		_bar: (zed: combine{_zed, _bar_scope})
+		_bar_scope: (parentScope: _bar.scope)
+
+		_zed: ( y: this.scope.x )
+
+* note that `foo_scope` and `_bar_scope` would be statically generated
+* however, this doesn't work
+* if `foo` is cloned, it still uses the old `foo_scope`
+
+* actually this isn't specific to scoping
+* a simpler example:
+
+		foo:
+			bar:
+				zed: foo
+
+* how do we ensure that, when `foo` is cloned, the new `zed` will point to the new `foo`?
+* if we try to do
+
+		foo: (bar: _bar)
+		_bar: (zed: this.scope.foo)
+
+* then when we clone `foo`, even if it somehow clones `_bar` as well, the new `_bar` will point to the old foo
+
+* even something as simple as `sum: (a: 10, b: 20, result: a+b)`
+* when you do `a+b`
+* in flattened structure, it is created at top-level
+* so how do we pass the new `a` and `b` in
+
+* if we think in terms of DNA
+* we might have `sum` cell that adds together the data at the `a` and `b` sections of the DNA,
+	* and places the result in the `result` section of the DNA
+* so if you combined/merged the `sum` cell DNA strand with a `(a: 10, b: 20)` DNA strand
+* then the child would have `result: 30` inside its DNA
+* however, imagine if we wanted a 3-sum cell, that just chains together two `sum` cells inside
+* we would do something like
+
+		3sum: (x y z >> result: sum(a: sum(a: x, b: y).result, b: z))
+
+* notice that we have to take the data at `x` and `y` of the `3sum` DNA,
+	* and bind it to the `a` and `b` sections of the inner `sum` arguments
+* and then we take the `result` of the inner `sum` and bind it to one argument of the outer `sum`
+* this complex binding and mapping does not seem achievable via cloning itself
+* we need an operation for defining these mappings
+
+
+* maybe "creation" has to be another operation that can be used when defining an object
+* note that creation is different from defining an object
+* when you define an object, you define the behavior of the object, made up of Axis core operations
+* "creation" is a core operation, that takes values from the behavior and binds them to properties of a new object
+* this special object has no behavior, it is just a container for values
+
+* it seems like creation is really only used for defining arguments for cloning
+* it also feels ugly
+* especially because, if you want an object with zero behavior, there are two ways of defining it
+	1. bind values to object properties directly in the object definition
+	2. use creation to create a new object, and return the created object
+
+* creation almost feels like writes, inverse property access
+* because we are creating an object by defining its properties from the outside
+* but we already have insertion for writes...
+
+* we can think of creation as a way of "mapping domains"
+* so in `3sum`, we are mapping the inner sum's `a` and `b` and `result` to the corresponding properties in `3sum`
+	* namely, `x`, `y`, and the outer sum's `a`
+
+* maybe these mappings can be clones of static global objects, eg
+
+		mapXtoY: x >>
+			result:
+				y: x
+		foo:
+			x: 10
+		bar: mapXtoY(foo)   // bar.x will be 10
+
+* so just like we can reference, say, the number `10` in our program
+* we can also reference a mapping `mapXtoY` in our program, and clone it to perform a mapping
+* without needing a "creation" operation
+* so in the `3sum` example, we would clone the mapping `mapABResult_to_XYA`
+
+* but notice that the `mapXtoY` function internally uses nesting...
+* in addition, there are infinite mappings, so we might not be able to statically define them as globals
+* however, there are infinite numbers, how come we can reference them as globals?
+* well, if we think of numbers as Church Numerals, then when we reference numbers we are actually using the successor function
+* can we implement the successor function without nesting?
+
+vvvvvvvv TODO: clean this up vvvvvvvvvvvvvvv
+
+		TODO: example: attempt as implementing successor function without nesting
+
+* actually, we can see why we need the creation operation
+* without it, we only have cloning, property access, and insertion
+	* we can ignore insertion for now
+* in order to emulate nesting, we have to find a way for an object to create other objects, that are bound to the parent's values
+* cloning needs arguments
+* if both those arguments are just external objects, then it's not bound to the parent's values
+* but if not, then at least one argument has to come from the parent, be created by the parent
+* so that argument has to be a clone created by the parent
+* but then we have the same problem: that cloning operation has to have two arguments as well
+* ultimately, the parent has to create some object, not a clone
+
+* there is one possibility though
+* if the object uses _itself_ as an argument to one of its internal cloning operations
+* eg, for `3sum`
+
+		3sum: x y z >>
+			self: this
+			_map1: combine{map_x_to_a, self}
+			_map2: combine{map_y_to_b, self}
+			_sum1: combine{sum, combine{_map1, _map2}}
+
+			_map3: combine{map_result_to_a, _sum1}
+			_map4: combine{map_z_to_b, self}
+			result: combine{sum, combine{_map3, _map4}}
+
+* we still have to implement these mapping functions though
+
+		TODO: attempt at implementing mapping function
+
+* it's important to note that "creation" or "mapping" is different from defining a nested child
+* a nested child can contain behavior
+* but the "mapping" operation basically creates an object that only contains mappings, no behavior
+* so to flatten a nested structure, we lift nested children to top-level templates,
+* and then inside the parent, use cloning and mapping to create the children and bind them to the parent's variables
+* so something like
+
+		parent:
+			num: 10
+			child: 
+				foo: sum(a: num, b: 1).result
+
+* turns into something like
+
+		_child:
+			mapping: map{a: scope.num, b: 1}
+			foo: combine{sum, mapping}.result
+		parent:
+			num: 10
+			child: combine{_bar, scope}
+
+* important: notice that the nested `child` object becomes a single top-level definition, plus a single clone in the parent
+* by making the distinction between a child's behavior, and its mapping/binding during cloning,
+* we are able to solve the issue with infinite recursion when trying to flatten nested structures
+* before, when we tried to represent creation as cloning a blank object, we ended up with infinite recursion:
+	* `(args)` => `()(args)` => `()()(args)` => `()()()(args)` ...
+* and so if we tried to hoist a nested child to the top-level, with a clone operation in the parent,
+* the clone operation still seemed to require a nested block to define how the parent's variables were passed to the child
+* however, we have shown that this nested block doesn't actually contain behavior
+* we hoist the child behavior, but keep the mapping inside the parent
+
+* its also important to note that, mapping is more of a syntactic convenience
+* in a diagram syntax, you wouldn't necessarily need these mapping objects,
+* you can just draw bindings directly from values inside the caller, to inputs of the clone operation
+* (though actually, this doesn't work as nicely as it sounds, we'll have to explore this later)
+
+* to bring this back to the interpreter implementation
+* every time we define a nested child object/block (this includes any argument blocks)
+* it's internally represented using two Nodes:
+* an `ObjectNode`, that contains its properties and behavior
+* a `CloneNode` whose purpose is just to resolve the references (aka handle the mappings)
+	with the aforementioned ObjectNode as source, and a `(_scope: ...)` object as arguments that just passes in parent scope
+
+* note that, the attempt to represent creation as cloning a blank object, eg `(args)` => `()(args)`
+* was a flawed idea to begin with
+* it's like trying to represent every number `x` with the expansion `0+x`
+* it's true that `x` is the same as `0+x`, but that doesn't mean we can represent numbers using `+`
+* numbers are objects, `+` is an operation
+* `x` is the same as `0+x` only because `0` is the identity object for the `+` group
+
+* now that we aren't cloning empty `()`
+* how do we make it so resolve references initiates evaluation at these root object nodes
+
+
+
+still weird though
+because with cloning, you combine two objects
+	requires two objects
+but with creation, you combine an object with a mapping (which we clarified, is not the same as an object, because no behavior)
+	only requires one object
+so they are still different...
+
+
+
+### Dynamic Properties and Eager Evaluation
+
+
+* now that we have side effects
+* how do we deal with infinite lists
+* we talked about this earlier
+	// TODO: FIND REFERENCED SECTION
+
+* one option is to lazy-evaluate
+* but that feels ugly, because that means the behavior might changed based on what properties are accessed
+	* eg if certain keys cause the dynamic property to make insertions
+* lazy evaluation is an optimization, it doesn't feel like it should affect output
+* and anyways, properties are supposed to just be pointers to internal behavior
+	* accessing a pointer shouldn't affect behavior
+
+* maybe we should only allow dynamic properties for functions that have no side effects?
+* but this is impossible to tell if there is private behavior in the dynamic prop function
+
+* we don't know if a given function will have side effects or not
+* we can't, for example, try testing a subset, eg run the dynamic property fn on the key `0`
+* because the side effects might only appear for certain keys
+
+* so lazy evaluation doesn't seem like a good idea, very unpredictable
+* but eager evaluation is also impossible, because there are infinite keys to loop across
+* so we are stuck
+* it doesn't seem like dynamic properties are consistent with the rest of my language
+
+* maybe you have to specify a finite range of keys for any dynamic property?
+
+* note that dynamic properties are important because we leverage them for hashmaps
+	// TODO: FIND REFERENCED SECTION
+* hashmaps are implemented like:
+
+		hashmap: collector
+			items >>
+			[key]: items.find(key)
+
+* so if we can't have dynamic properties, we can't really have hashmaps
+* we would have to start using syntax like `myDict(10)` instead of `myDict[10]` to emulate hashmaps/dictionaries
+
+* it seems like our main issue is that dynamic properties define infinite behavior
+* and so lazy evaluation would be inaccurate, and eager evaluation would take forever
+
+* but actually, there is no reason why dynamic properties should have to define infinite behavior
+* all we want is an object whose properties are dynamic
+* we can still have finite behavior in an object
+* and properties are just pointers to sections of that behavior
+* we just want to dynamically generate the pointers
+
+* for example, a hashmap does not contain infinite behavior
+* it contains a dynamic amount of behavior based on the number of insertions
+* and we want the properties to change based on those insertions as well
+
+
+
+
+### state variables and collectors?
+
+
+* imagine if we had the following javascript code
+
+		function onmouseclick (e) {
+			a += 10
+			b *= 2
+			result = a/b
+			output.display(result)
+		}
+
+* and we want to convert it to axis
+
+		onmouseclick: e, timestamp >> @timestamp
+			a += 10
+			b *= 2
+			result := a/b
+			output.display <: result
+
+* naturally we would want output to only show one insertion
+* however, what if `output,display` isn't a state variable
+* some 3rd party object
+
+
+
+
+
+### ML models ..... ?
+
+I've recently been thinking about making a Spaced-Repetition System Kanji learning app
+and what would be nice is if there was a giant relational model
+that modeled the "similarity" and relationships between Kanji, and multi-kanji words/vocabulary
+that way when you are going through the flashcards/quizzes and you are having trouble with certain kanji
+it knows that you would also have trouble with words/vocabulary that contain that kanji
+
+what you could do is have a ML model as an object
+and then pass in your stats as an input to the ML model
+and it would evaluate the weights of the other nodes, based on the nodes you pass in
+sort of similar to the `hikeDistance` feedback example
+eg
+
+		myKanjiRelations: KanjiRelations(stats)
+
+
+
+### Axis and Group Theory
+
+* we can think of cloning as the primary operation in the group of all objects
+* it is associative and has identity
+* however it is not invertible or commutative
+
+* member access `.` can be thought of as the secondary operation
+* but it is not distributive
+* aka `combine{a,b}.foo` is not the same as `combine{a.foo, b.foo}`
+* because `combine{a,b}` could have side effects that are not executed in `combine{a.foo, b.foo}`
+* it then follows that, if Axis was a pure functional language, member access _would_ be distributive
+
+
+* I need to extensively research category theory, group theory, and its relation to haskell/prolog and other langs
+* to fully start understanding where Axis stands in category theory
+
+
+
+### 
+
+now that we use child scope for cloning, cloning is now more symmetric
+	* see section "Implementing Scope - Child Scope vs Arguments Scope II"
+* and the way we think about cloning is more like DNA
+
+
+* so why is cloning a binary operation?
+* it seems logical to generalize cloning to instead just be a way of combining behaviors
+* actually we talked about extending cloning to more than two objects before
+	TODO: FIND REFERENCED SECTION
+* the way we can think about it is
+* it is a way of creating a new behavior, by splicing together a bunch of existing behaviors
+
+
+
+### Overriding Behavior vs Overriding References
+
+* right now cloning combines two objects
+* and overrides the properties of the source with the properties of the arguments
+* but one thing we haven't really clarified yet is
+* if a property gets overridden, does the behavior also get removed?
+* eg if we had
+
+		source: user >>
+			song: user.getFavoriteSong()->
+
+		clone: source(song: "10 hours of spongebob saying yeah")
+
+* does `user.getFavoriteSong` still get called?
+* on one hand, if we think of properties as just pointers to behavior, then overriding a pointer wouldn't destroy the behavior
+* it would just affect anything that is referencing that property
+* on the other hand, in this case (and similar cases) it doesn't seem to make sense for the overridden behavior to exist
+
+* note that this is only an issue because cloning objects can have side effects
+* in a pure functional language, overriding references is the same as overriding behavior
+* if the reference is overridden, then it doesn't matter if the old behavior still exists or not
+* if it isn't being referenced or used, then it can be ignored
+* whereas in Axis, if a behavior isn't referenced, but still exists, then it matters
+
+* for security purposes, it seems better for overridden behavior to remain
+* security-wise, it is easier to maintain if we assume all behavior is permanent, and copied to all clones
+* because otherwise people can selectively remove behavior (as long as it is public), eg
+
+		source: user >>
+			authKey: authorize(user, currentApp)   // authorize() will notify the user that somebody is trying to access their information
+			getPrivateInfo(user, authKey)
+
+		attacker: source(authKey: savedAuthKey) // prevent "authorize" from being called
+
+* though in this case, doesn't seem to be so bad
+* there shouldn't be any reason for re-using a saved `authKey`
+* `authorize()` only needs to notify a user if a new application is trying to access their information
+* but if its from the same application, then there is no need for duplicate calls to `authorize`
+
+* and anyways, if we want behavior to be permanent we can just declare it in a private property (so it can't be overridden)
+
+* in addition, note that, in DNA, sections of DNA dictate behavior
+* so if you overwrite a section, it will overwrite that behavior
+
+* another way you can think about it, is for say, a car
+* if you swap out certain parts of the car, you are swapping out behaviors
+* eg if you swap the engine for a bigger one, you are taking out the original engine's behavior, and putting in new behavior
+
+* also note that, in object-oriented typed languages like Java, when you override a parent class's method, it overrides the behavior
+* as in, when you call the child method, it won't call the parent method (unless you explicitly do so using `super()` in Java)
+
+* I think for now, overriding behavior makes sense
+* it is the most intuitive visually
+	* since we are overwriting a property, it doesn't make as much sense for the old behavior to exist hidden in the background
+* however, if we do end up following this model
+* then we have to re-think about what properties are
+* because overriding behavior, means that properties aren't just pointers anymore
+* they actually capture sections of behavior
+
+* we also have to think about how much behavior is captured by each property
+* for example, consider this:
+
+		xyz:
+			xy: x*y
+			plusz: xy+z
+			minusz: xy-z
+
+* the dependency graph of this would have a `*` node (from `x*y`), branching out to a `+` node and a `-` node
+* if we do `xyz(plusz: undefined)`, it will overwrite the `+` operation, but it obviously won't affect the `*` operation
+* however, consider the two objects below:
+
+		foo:
+			result: outer(inner(10))
+
+		bar:
+			_temp: inner(10)
+			result: outer(_temp)
+
+* these may seem like the same
+* but notice what happens if we clone each of them and override `result`
+* if we do `foo(result: undefined)`, then presumably, both `outer` and `inner` won't be called
+* but if we do `bar(result: undefined)`, then `inner` will still be called
+* so how we use intermediate variables, can affect what behavior can/cannot be overridden
+* though that seems like too much to micro-manage, a lot for the programmer to worry about
+
+* note that, at least with text syntax, properties can only capture a tree-structure portion of the dependency graph
+* and our language philosophy tries to avoid tree hierarchies
+	TODO: FIND REFERENCED SECTION
+
+* if we really wanted to have full control over an object
+* we could attach a property (private or public) to every single node in the object's behavior graph
+* and then that would allow users to selectively overwrite any node in the graph
+* this could be considered a generalized form of how overwriting behavior works
+* however, it is unreasonable to have so many properties for every object
+
+* in addition, with diagram syntax, it's even weirder
+* in diagram syntax we often don't need to use intermediate variables
+* eg for the `xyz` example shown earlier, we wouldn't need the `xy` variable
+* we would just have the `*` node branch out to the `+` and `-` nodes
+* in addition, with diagram syntax, properties literally just look like pointers
+* you take a node in the dependency graph, draw an arrow coming out, add a name, and voila! you have a property
+* however, if we want properties to also encapsulate behavior
+* it's hard to distinguish how much of the dependency graph is "captured" by each property
+* is it just the node that the property is connected to?
+* or can it capture multiple, eg in the `outer(inner(10))` example earlier
+
+* in fact, for the `foo` and `bar` example from earlier
+* in diagram syntax, the only difference between `foo` and `bar` is that
+	`bar` has a `_temp` property pointer coming out of the `inner` clone node
+* so unlike the text syntax, is isn't intuitive that `foo(result: undefined)` would override `outer` and `inner`,
+	* while `bar(result: undefined)`, would only override `outer`
+* whereas in text syntax, this seemed intuitive (discussed earlier in this section)
+
+### Referential Transparency II - Referencing vs Nesting 
+
+* I guess this is sort of getting into referential transparency
+* `result: outer(inner(10))` is different from `_temp: inner(10), result: outer(_temp)`
+* because in the former, `outer` directly contains the `inner` object, aka `inner` is nested inside `outer`
+* whereas in the latter, `outer` only contains a reference to the `inner` object
+* note that we don't have referential transparency for cloning
+	* see section "Referential Transparency" and "Defining Behavior That Should be Duplicated"
+* so maybe we also don't have referential transparency for overriding properties
+* this means that, for diagram syntax, we would have to distinguish between referencing and nesting
+
+* actually remember that nesting is not the same as referencing
+* during the analysis in "Implementing Scope - Flattening Nested Structures",
+* we observed that nesting is actually defining an external object, and _cloning_ it (not just referencing it)
+
+
+* maybe we can make it so property overriding only overrides the behavior/node directly referenced by the property
+
+		example
+
+* this way, we can do the same in diagram syntax
+* however what about something like
+
+		foo: fn(args).prop
+
+* in this case the property directly points to the member access node
+* so the `fn` call wouldn't be overridden
+* but intuitively, it should be
+* intuitively, all behavior captured in the property declaration, would get overridden
+
+* but how does this translate to diagram syntax
+
+a branch in diagram syntax
+but actually, not exactly
+cloning isn't the same as branches in diagrams, cloning has a source and args in text syntax
+the restrictions of property declaration in text syntax, isn't very clean or elegant
+feels weird to base our language behavior too much on the weird text syntax
+
+### Fusion and Shared Private Keys
+
+when you combine two objects
+it only overrides the variables public to you
+hmm...but then what happens if somebody in the private scope looks at the child
+its possible to see conflicting properties? if two properties have the same private key?
+
+
+i think private behavior gets overridden
+they were declared with a shared private key for a reason
+the way they combine is out of your control though
+you can think of it as two objects, both containing a black box
+when you merge the two objects, the block boxes merge as well
+you don't know how the black boxes merge, but they will merge
+
+### Extrapersonal vs Intrapersonal Fusion
+
+but what's still weird is, can you combine two other objects?
+before we talked about how you can achieve _____ scoping behavior by combining yourself with other objects
+this sorta makes sense
+you can only combine yourself with other objects
+you can't force other objects to combine
+you can only procreate with other objects
+you can't force other objects to procreate with eachother
+
+but note how we can achieve this
+we combine ourself with the source object (to pass in scope)
+and then combine the resulting object with the arguments object
+we can do this any number of times, combine any number of objects
+this addresses the ugliness we had earlier, where creating an object and cloning and object felt too different
+because creating an object only involves one source object, while cloning involves combining two source objects
+	// TODO: FIND REFERENCED SECTION
+now we can see that, cloning and creation are both extensions of the same thing
+where we successively merge objects into the current object
+
+actually, this is still not right though
+when we combine the result with arguments, we are combining two "other" objects
+called "extrapersonal fusion"
+whereas we are trying to only allow "intrapersonal fusion" (combining yourself with another object)
+
+I guess the main question is: can we implement extrapersonal fusion using intrapersonal fusion?
+if we can, then that means we only need intrapersonal fusion
+if we can't, then that means we should allow extrapersonal fusion (since it is so intuitive and natural, syntactically)
+
+actually, maybe they are the same thing
+when we combine the current object with the clone source, we create a new object _within our scope/behavior_
+so when we then combine the resulting object with the arguments object, the resulting object is part of the current object
+so it is still intrapersonal fusion
+the result of the first combining operation is placed in a new namespace/section of our object's behavior
+and then the second combining operation occurs in that new namespace
+to use an analogy
+imagine we want to combine two cars together
+the initial cloning/combining is like, bringing in the first car, and allocating a new space in the garage for it
+the second cloning, brings in the second car, and then merges it with the first car in the newly allocated space
+
+creating this namespace, and performing the second clone within the namespace, is achieved via mapping
+eg
+
+	parent:
+		child: source(args)
+
+is like
+
+	parent:
+		_new_namespace: combine{this.scope, source}
+		child: combine{_new_namespace, args}
+
+### Fusion and Shared Private Keys II
+
+hmmm it feels weird to combine private behaviors during cloning
+if combining is always intrapersonal...
+then it is like, the current object (initiating object) is the one manually combining properties and behaviors
+and since the current object can't see private behavior in the source or arguments
+how would the private behavior get fused without knowledge of how to decrypt it
+
+where is the cloning happening? who is responsible for creating the clone?
+we talked about this before
+if the cloning is happening in the source and arguments object, then it makes sense for all behavior to be cloned (nothing overwritten)
+	something we were exploring in an earlier section, "Overriding Behavior vs Overriding References"
+if the cloning is happening in the caller, then it doesn't make sense to clone private behavior because the caller doesn't have access to it
+
+there are two conflicting ideas here
+when we talked about security concerns in the section "Overriding Behavior vs Overriding References",
+where we mentioned how security-wise, it is simpler to assume that all behavior is permanent, and copied to all clones
+so that we don't have to worry about bad actors selectively removing sections and creating behaviors that we haven't accounted for
+in that sense, we are thinking of property keys as just references
+like pointers
+each car has a pointer to the engine, a pointer to the wheels, a pointer to the axles, etc
+you create clones of the two cars, and hide them, and have a "virtual" car whose parts point to parts of the hidden two cars
+
+but then, in the section "Fusion and Shared Private Keys", we talked about how there's no reason to specifically use a shared private key
+unless they are meant to be overriden
+in that sense, we are thinking about properties as sections of behavior that are meant to be overriden
+like slots, sections
+each car has a slot for the engine, a slot for the wheels, a slot for the axles, etc
+you create clones of the two cars, and then pull out parts and combine them to make the new car
+
+
+robust vs elegance
+the pointer method is more robust, you don't have to account for bad actors creating behaviors you haven't accounted for
+the slot method is more elegant (??), makes it easy to create behavior that should be overriden, 
+	whereas you can easily create behavior that shouldn't be overridden, by making a new private property for them
+
+
+
+remember that the main reason why we make this distinction between overriding behavior vs references
+is because Axis has side effects, so it matters if the overridden behavior still exists or not
+	discussed in section "Overriding Behavior vs Overriding References"
+so let's try an example that uses side effects
+
+mailtruck example (with a "module" for inserting mail)
+but that's actually not the same, since if you try to override the mail-insertion-module, you aren't actually overriding behavior
+	since the mail-insertion-module is just a template for insertion mail, but doesn't insert mail on its own
+so in that case, doesn't matter if the mail-insertion-module is removed, or hidden
+
+insertion feels like an action
+whereas overriding is for objects/properties
+
+`1` is an object
+`divide` is an object? but contains behavior and generates values
+what about insertion?
+
+
+actually what if you override the mail-insertion-module template
+
+
+if we only want to override "direct" nodes pointed to by the property key
+	mentioned in a previous section TODO: FIND REFERENCED SECTION
+properties can be wrapped:
+
+		prop: some(operations).go.here
+
+		prop: _prop.result
+		_prop:
+			result: some(operations).go.here
+
+however notice that we still need a member access, `_prop.result`, so it's still not overriding the direct node
+
+
+
+text-syntax for properties allows a really easy way to section out core operations (clone,insert,member access,mapping)
+each section can be private or public
+and can be referenced with a single property name/key
+this way, when you override a property name/key
+you know that all references to that section will be rebound
+and the old behavior can be removed
+
+in diagram syntax, it's not so easy to do this
+
+
+We can use the chat example
+Normally the chat client will make an insertion to the activeUsers collector
+But we can imagine a "spectator" chat client, that doesn't have an option to insert a username or send messages
+One can imagine that maybe you have to be invited to join the actual chat, but otherwise you can simply view the chat
+However, we want this spectator chat client to still inherit the chat viewing interface from the normal chat client
+
+

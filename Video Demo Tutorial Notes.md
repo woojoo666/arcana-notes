@@ -1,7 +1,7 @@
 Video DEMO/tutorial Notes
 
 
-1st video:
+### 1st video
 
 1. basic syntax, objects
 2. cloning
@@ -60,7 +60,7 @@ the interpreter can tell the friend that they don't need to retrieve the ignored
 the less you specify, the more you can optimize
 
 
-2nd video:
+### 2nd video
 
 classes and templates
 state variables
@@ -106,7 +106,7 @@ in readme, talk about how insertion allows for data mutation while prserving con
 
 
 
-3rd video
+### 3rd video
 
 
 no syntax, no implementation, just talking about philosphy
@@ -131,3 +131,10 @@ another might be a instagram tag, anybody can tag an image with the tag, and it 
 
 compare actor-model to imperative and functional
 forward vs backward construction
+
+
+### 4th video - return to zork
+
+Return to Zork example game
+then make it multiplayer
+then make it twitch-plays style (every 5 seconds it chooses a random input from all multiplayer inputs)
