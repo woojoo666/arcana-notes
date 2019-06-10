@@ -144,7 +144,7 @@ Cloning can do much more than just provide values for parameters. We can also us
 		greeting: Person.greeting(name) + ". I go to " + school
 
 	alice: Student("Alice", "Harvard", console.log(this.greeting))    // create a new student, and automatically print her greeting to console
-	bob: joe(name: "Bob")                                               // creates a student with the same behavior as alice, so he also logs his own greeting
+	bob: alice(name: "Bob")                                               // creates a student with the same behavior as alice, so he also logs his own greeting
 
 Notice that when we clone `alice` to create `bob`, the function `console.log(this.greeting)` will be called again. This might seem counter-intuitive, because in imperative languages, function calls are executed before they are passed as arguments. However, remember that this is not a function call, we are extending an object, and defining new behavior.
 
@@ -166,7 +166,7 @@ We can insert to any object, no restrictions. However, by default, objects ignor
 	sum: collector(+)     // collector(<some function>) will apply the function to all insertions
 
 	for num in (1 2 3)
-		foo <: num * num
+		sum <: num * num
 
 	console.log(sum)       // will print 1+4+9, aka "14"
 
