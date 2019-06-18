@@ -277,8 +277,8 @@ class BinopNode extends Node {
 		return newNode;
 	}
 	evaluate () {
-		let left = this.operands[0].value;
-		let right = this.operands[1].value;
+		let left = +this.operands[0].value;
+		let right = +this.operands[1].value;
 
 		switch (this.operator) {
 			case '+': return left + right;

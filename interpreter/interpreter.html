@@ -52,21 +52,20 @@
 
 	inputScope.input.update(); // initialize number node
 
-	// const testCode = 'foo: (bar: -1+x*2/y, x: 10, y: input), clone: foo(x: 15), barAlias: clone.bar';
-	// const output = new Interpreter(testCode).interpretTest(inputScope, 'Indent');
-	// console.log('answer should contain: foo.bar = 0, clone.bar = 0.5, foo.x = 10, clone.x = 15');
-	// console.assert(output.properties.foo.properties.bar.value == 0, 'ERROR');
-	// console.assert(output.properties.clone.value.properties.bar.value == 0.5, 'ERROR');
+	const testCode = 'foo: (bar: -1+x*2/y, x: 10, y: input), clone: foo(x: 15), barAlias: clone.bar';
+	const output = new Interpreter(testCode).interpretTest(inputScope, 'Indent');
+	console.log('answer should contain: foo.bar = 0, clone.bar = 0.5, foo.x = 10, clone.x = 15');
+	console.assert(output.properties.foo.properties.bar.value == 0, 'ERROR');
+	console.assert(output.properties.clone.value.properties.bar.value == 0.5, 'ERROR');
 	
-	// console.log('----------- updating input node to value 10 ----------------');
-	// inputScope.input.syntaxNode.value = 10;
-	// inputScope.input.update();
-	// console.log('answer should update to: foo.bar = 1, clone.bar = 2, foo.x = 10, clone.x = 15');
-	// console.assert(output.properties.foo.properties.bar.value == 1, 'ERROR');
-	// console.assert(output.properties.clone.value.properties.bar.value == 2, 'ERROR');
-	// console.assert(output.properties.barAlias.value == 2, 'ERROR');
+	console.log('----------- updating input node to value 10 ----------------');
+	inputScope.input.syntaxNode.value = 10;
+	inputScope.input.update();
+	console.log('answer should update to: foo.bar = 1, clone.bar = 2, foo.x = 10, clone.x = 15');
+	console.assert(output.properties.foo.properties.bar.value == 1, 'ERROR');
+	console.assert(output.properties.clone.value.properties.bar.value == 2, 'ERROR');
+	console.assert(output.properties.barAlias.value == 2, 'ERROR');
 
-	const testCode = 'foo: ()';
 </script>
 <script type="module">
 	import { PreProcessor, Block } from './preprocessor.js';
