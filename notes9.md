@@ -11112,6 +11112,16 @@ now that we use child scope for cloning, cloning is now more symmetric
 
 * also note that, in object-oriented typed languages like Java, when you override a parent class's method, it overrides the behavior
 * as in, when you call the child method, it won't call the parent method (unless you explicitly do so using `super()` in Java)
+* eg
+
+```javascript
+class Person {
+	logGreeting () { console.log('Hi im a person'); }
+}
+class Student extends Person {
+	logGreeting () { console.log('Hi im a student'); } // notice that Person.logGreeting won't be called, so this overrides the old behavior
+}
+```
 
 * I think for now, overriding behavior makes sense
 * it is the most intuitive visually
@@ -11294,6 +11304,8 @@ if the cloning is happening in the source and arguments object, then it makes se
 	something we were exploring in an earlier section, "Overriding Behavior vs Overriding References"
 if the cloning is happening in the caller, then it doesn't make sense to clone private behavior because the caller doesn't have access to it
 
+### Replacement vs Shadowing, Partitions vs Pointers
+
 there are two conflicting ideas here
 when we talked about security concerns in the section "Overriding Behavior vs Overriding References",
 where we mentioned how security-wise, it is simpler to assume that all behavior is permanent, and copied to all clones
@@ -11305,15 +11317,15 @@ you create clones of the two cars, and hide them, and have a "virtual" car whose
 
 but then, in the section "Fusion and Shared Private Keys", we talked about how there's no reason to specifically use a shared private key
 unless they are meant to be overriden
-in that sense, we are thinking about properties as sections of behavior that are meant to be overriden
-like slots, sections
+in that sense, we are thinking about properties as sections/partitions of behavior that are meant to be overriden
+like slots, sections, partitions
 each car has a slot for the engine, a slot for the wheels, a slot for the axles, etc
 you create clones of the two cars, and then pull out parts and combine them to make the new car
 
 
 robust vs elegance
 the pointer method is more robust, you don't have to account for bad actors creating behaviors you haven't accounted for
-the slot method is more elegant (??), makes it easy to create behavior that should be overriden, 
+the partition method is more elegant (??), makes it easy to create behavior that should be overriden, 
 	whereas you can easily create behavior that shouldn't be overridden, by making a new private property for them
 
 
@@ -11370,3 +11382,387 @@ One can imagine that maybe you have to be invited to join the actual chat, but o
 However, we want this spectator chat client to still inherit the chat viewing interface from the normal chat client
 
 
+
+
+
+
+
+
+text to tree conversion
+why do we need a stack?
+stack is intermediate between linear structure and tree structure
+shows that, at any point during the traversal of the linear structure, we only need to know the ancestors of the current node
+
+
+
+builder pattern
+often we want to create an object dynamically, and then end up with a immutable output
+like, build a Pizza, then cook(), then end up with an immutable Pizza
+we can use insertion to build the object
+but how do we go from the collector, to an immutable object
+can't use cloning, because cloning collectors still results in a collector right?
+
+maybe we can do something like
+
+	builder:
+		props: hashmap()
+		build: =>
+			a: hashmap.a
+			b: hashmap.b
+	builder.props.put('a', 10)
+	builder.props.put('b', 20)
+	console.log(builder.build()->)
+
+this takes advantage of nesting, but we know how nesting works now (see earlier sections)
+
+
+
+
+imagine creating a graph visualizer in react
+maybe we input the graph using some text-based syntax
+we convert from the text-based syntax to a graph-model
+
+do we use factory pattern to convert each node in the graph-model, to a react component?
+what if it gets so complex, that the factory blows up
+eg, what if we have to start doing some parsing on each node in the graph model, before we can turn it to a react componenent?
+what if the `foo` property of nodes can change which componenent to convert to
+
+we can use a factory if there are no structural changes between the graph-model and the react components
+a factory is basically a mapping from graph-model to component-tree
+if we do have structural changes, we should isolate these structural changes to a new intermediate structure, and then create a new mapping from this intermediate structure to the component-tree
+this example shows how mapping != behavior
+
+
+
+[javascript computed property names](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Object_initializer#Computed_property_names)
+
+https://github.com/tc39/proposal-object-rest-spread
+
+
+
+Two Types of Dynamic Bindings: Conditional Binds and Dynamic-Memory-Location Binds
+
+ternary
+behavior still exists?
+lazy eval
+eager eval
+
+
+
+how do you implement rotateTree in Axis?
+actions and reducers
+redux uses pure functions...so are side effects really necessary?
+though notice that "dispatch" (redux state management) is a function with side effects
+
+
+
+
+Reddit postbot {
+   Start time, current time, interval
+   Posts
+   Numposts
+
+Social media postbot
+    Reddit postbot
+    Facebook postbot
+    YouTube postbot
+
+Imagine you want to use a different Reddit postbot
+
+
+
+how is cloning/combining represented in diagram syntax
+actually, so far we have only represented mapping in diagram syntax
+we have only cloned objects with value mappings, not internal behavior
+
+note that we can implement combining, via cloning and value mapping
+
+	foo:
+		a: 10
+		b: 20
+	bar:
+		a: 'a'
+		c: 'c'
+
+	foobar: // represents combine(foo, bar)
+		scope: ...
+		_foo: foo(scope) // just passes in the mapping, no combining involved
+		_bar: bar(scope) // just passes in the mapping, no combining involved
+		a: _bar.a || _foo.a
+		b: _bar.b || _foo.b
+		c: _bar.c || _foo.c
+
+note that this doesn't overwrite behavior though
+follows the "hidden old behavior" model, where old behavior is kept but hidden
+if we want to follow the model where behavior is overwritten, we can, but it's more complicated
+
+
+	FINISH THIS, USE CONDITIONAL BLOCKS TO ENABLE/DISABLE BEHAVIOR WHEN OVERWRITTEN
+
+
+text-syntax lines represent chains of operations
+so replacement would only allow for replacement of chains
+not trees or graphs
+which is a rather arbitrary line to draw
+in diagram syntax, it doesn't make sense to only allow replacement of chains, but not graphs or trees
+you might have something like `foo: a(b(c))`, but then what about `a: b(c), foo: a(a)`, why can't that all be replaced in one go?
+
+
+
+expressions are not replaceable
+but single object creations are
+note that cloning counts as a single object creation
+so i guess if the last operation is a reference or a member access, not replaceable
+if its a clone or creation, then it is replaceable
+
+
+
+
+every text-based expression can be represented using a module with a single `scope` input, and a single output
+eg, `foo: a.b + c` can be represented diagramatically as
+
+		scope.a.b ---\
+		             (+)-------> foo
+		scope.c -----/
+
+which can be abstracted to
+
+		scope ----[ Module ]----> foo
+
+remember that text-based expressions can only form linear/tree structures?
+but if we generalize the concept above, we can say that these "expressions" are just modules with a single `scope` input and a single output
+so we can make it so, overriding a property will replace the entire expression
+
+
+DNA corresponds to behavior definition, not value
+value would be the values and actions that are defined by the DNA
+
+
+previously when we said that text-based expressions can only form linear structures,
+that is actually wrong
+you can do tree structures
+and you can actually do graph-like structures as well
+using an IIFE:
+
+	foo: (
+			x: a+b
+			result: x*x
+		).result
+
+
+
+replacement vs overshadowing
+
+combining, pass-by-behavior, is more like replacement
+mapping, pass-by-value, is more like overshadowing
+
+replacement makes it seem like, a variable name corresponds to both behavior and a value
+which is sort of like functional
+in functional, functions have both a return value, and the behavior in the body of the function
+so maybe we can transfer this mindset to Axis
+but could it have any unintended implications?
+
+hmm, what about accessing a property then
+does it extract the value or the behavior?
+if we do
+	foo:
+		a: someModifier().result
+		b: anotherModifier().result
+	bar: (foo.a, foo.b)
+
+let's say `someModifier()` and `anotherModifier()` are both impure functions, aka they have side effects
+that means the behavior defined in `foo.a` and `foo.b` have side effects
+are the behaviors of `foo.a` and `foo.b` imported into `foo`?
+or just references to `foo.a` and `foo.b`?
+probably just references...
+but doesn't that mean `foo.a` refers to the value `foo.a`, not the behavior defined in `foo.a`?
+
+
+
+we can think of replacement as like
+the cloner, mixing and matching pieces from different sources
+to cobble together some new machine
+however, remember that the sources could have private behavior
+so perhaps replacement doesn't work if the sources contain private behavior?
+well, but still, if that private behavior references a public property, and the public property gets replaced
+could still make sense
+for the cloned private behavior to reference the new public property
+and for the old behavior to be discarded
+the source has to agree to it though, because the source would be the one cloning the private behavior
+and the source could just retain the old public behavior if it wanted to
+the source will always be aware of all clones
+but does the cloner trust the source to discard old behavior?
+
+though, if the source wants behavior to be retained across clones, it could always just make it private
+
+you can mix and match after you clone them
+
+i suspect there is an inconsistency in how we want the social media post-bot to work (replacement),
+	and how the rest of Axis seems to work (overshadowing)
+social media post-bot, what if the reddit component inserts into a private var
+
+how does scoping and private variables work
+remember that scoping is an approx, only allows for hierarchal structures
+we want to be able to support graph structures
+for example, if we had a child with two parents
+say, each parent has a private variable that the child can access
+how would that work?
+though what about cloning?
+in a typical nested structure, cloning the parent automatically clones the child
+but if you have multiple parents, how does that work?
+
+that is the piont of structured cloning?
+versus just having a giant parent with the entire directed graph, and every node is a child
+so you have to clone the parent to clone the entire graph
+remember that the ancestry graph is hierarchal
+	TODO: FIND REFERENCED SECTION
+actually that isn't related
+we aren't talking about ancestry here
+we are talking about parents cloning children
+but it can have cycles, eg recursion
+
+or `magnitude: (a, b, result: a*a+b*b)`
+
+can we think of an example where you need nesting
+actually no
+every case can be handled with mapping and top-level clones
+actually this was pretty much already proven when we reduced nesting to mapping + cloning
+
+but what about references to private vars
+eg:
+
+	parent:
+		_a: 10
+		child:
+			result: _a*_a
+
+* how do we pass `_a` to `child`
+if we hoist `child` to the top-level, and use a clone inside `parent`
+then we need to pass in `_a` somehow
+but notice how `child` should not have any public variables except for `result`
+* maybe we can just use parameters and anonymous arguments
+
+		_child: template
+			_a >>
+			result: _a*_a
+		parent:
+			_a: 10
+			child: _child(_a)
+
+
+
+we need a concrete example of multiple parents
+imagine we had a multi-parent scoping mechanism
+where any object can "adopt" other objects
+when an object is adopted, the parent gets added to the scope of the adopted child
+so children can have multiple parent scopes
+if these parent scopes have colliding properties, every colliding property resolves to an `overdefined` value
+
+	child:
+		result: a+b
+	parent1:
+		a: 10
+		adopt{child}
+	parent2:
+		b: 20
+		adopt{child}
+
+
+partitions vs pointers
+
+
+remember that cloning something like `foo: a.b` will clone the value, not the expression
+
+
+value, property, and source code
+we used to think if something is public, then the source code is public
+eg
+
+		_foo:
+			result: a+b
+		bar: _foo
+
+if we look at `bar`, we can see that `bar.result` is equal to `a+b`
+the value of `_foo` is its source code
+and that value is exposed via `bar`
+
+however that line of thinking treats behavior as sectioned by property, like how replacement treats it
+
+private and public source code
+remember how even though we treat the source code of an object as its "value"
+you can still make certain parts private
+eg if we did
+
+		foo:
+			a: _b+c
+			_b: 10
+			c: 20
+then the source code for `a` and `c` would be visible, but the code for `_b` would be private
+so if you viewed it, it would look like
+
+		foo:
+			a: <private>+c
+			c: 20
+			<private>
+
+* however, notice that this is also splitting behavior into sections, like what Replacement does
+* each property has a corresponding section of behavior, a slice of behavior
+* and depending on if the property is public/private, determines if we can see the corresponding behavior or not
+* this is also more in line with replacement instead of shadowing
+
+* I guess what it comes down to
+* the main question is
+* do we want source code to be visible, and manipulatable?
+* when we handle objects in runtime, should we only access their values and property values?
+* or should we allow access to the behavior/source code as well?
+
+* I think I want to allow access to the source code
+* people shouldn't have to go to Github.com or something to view the source code of a program
+* they should be able to open it up and inspect it
+* an object and its source code are, in a sense, one and the same
+
+* for example, in real life, we can take apart a car and see how it works
+* some parts might be too complicated, obfuscated (eg the circuitry and wiring)
+* and these can be thought of as private behavior
+* but other parts, like the engine and axle and wheels, are public
+* not only can we see them
+* we can swap them out, or modify them
+
+* ideally, I would want to be able to do the same in Axis
+* visually, I would want to be able to inspect an object
+* and then when cloning it, swap out parts, remove parts, and insert parts
+* I should be able to see all the nodes (clone nodes, property-access nodes, etc) that make up the behavior of the object
+* and then selectively remove and rewire and replace them
+
+* this might be easy to do using a GUI and visual syntax
+* but the text syntax is an approximation of this
+* when you declare properties in text-syntax, it partitions the behavior into sections
+* then, when cloning, we can replace partitions (or remove them, by replacing them with `undefined`)
+
+* in diagram syntax, we can feasibly imagine a system for the programmer to remove/replace/insert individual behavior nodes
+	* eg, the programmer crosses out nodes they don't want, and draws in nodes they want to add
+* but in text-syntax, it is much more difficult to design such a system
+* so we use partitions as an aid, which makes removing/replacing/inserting nodes intuitive in text-syntax
+
+* notice that, if we wanted to, we could assign a partition to every individual behavior node
+* eg we could turn this:
+
+		magnitude: x, y >>
+			result: x*x + y*y
+
+* into this:
+
+		magnitude: x, y >>
+			_xx: multiply{x,x}
+			_yy: multiply{y,y}
+			result: add{_xx,_yy}
+
+* (note that the weird `{ }` syntax is to emphasize the fact that each one is an individual behavior node)
+* placing every single behavior node into a separate property,
+* allows us to individually replace/remove nodes,
+* just like how we could theoretically do in the diagram syntax
+* so this is another way we can think of it
+* in a sense, in diagram syntax, property names are just pointers
+* and we have a separate mechanism for replacing nodes
+* but in text-syntax, we combine the two, so properties both point to a value, and correspond to a partition
+* this allows us to both access the value of a property, and replace a partition, using the same property name
