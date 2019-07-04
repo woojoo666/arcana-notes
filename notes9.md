@@ -11467,7 +11467,8 @@ Social media postbot
     Facebook postbot
     YouTube postbot
 
-Imagine you want to use a different Reddit postbot
+Imagine you don't like reddit anymore, and want to replace it with voat
+so you want to replace the reddit post-bot with the voat post-bot
 
 
 
@@ -11600,6 +11601,38 @@ you can mix and match after you clone them
 i suspect there is an inconsistency in how we want the social media post-bot to work (replacement),
 	and how the rest of Axis seems to work (overshadowing)
 social media post-bot, what if the reddit component inserts into a private var
+
+
+notice that for the social media postbot
+you don't want to replace the `reddit` property with the voat postbot
+because the voat postbot should be under the `voat` property
+so instead, you should be replacing `reddit` property with undefined
+and then defining the `voat` property
+however, look at how it works in the code
+
+		social_media_bots:
+			bots: collector
+			facebook: ...
+			reddit: ...
+			youtube: ...
+			bots <: facebook
+			bots <: reddit
+			bots <: youtube
+
+		modified_bots: social_media_bots
+			reddit: undefined
+			voat: ...
+			bots <: voat
+
+notice that even though we are setting the `reddit` property to undefined
+it is still being inserted into `bots`
+so we end up with an `undefined` value inside the `bots` collector
+in diagram syntax, when you remove the `reddit` bot, it would naturally remove the insertion as well
+	because the insertion is a backwards pointer from the reddit bot to the collector, so removing the bot would detach the pointer
+so maybe we should do the same in text syntax?
+if you replace a property with `undefined`, and it is being inserted into some collector, the insertion is removed as well?
+
+
 
 how does scoping and private variables work
 remember that scoping is an approx, only allows for hierarchal structures
