@@ -11799,3 +11799,21 @@ so if you viewed it, it would look like
 * and we have a separate mechanism for replacing nodes
 * but in text-syntax, we combine the two, so properties both point to a value, and correspond to a partition
 * this allows us to both access the value of a property, and replace a partition, using the same property name
+
+
+
+
+diagram syntax
+have to choose whether each behavior node is public or private
+but actually, what you are doing
+is choosing the key for each node (if its public, use public key, if its private, use private key)
+another way of thinking about it is,
+you are choosing the location of each partition of behavior
+so if you were building a car
+you put the main assembly inside the hood of the car to keep it private
+but then parts like the wheels, door handles, windows, those are all public and on the surface
+(note, by default, nodes are public)
+(instead of declaring individual nodes private, it is easier to just create a private container and put objects inside)
+(this is sort of like, creating a locked safe in your house and putting objects inside, instead of creating a locked safe for every object)
+(another way of thinking about it: instead of putting every item into a different hiding spot, put all the items in a box and just hide the box)
+

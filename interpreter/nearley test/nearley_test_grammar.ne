@@ -9,7 +9,7 @@ const lexer = {
 		return null;
 	},
 	reset (chunk) {
-		this.tokens = chunk.split(',').map((str,ind) => {value: token, index: ind});
+		this.tokens = chunk.split(',').map((str,ind) => ({value: str, index: ind}));
 		this.index = 0;
 	},
 	formatError (token) {
