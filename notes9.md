@@ -11817,3 +11817,59 @@ but then parts like the wheels, door handles, windows, those are all public and 
 (this is sort of like, creating a locked safe in your house and putting objects inside, instead of creating a locked safe for every object)
 (another way of thinking about it: instead of putting every item into a different hiding spot, put all the items in a box and just hide the box)
 
+
+
+
+
+how to do this function
+
+```js
+function* getFlavors(config) {
+	if (!config.mobile && !config.desktop) {
+		config.mobile = true;
+		config.desktop = true;
+	}
+	if (config.mobile) {
+		yield 'mobile';
+	}
+	if (config.desktop) {
+		yield 'desktop';
+	}
+}
+```
+
+in Axis?
+
+
+
+### State Variables and Data Slicing
+
+state variables are like data slicing
+which allows us to specify order when we are processing the data, not when we are defining it
+so we can define a nebulous unordered dataset
+and then have different actors filter/slice/order it independently
+so say, we could have a giant collector full of posts in a social network
+and one actor could slice it by time
+one actor could slice it by user
+etc
+
+### Code / Program Slicing
+
+* code slicing, slice code at certain conditions
+* thins like "Chain of Responsibility" pattern, which instead of calling functions, you use a dynamic handler variable that holds a function
+* it can get very hard to debug because when you look at the code, you have no idea which function is stored in the handler
+* all you know is that the handler is being called
+* but with code slicing, you can set certain conditions and then generate a flavor of the code with those conditions
+* or you can, during runtime/execution, freeze the program and see what it looks like at a certain point in time
+
+* oh wait actually this exists
+* see "Program Slicing" on wikipedia
+
+
+
+For debugging, should be possible to reach into "live" objects and modify them
+In Axis everything is alive
+Compare to OO's Open-Closed principle
+in OO, things are "open" to inheritance but "closed" to modification
+however, in Axis, objects aren't necessary "closed" to modification, but merely "locked"
+those with the right keys _can_ reach in and modify objects
