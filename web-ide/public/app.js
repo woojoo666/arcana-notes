@@ -22,16 +22,7 @@ function loadEditor(container) {
 	// Register a new language
 	monaco.languages.register({ id: 'mySpecialLanguage' });
 	// Register a tokens provider for the language
-	monaco.languages.setMonarchTokensProvider('mySpecialLanguage', {
-		tokenizer: {
-			root: [
-				[/\[error.*/, "custom-error"],
-				[/\[notice.*/, "custom-notice"],
-				[/\[info.*/, "custom-info"],
-				[/\[[a-zA-Z 0-9:]+\]/, "custom-date"],
-			]
-		}
-	});
+	monaco.languages.setMonarchTokensProvider('mySpecialLanguage', myLang);
 	// Define a new theme that contains only rules that match this language
 	monaco.editor.defineTheme('myCoolTheme', {
 		base: 'vs',
@@ -73,62 +64,107 @@ function loadEditor(container) {
 	});
 	monaco.editor.create(container, {
 		theme: 'myCoolTheme',
-		value: getCode(),
+		value: sampleCode,
 		language: 'mySpecialLanguage'
 	});
-	function getCode() {
-		return [
-			'[Sun Mar 7 16:02:00 2004] [notice] Apache/1.3.29 (Unix) configured -- resuming normal operations',
-			'[Sun Mar 7 16:02:00 2004] [info] Server built: Feb 27 2004 13:56:37',
-			'[Sun Mar 7 16:02:00 2004] [notice] Accept mutex: sysvsem (Default: sysvsem)',
-			'[Sun Mar 7 16:05:49 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 16:45:56 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 17:13:50 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 17:21:44 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 17:23:53 2004] statistics: Use of uninitialized value in concatenation (.) or string at /home/httpd/twiki/lib/TWiki.pm line 528.',
-			'[Sun Mar 7 17:23:53 2004] statistics: Can\'t create file /home/httpd/twiki/data/Main/WebStatistics.txt - Permission denied',
-			'[Sun Mar 7 17:27:37 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 17:31:39 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 17:58:00 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 18:00:09 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 18:10:09 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 18:19:01 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 18:42:29 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 18:52:30 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 18:58:52 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 19:03:58 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 19:08:55 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 20:04:35 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 20:11:33 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 20:12:55 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 20:25:31 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 20:44:48 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 20:58:27 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 21:16:17 2004] [error] [client xx.xx.xx.xx] File does not exist: /home/httpd/twiki/view/Main/WebHome',
-			'[Sun Mar 7 21:20:14 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 21:31:12 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 21:39:55 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Sun Mar 7 21:44:10 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 01:35:13 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 01:47:06 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 01:59:13 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 02:12:24 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 02:54:54 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 03:46:27 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 03:48:18 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 03:52:17 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 03:55:09 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 04:22:55 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 04:24:47 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 04:40:32 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 04:55:40 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 04:59:13 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 05:22:57 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 05:24:29 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'[Mon Mar 8 05:31:47 2004] [info] [client xx.xx.xx.xx] (104)Connection reset by peer: client stopped connection before send body completed',
-			'<11>httpd[31628]: [error] [client xx.xx.xx.xx] File does not exist: /usr/local/installed/apache/htdocs/squirrelmail/_vti_inf.html in 29-Mar 15:18:20.50 from xx.xx.xx.xx',
-			'<11>httpd[25859]: [error] [client xx.xx.xx.xx] File does not exist: /usr/local/installed/apache/htdocs/squirrelmail/_vti_bin/shtml.exe/_vti_rpc in 29-Mar 15:18:20.54 from xx.xx.xx.xx',
-		].join('\n');;
-	}
 	/*----------------------------------------SAMPLE CSS END*/
 }
+
+const sampleCode = `\
+class MyClass {
+	@attribute
+	void main() {
+		Console.writeln( "Hello Monarch world\n");
+	}
+}`;
+
+const myLang = {
+	// Set defaultToken to invalid to see what you do not tokenize yet
+	// defaultToken: 'invalid',
+
+	keywords: [
+		'abstract', 'continue', 'for', 'new', 'switch', 'assert', 'goto', 'do',
+		'if', 'private', 'this', 'break', 'protected', 'throw', 'else', 'public',
+		'enum', 'return', 'catch', 'try', 'interface', 'static', 'class',
+		'finally', 'const', 'super', 'while', 'true', 'false'
+	],
+
+	typeKeywords: [
+		'boolean', 'double', 'byte', 'int', 'short', 'char', 'void', 'long', 'float'
+	],
+
+	operators: [
+		'=', '&gt;', '&lt;', '!', '~', '?', ':', '==', '&lt;=', '&gt;=', '!=',
+		'&amp;&amp;', '||', '++', '--', '+', '-', '*', '/', '&amp;', '|', '^', '%',
+		'&lt;&lt;', '&gt;&gt;', '&gt;&gt;&gt;', '+=', '-=', '*=', '/=', '&amp;=', '|=', '^=',
+		'%=', '&lt;&lt;=', '&gt;&gt;=', '&gt;&gt;&gt;='
+	],
+
+	// we include these common regular expressions
+	symbols:  /[=&gt;&lt;!~?:&amp;|+\-*\/\^%]+/,
+
+	// C# style strings
+	escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+
+	// The main tokenizer for our languages
+	tokenizer: {
+		root: [
+			// identifiers and keywords
+			[/[a-z_$][\w$]*/, { cases: { '@typeKeywords': 'keyword',
+																	 '@keywords': 'keyword',
+																	 '@default': 'identifier' } }],
+			[/[A-Z][\w\$]*/, 'type.identifier' ],  // to show class names nicely
+
+			// whitespace
+			{ include: '@whitespace' },
+
+			// delimiters and operators
+			[/[{}()\[\]]/, '@brackets'],
+			[/[&lt;&gt;](?!@symbols)/, '@brackets'],
+			[/@symbols/, { cases: { '@operators': 'operator',
+															'@default'  : '' } } ],
+
+			// @ annotations.
+			// As an example, we emit a debugging log message on these tokens.
+			// Note: message are supressed during the first load -- change some lines to see them.
+			[/@\s*[a-zA-Z_\$][\w\$]*/, { token: 'annotation', log: 'annotation token: $0' }],
+
+			// numbers
+			[/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+			[/0[xX][0-9a-fA-F]+/, 'number.hex'],
+			[/\d+/, 'number'],
+
+			// delimiter: after number because of .\d floats
+			[/[;,.]/, 'delimiter'],
+
+			// strings
+			[/"([^"\\]|\\.)*$/, 'string.invalid' ],  // non-teminated string
+			[/"/,  { token: 'string.quote', bracket: '@open', next: '@string' } ],
+
+			// characters
+			[/'[^\\']'/, 'string'],
+			[/(')(@escapes)(')/, ['string','string.escape','string']],
+			[/'/, 'string.invalid']
+		],
+
+		comment: [
+			[/[^\/*]+/, 'comment' ],
+			[/\/\*/,    'comment', '@push' ],    // nested comment
+			["\\*/",    'comment', '@pop'  ],
+			[/[\/*]/,   'comment' ]
+		],
+
+		string: [
+			[/[^\\"]+/,  'string'],
+			[/@escapes/, 'string.escape'],
+			[/\\./,      'string.escape.invalid'],
+			[/"/,        { token: 'string.quote', bracket: '@close', next: '@pop' } ]
+		],
+
+		whitespace: [
+			[/[ \t\r\n]+/, 'white'],
+			[/\/\*/,       'comment', '@comment' ],
+			[/\/\/.*$/,    'comment'],
+		],
+	},
+};
