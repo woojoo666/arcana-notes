@@ -6,24 +6,13 @@
 <script src="https://unpkg.com/react@16/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js" crossorigin></script>
 
-</head>
-<body>
-<div id="container" style="width:800px;height:600px;border:1px solid grey"></div>
-
 <!-- OR ANY OTHER AMD LOADER HERE INSTEAD OF loader.js -->
 <script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
-<script>
-	require.config({ paths: { 'vs': '../node_modules/monaco-editor/min/vs' }});
-	require(['vs/editor/editor.main'], function() {
-		var editor = monaco.editor.create(document.getElementById('container'), {
-			value: [
-				'function x() {',
-				'\tconsole.log("Hello world!");',
-				'}'
-			].join('\n'),
-			language: 'javascript'
-		});
-	});
-</script>
+
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel" src="app.js" crossorigin></script>
 </body>
 </html>
