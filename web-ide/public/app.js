@@ -26,13 +26,8 @@ function loadEditor(container) {
 	// Define a new theme that contains only rules that match this language
 	monaco.editor.defineTheme('myCoolTheme', {
 		base: 'vs',
-		inherit: false,
-		rules: [
-			{ token: 'custom-info', foreground: '808080' },
-			{ token: 'custom-error', foreground: 'ff0000', fontStyle: 'bold' },
-			{ token: 'custom-notice', foreground: 'FFA500' },
-			{ token: 'custom-date', foreground: '008800' },
-		]
+		inherit: true,
+		rules: []
 	});
 	// Register a completion item provider for the new language
 	monaco.languages.registerCompletionItemProvider('mySpecialLanguage', {
@@ -74,7 +69,7 @@ const sampleCode = `\
 class MyClass {
 	@attribute
 	void main() {
-		Console.writeln( "Hello Monarch world\n");
+		Console.writeln( "Hello Monarch world\\n");
 	}
 }`;
 
