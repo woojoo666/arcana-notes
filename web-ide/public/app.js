@@ -89,14 +89,14 @@ const myLang = {
 	],
 
 	operators: [
-		'=', '&gt;', '&lt;', '!', '~', '?', ':', '==', '&lt;=', '&gt;=', '!=',
-		'&amp;&amp;', '||', '++', '--', '+', '-', '*', '/', '&amp;', '|', '^', '%',
-		'&lt;&lt;', '&gt;&gt;', '&gt;&gt;&gt;', '+=', '-=', '*=', '/=', '&amp;=', '|=', '^=',
-		'%=', '&lt;&lt;=', '&gt;&gt;=', '&gt;&gt;&gt;='
+		'=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=',
+		'&&', '||', '++', '--', '+', '-', '*', '/', '&', '|', '^', '%',
+		'<<', '>>', '>>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
+		'%=', '<<=', '>>=', '>>>='
 	],
 
 	// we include these common regular expressions
-	symbols:  /[=&gt;&lt;!~?:&amp;|+\-*\/\^%]+/,
+	symbols:  /[=><!~?:&|+\-*\/\^%]+/,
 
 	// C# style strings
 	escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
@@ -115,7 +115,7 @@ const myLang = {
 
 			// delimiters and operators
 			[/[{}()\[\]]/, '@brackets'],
-			[/[&lt;&gt;](?!@symbols)/, '@brackets'],
+			[/[<>](?!@symbols)/, '@brackets'],
 			[/@symbols/, { cases: { '@operators': 'operator',
 															'@default'  : '' } } ],
 
