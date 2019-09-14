@@ -36,7 +36,8 @@ function loadEditor(container) {
 			{ token: 'string', foreground: 'E6DB74' },
 			{ token: 'number', foreground: 'AE81FF' },
 			{ token: 'comment', foreground: '75715E' },
-			{ token: 'tag', foreground: 'FD971F'}
+			{ token: 'tag', foreground: 'FD971F'},
+			{ token: 'parameter', foreground: 'FD971F'},
 		],
 	});
 	// Register a completion item provider for the new language
@@ -135,6 +136,10 @@ const myLang = {
 			// whitespace
 			{ include: '@whitespace' },
 
+			// arguments/parameters
+			[/^(?=[\w\s,\(\)\[\]]*?>>)/, 'operator', '@parameters'], // to match start of line, ^ has to be at start of regex, so we can't do fancy stuff like (^|:)
+			[/:(?=[\w\s,\(\)\[\]]*?>>)/, 'operator', '@parameters'],
+
 			// delimiters and operators
 			[/[{}()\[\]]/, '@brackets'],
 			[/[<>](?!@symbols)/, '@brackets'],
@@ -160,6 +165,16 @@ const myLang = {
 			[/'[^\\']'/, 'string'],
 			[/(')(@escapes)(')/, ['string','string.escape','string']],
 			[/'/, 'string.invalid']
+		],
+
+		parameters: [
+			[/@identifier/, 'parameter' ],
+			[/[{}()\[\]]/,  '@brackets'],
+			[/,/,           'operator'],
+
+			{include: '@whitespace' },
+
+			[/>>/, 'keyword', '@pop' ],
 		],
 
 		comment: [
