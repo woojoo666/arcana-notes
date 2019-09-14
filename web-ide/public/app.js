@@ -23,11 +23,21 @@ function loadEditor(container) {
 	monaco.languages.register({ id: 'mySpecialLanguage' });
 	// Register a tokens provider for the language
 	monaco.languages.setMonarchTokensProvider('mySpecialLanguage', myLang);
-	// Define a new theme that contains only rules that match this language
+
+	// colors from VS Code Monokai Extended
 	monaco.editor.defineTheme('myCoolTheme', {
-		base: 'vs',
+		base: 'vs-dark',
 		inherit: true,
-		rules: []
+		rules: [
+			{ token: 'key', foreground: 'A6E22E' },
+			{ token: 'keyword', foreground: 'F92672'},
+			{ token: 'operator', foreground: 'F92672' },
+			{ token: 'delimiter.parenthesis', foreground: '66D9EF' },
+			{ token: 'string', foreground: 'E6DB74' },
+			{ token: 'number', foreground: 'AE81FF' },
+			{ token: 'comment', foreground: '75715E' },
+			{ token: 'tag', foreground: 'FD971F'}
+		],
 	});
 	// Register a completion item provider for the new language
 	monaco.languages.registerCompletionItemProvider('mySpecialLanguage', {
@@ -66,12 +76,25 @@ function loadEditor(container) {
 }
 
 const sampleCode = `\
-class MyClass {
-	@attribute
-	void main() {
-		Console.writeln( "Hello Monarch world\\n");
-	}
-}`;
+// Type source code in your language here...
+(a,b >> c+d) (e,f >> g+h)
+foo: (bar: -1+x*2/y, x: 10, y: 3)
+clone: foo(x: 15)
+barAlias: clone.bar
+sum: a,b >>
+    result: a+b
+   str: "hello world"
+   c,d >>
+item, item2
+
+binaryTreeHeight: tree >>
+   tag #height.           // declare a tag, which can be used to attach attributes to objects
+
+   // calculate height of all nodes
+   for node in tree.nodes:
+      node.#height: Math.max(node.left.#height | 0, node.right.#height | 0) + 1
+
+   => tree.#height   // return height of root node`;
 
 const myLang = {
 	// Set defaultToken to invalid to see what you do not tokenize yet
@@ -84,16 +107,14 @@ const myLang = {
 		'finally', 'const', 'super', 'while', 'true', 'false'
 	],
 
-	typeKeywords: [
-		'boolean', 'double', 'byte', 'int', 'short', 'char', 'void', 'long', 'float'
-	],
-
 	operators: [
-		'=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=',
+		'=', '>', '<', '!', '~', '?', '==', '<=', '>=', '!=',
 		'&&', '||', '++', '--', '+', '-', '*', '/', '&', '|', '^', '%',
 		'<<', '>>', '>>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
-		'%=', '<<=', '>>=', '>>>='
+		'%=', '<<=', '>>=', '>>>=','=>'
 	],
+
+	identifier: /[a-zA-Z_][\w]*/,
 
 	// we include these common regular expressions
 	symbols:  /[=><!~?:&|+\-*\/\^%]+/,
@@ -104,11 +125,12 @@ const myLang = {
 	// The main tokenizer for our languages
 	tokenizer: {
 		root: [
+			[/@identifier(?=\s*:)/, { cases: { '@keywords': 'keyword',
+																	 '@default': 'key' } }],
+
 			// identifiers and keywords
-			[/[a-z_$][\w$]*/, { cases: { '@typeKeywords': 'keyword',
-																	 '@keywords': 'keyword',
+			[/@identifier/, { cases: { '@keywords': 'keyword',
 																	 '@default': 'identifier' } }],
-			[/[A-Z][\w\$]*/, 'type.identifier' ],  // to show class names nicely
 
 			// whitespace
 			{ include: '@whitespace' },
@@ -119,10 +141,8 @@ const myLang = {
 			[/@symbols/, { cases: { '@operators': 'operator',
 															'@default'  : '' } } ],
 
-			// @ annotations.
-			// As an example, we emit a debugging log message on these tokens.
-			// Note: message are supressed during the first load -- change some lines to see them.
-			[/@\s*[a-zA-Z_\$][\w\$]*/, { token: 'annotation', log: 'annotation token: $0' }],
+			// # tags.
+			[/#@identifier/, { token: 'tag' }],
 
 			// numbers
 			[/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
