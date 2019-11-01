@@ -11873,3 +11873,17 @@ Compare to OO's Open-Closed principle
 in OO, things are "open" to inheritance but "closed" to modification
 however, in Axis, objects aren't necessary "closed" to modification, but merely "locked"
 those with the right keys _can_ reach in and modify objects
+
+
+
+
+### Documentation by Example
+
+*less about the functionality and more about the intention*
+examples show what the programmer was thinking when they were creating the function
+so it can also give insight into the optimizations and decisions the programmer made
+
+so somebody who comes later to refactor/optimize the code, can see what the main purpose of the code was
+and can see what areas have more leeway, eg if certain edge case handling can be changed without affecting the main intention of the program
+
+also the examples can be used as tests
