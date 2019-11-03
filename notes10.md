@@ -35,7 +35,7 @@ otherwise you end up with infinite insertions
 
 
 
-name change?
+### Name Brainstorm April 2019
 
 want to capture the "emergence" idea
 and "axis" sounds too generic and centralized
@@ -6245,3 +6245,21 @@ so somebody who comes later to refactor/optimize the code, can see what the main
 and can see what areas have more leeway, eg if certain edge case handling can be changed without affecting the main intention of the program
 
 also the examples can be used as tests
+
+### Axis is now Firefly, and a new direction for the language
+
+* back in the section "Name Brainstorm April 2019" I mentioned that I chose Axis over Firefly
+   * because Axis felt more fitting for a language and Firefly felt better for a product (eg an IDE)
+* however, I'm going back on that now for a few reasons:
+
+1. Firefly has more personality
+   * many programming languages have quirky names, eg Java or Python or Go
+2. Axis is too pretentious
+   * when I was researching SmallTalk, they mentioned that it was named that because many other langs at the time had big names but didn't do much
+   * I want to pay homage to that, and give a more unassuming name
+3. ta new direction for the language
+   * or rather, I have honed the goals to be a bit more specific
+   * I want the language to be for artists, prototypers, hackers, and live coders
+   * it's meant to make small quick apps and microservices that run in swarms and decentralized networks
+   * so Firefly is much more fitting to that
+4. I already have ideas on how "Firefly" can make for a cool website
