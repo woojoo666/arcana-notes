@@ -3938,6 +3938,8 @@ vvvv move this to philosophy section? vvvv
 	* insertions are just backward-references to child objects
 	* we also talked about this a bit when talking about templates? // TODO: FIND REFERENCED SECTION
 	* section: "The Nature of Objects - Insertions as Backward References"
+25. child scope, references are dynamic and can change and point to overriden properties
+	* see section "Implementing Scope - Child Scope vs Arguments Scope II"
 
 ### Implementation Rules
 
