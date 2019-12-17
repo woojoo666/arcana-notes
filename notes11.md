@@ -1,4 +1,470 @@
 
+### Axis is now Firefly, and a new direction for the language
+
+* back in the section "Name Brainstorm April 2019" I mentioned that I chose Axis over Firefly
+   * because Axis felt more fitting for a language and Firefly felt better for a product (eg an IDE)
+* however, I'm going back on that now for a few reasons:
+
+1. Firefly has more personality
+   * many programming languages have quirky names, eg Java or Python or Go
+2. Axis is too pretentious
+   * when I was researching SmallTalk, they mentioned that it was named that because many other langs at the time had big names but didn't do much
+   * I want to pay homage to that, and give a more unassuming name
+3. ta new direction for the language
+   * or rather, I have honed the goals to be a bit more specific
+   * I want the language to be for artists, prototypers, hackers, and live coders
+   * it's meant to make small quick apps and microservices that run in swarms and decentralized networks
+   * so Firefly is much more fitting to that
+4. I already have ideas on how "Firefly" can make for a cool website
+
+
+
+
+
+an actor can spawn finite actors but infinite updates (feedback)
+
+
+### Contracts - generalizing insertions and state variables
+
+insertions are just an added global input and output to all vars
+state variables are just an added default input to all scoped vars
+maybe we can generalize this
+contracts: you can create scopes where all variables inside have to conform to certain rules/interfaces
+so for insertion, the contract is that all variables have to have a "insertion" input and "outsertion" output
+for state variables, the contract is that all variable have an "state input" input
+
+
+
+### Restructuring the interpreter - primary and secondary constructs
+
+right now the interpreter is a bit ugly
+a lot of the Node types don't feel like they are "core" operations
+references and property access feel like they should be the same
+the `Node.clone()` function (not to be confused with `CloneNode`) is rather hacky for many nodes
+
+I want to rebuild the interpreter in a simpler, more elegant way
+starting from core concepts
+
+references == mappings
+every reference is a mapping
+for example, `foo+3`, the `foo` might look like a reference, but it's actually a mapping `sum(a: foo, b: 3)`
+
+Primary Constructs
+
+* creation / mapping / combining
+* de-reference / property access
+* insertion
+
+then we also have secondary constructs, which can be reduced to combinations of primary constructs
+
+* binop -> cloning + property access
+* ternary -> cloning + property access
+
+
+
+* one of the difficulties I faced with the interpreter is handling feedback
+* if we have something like this:
+
+	km: m/1000
+	m: km*1000
+
+* in what order should we create the nodes?
+* if we create `km` first, then while we are creating `km`, how do we resolve `m`? `m` hasn't been created yet
+* same issue arises if we try to create `m` first
+
+* one way to think about this is
+* imagine if we were making an interpreter for the old version of Nylo, aka a functional non-reactive language
+* evaluation could be done via recursion, backtracking from the output (lazy-evaluation) and making calls as needed
+* so let's say we want to evaluate the following
+
+	distance:
+		km: m/1000
+		m: km*1000
+	=> distance(km: 7).m
+
+(in the following, primary constructs are in _italics_)
+* in the beginning, nothing is evaluated, not even the `/` or `*` calls inside `distance`
+* so no issues with feedback yet
+* we start by evaluating `distance(km: 7)`
+* in `distance(km: 7)`, all we do is override the `km` property inside `distance`, still no evaluation yet
+  * this is just a _mapping_ operation
+* when we get to the _property access_ `.m`, now we finally need to do some evaluation
+* first, let's represent `/` and `*` with their equivalent functional forms
+
+	distance:
+		km: div(m,1000)->
+		m: mult(km,1000)->
+	=> distance(km: 7).m
+
+* now we can see that when we access the `.m` property, we have to first evaluate `mult(km,1000)`
+* the `km` in this case is a reference to the `km: 7` override we made previously, so we resolve that first
+  * recall that references are just _property access_ performed on the scope
+* then we _map_ `km` and `1000` into the `mult` object
+* after that, we _access_ the output `->` property of the `mult` operation (which itself may execute a bunch of internal evaluations)
+
+* thus, everything is reduced to 2 primary constructs: mapping & property access
+* for Firefly, we only need to add one more core operation, insertion
+
+* but what if we want a reactive persistent program?
+* we can actually reactivity as continuous evaluation
+* 
+
+* now how do we go from the AST to the evaluation step?
+* we need to somehow link things together to prepare for evaluation
+* but we don't want to confuse this with the "mapping" core operation
+
+* maybe all we need to do is create the scopes for each object
+* well...no...scope is not a primary construct
+
+* we need to do everything that _isn't_ part of the core operations, anything that isn't part of evaluation
+* so basically a bunch of conversions
+* convert binops and ternaries into their equivalent forms
+* convert scoping into equivalent forms
+  * create a `_scope` property in each object
+  * nested scopes should inherit parent scopes
+  * references to scope should be converted to property access on the `_scope` property
+* nested structures should be flattened, nested object definitions should be moved to a template at root level, and a clone operation in the parent object
+  * // TODO: FIND REFERENCED SECTION
+
+* is all this necessary?
+* can we do it in a simpler way using recursion?
+
+### Restructuring the interpreter - intermediate transformations
+
+* actually i guess what i have already isn't too bad after all
+* it just feels so much uglier than interpreters for functional or imperative langs
+* for a functional lang, you can just recurse backwards from the output
+  * but we can't do that because my lang has to be eagerly evaluated
+* in an imperative lang, you just maintain a current execution context and function stack, and go line by line
+  * but I can't do that because everything is running at the same time
+
+* though I guess the fact that my interpreter has to work so differently from traditional interpreters
+* shows how radically different my lang is :O
+
+
+* actually I've decided to change one major thing about my interpreter
+* I'm going to add an intermediate transformation step between the AST and the interpreter
+* this is for transforming any syntax sugar into core operations
+* and it will make things easier when I add more syntax sugar later along the road
+
+* for now, these transformations are:
+* turning binop and ternary nodes into function calls (aka cloning + prop access)
+* flattening nested scopes, implementing scope using cloning
+
+
+
+* how do we transform scope into primary forms?
+* Normally in imperative languages, it can be transformed during parsing, because the arguments are static
+  * as in, if we did `fn(10, 20)`, then we know there are exactly two arguments, and their ordering is set during compile time
+* if Firefly had static arguments, we could manually iterate over each argument and override callee properties one by one
+
+### Combining/Merging and Security Issues
+
+* however, what if we had something like javascript's `Function.apply()` method, where the arguments are provided as an object
+* I'll call this **merging**, or **combining**
+  * we've actually been using `combine{...}` before, see section "Implementing Scope - Flattening Nested Structures"
+* in this case, the arguments would be "dynamic"
+* the parser doesn't know which properties are being overriden and how many
+* in fact, the caller doesn't know either
+
+* usually when you clone, you have to manually provide each argument
+* so you can only override private vars if you know them
+
+```
+foo(a: 10, b: 20, [sharedKey]: 30)
+```
+
+* but if we allow dynamic arguments, then could there be security issues?
+* for example, if we had `merge{foo, bar}` or `foo.apply(bar)`
+* if `foo` and `bar` had private vars with the same keys, then `foo`'s would be overriden
+* even though the caller might not be able to even see those private vars
+* the caller is combining private vars without knowing about them
+
+* if two objects have a shared private variable, and an outsider merges them, could cause unknown effects
+
+* one example is, if club members had a private "nickname", visible only to other club members
+* an outsider could combine two club members, and override the nickname
+
+* notice how this doesn't happen with static arguments
+* if we only allowed static arguments, then you would have to manually pass in each argument
+
+```
+foo(x: bar.x, y: bar.y, .....)
+```
+
+* and the caller would only be able to pass in arguments that they had keys for
+* they can't merge properties that they can't see
+
+* maybe don't allow merging, only allow stuff like `foo(...bar)`
+* in this case, `foo(...bar)` expands the properties of `bar` that the caller can see, and gives them to `foo`
+
+
+* hmm, going back to the club member example from earlier
+* what if instead of a shared private property, why not a use a private tag
+
+```
+private #nickname
+Robert:
+	#nickname: Bob
+```
+
+* I guess the difference is that during cloning, the tag won't be preserved (if you clone club members)
+* we mentioned this in a previous section when talking about the difference between tags and properties
+* but, maybe we shouldn't preserve the nickname when cloning club members
+* what if we always used tags instead of private vars?
+
+* well what about a private mutator
+* eg `someCommunity.postAnnouncement()` should only be available to moderators
+* but at the same time, it can't be a tag because you should be able to clone `someCommunity` and carry over the mutator
+
+* simplest safest solution would be to make `foo(...bar)` a shallow copy of bar's properties as arguments, as mentioned earlier
+* this is what the syntax of such an expression would suggest anyways
+
+* however, then what about insertions? 
+* how do we carry those over?
+* are mixins even possible in this method?
+
+* kind of. You can do something like
+
+```
+foo(...bar())
+```
+
+* what this does is:
+  1. creates a clone of `bar` (cloning all insertions and children)
+  2. manually copies the properties into the arguments of `foo(  )` before cloning `foo`
+* note that in this method, properties of bar can effect foo, but properties of foo won't effect bar
+* whereas if we allowed `merge{foo,bar}`, then the behaviors would merge and affect eachother
+  * recall the sections "Clones and Calls Declared Inside the Arguments" and "Implementing Scope - Child Scope vs Arguments Scope II"
+
+* I still don't want to fully abandon the concept of merging though
+* I'll have to come up with a more concrete example with shared private properties and merging, to further investigate the security implications
+
+
+### Dynamic Scope
+
+* previously we decided to choose "child scoping" rules (see section "Implementing Scope - Child Scope vs Arguments Scope")
+* basically, this means that the behavior of a module is scoped by the module itself first, and afterwards the original caller/callee scope
+* to be more precise, in something like
+
+```
+foo:
+	a: 10
+	b: 20
+	bar: a+b  // will be 30
+	zed: a*b
+foo_clone: foo
+	b: 5
+	bar: a-b  // will be 5
+```
+* first, note that `foo_clone` inherits `zed`, which references `b`, which resolves to the new value of `b` that `foo_clone` provided
+* this normal behavior compared to other languages
+* however, also notice how `foo_clone` inherits `a` from `foo`, so `foo_clone.bar`'s reference to `a` resolves to that inherited variable
+* normally, in most languages, the `a` in `foo_clone.bar` would be undefined
+* this also makes the scoping behavior a bit more symmetric
+* inherited behavior can reference new values, and new behavior can reference inherited values
+
+* we called this "child scope" before, to distinguish it from "arguments scope" (which is what I called the mechanism that most other languages used. Perhaps a more apt name would be "caller scope")
+* I called it "child scope" because the behavior of a child is scoped to its own properties, instead of being scoped to the parent or the caller
+
+* but perhaps a better name is "dynamic scoping"
+* because we can think of an object's scope as "dynamic", because when it is cloned, the new behavior re-binds to the new values/properties it has in its scope
+
+
+### Denote private behavior using _
+
+* we can use the `_` special keyword anytime we want to denote private behavior
+
+```
+foo:
+	someFn()   // this is a public list item
+	_ someFn() // this is private behavior
+```
+
+### Implementing Scope - the static property list
+
+* we have previously talked about implementing scope using primary constructs
+  * eg in section "Interpreter Implementation - Reference Resolution and Initial Pass Revisited"
+
+* I guess one of the confusing aspects about implementing scope, is that it is so similar to merging/cloning
+  * (note that it's ok to have combining/merging inside the interpreter implemetation, as it is a core operation. The previous section is discussing whether we should expose merging as part of the language as well)
+* if we had
+
+```
+parent:
+	...
+	child:
+		...
+```
+
+* `child`'s scope overshadows `parent`'s scope
+* so the properties of `child_scope` override `parent_scope`
+* in a way, we can say `child_scope: combine{parent_scope, child}`
+* but this seems almost too similar to cloning
+* almost seems circular, how we are using `child` to create `child_scope`
+* even though `child_scope` should be a part of `child`...
+
+* but actually, it's important to note one distinction between merging scope, and cloning objects
+* when merging scope, we don't perform any insertions or side effects
+* merging scope just combines a list of properties
+* so it's actually more like `child_scope: combine{parent_scope, child_properties}`
+* `child_properties` is just a list of properties created alongside the definition of `child`
+* this list of properties is just references to the source object's actual properties, sort of like a shallow copy of the object
+* eg
+
+```
+parent:
+	...
+	foo:
+		a: 10+input
+		b: someFn(20, 30)->
+		c: b.someProp
+	foo_properties:
+		a: foo.a
+		b: foo.b
+		c: foo.c
+	foo_scope: combine{parent_scope, foo_properties}
+```
+
+* this way, when we merge scopes, we are just overriding references
+* we aren't creating any behavior
+
+* in terms of implementation, this is actually rather simple as well
+* for cloning, a `CloneNode` can create nested `CloneNode`s, which leads to recursion
+* however, while scopes leverages cloning, since each scope is just a list of references, with no nested behavior, then there is no recursion
+
+* however, there's one problem
+* inside `foo_properties`, we are referencing `foo`
+* but how can we reference `foo` without the concept of scopes??
+* references are supposed to be implemented via scope & property access
+* but here, we are implementing scope via references
+* circular!
+
+* maybe the "references" inside `foo_properties` are not actually references
+* they are direct bindings to `foo`, statically created during interpretation
+* just like how, in the expression, `a.b.c`, the member access `.c` is directly bound to the result of `a.b`
+* so when the parser/interpreter sees the definition for `foo`, it creates this `foo_properties` object, with each property being a direct binding to a corresponding property in `foo`
+* then `foo_scope` is also created using a combine operation on `foo_properties` and the parent scope
+* thus, these `xxx_properties` and `xxx_scope` objects are static structures created at "compile" time
+* aka during the AST transformation
+
+
+
+* what's nice is that, this implementation of scope is rather robust
+* for example, recall the previous section, "Merging, Dynamic Arguments, and Security Issues"
+* we can start safe and not allow merging
+* but if we do end up adding it to the language, our implementation of scopes won't have to change
+* in fact, implementing scope is what brought up the discussion of merging and security in the first place
+* but in the end, that discussion proved irrelevant to our implementation for scopes
+
+### Dynamic Property Lists?
+
+* in the previous section we talked about creating a static `xxx_properties` list alongside any created object
+* but what if the object definition was dynamic
+* eg if we had something akin to javascript's `Object.fromEntries(entries)`
+* if `entries` changes, then the resulting object changes, as well as the property list
+* and we can't just dynamically generate the property list, because everything dynamic should happen in the evaluation phase, and everything in the evaluation phase should be implemented using primary constructs
+
+* well let's see how a "polyfill" for this might be written
+
+```
+fromEntries: entries >>
+	res: Map()
+	for ((key, value) in entries):
+		res.set(key, value)
+	=> res
+```
+
+```
+fromEntries: entries >>
+	res: entries.reduce(...)->
+		reducer: acc, entry => template acc([key]: value)
+		initial: ()
+	=> res()
+```
+
+* hmm but reducer method introduces order
+* and Map() method uses a secondary form `Map()`, which begs the question, how is `Map` implemented?
+* maybe we should provide a primary form for dynamically creating properties
+* something like
+
+```
+fromEntries: entries >>
+	for ((key, value) in entries):
+		[key]: value
+```
+
+* note that this kind of syntax was previously explored in Readme_old.md section "Dynamic Keys"
+* "Implementing Hashmaps and Property Insertion - Dynamic Properties"
+
+using the `combine{...}` primary construct
+
+```
+fromEntries: entries >>
+	=> combine{...entries.map(fn: ((key, val) => (...)))}
+		[key]: value
+```
+
+* this is good because it is unordered, unlike the reducer method
+* note that this is technically still a static property list
+* so this does not violate the scoping transformation mentioned in the previous section, "Implementing Scope - the static property list"
+* this is important, I can implement the scoping transformation without worrying about dynamic properties
+* and I know it is powerful enough to capture behavior like `fromEntries()`
+
+
+* the syntax is rather ugly tho
+* gah so many parenthesis
+* could i extend the for-loop to do something similar?
+
+```
+fromEntries: entries >>
+	=> ...for ((key, value) in entries):
+		[key]: value
+```
+
+* i'll have to explore this later
+
+### Dynamic Properties - Matchers vs Computed Properties
+
+* note that we have been mixing up two types of dynamic properties
+	1. matchers, eg `[key]: key*key`
+	2. dynamically computed keys, eg `[someValFromScope]: 10`
+
+* matchers are pretty much the same as functions, and could technically allow for infinite streams/lists
+  * also creates dynamic property lists
+* dynamically computed keys would still ensure finite and static property lists (as mentioned in the previous section, "Dynamic Property Lists?"
+
+* computed properties seems like something we should definitely in the language
+* matchers...I will have to think more about, since you could always just use a function instead of a matcher
+
+### Arrow Functions vs Pass-By-Behavior
+
+* we discussed a lot earlier about how arrow functions have to be wrapped in parens
+* eg `someFn((a,b => a+b))`
+* because `someFn(a,b => a+b)` implies that we are overriding the properties `a`, `b`, and `=>` inside `someFn`
+* note that passing in functions is a bit cleaner if you specify property name, eg
+* `someFn(callback: (a,b => a+b))`
+* however, note that due to pass-by-behavior and dynamic scoping
+* often, we don't even need to pass in a function
+* for example, if we wanted to call a function that makes an async data fetch, and then does something with the data:
+
+javascript:
+```javascript
+fetchData(data => {
+	doSomething(data);
+});
+```
+
+firefly:
+```
+fetchData(data >>
+	_ doSomething(data)
+)
+```
+
+* since `data` is a variable that is provided by the `fetchData` module, we can just reference it in the behavior we pass in
+
+
 
 * before, we relied on traversing the tree structure to figure out what to clone, and then stopping at references
 * but that becomes less useful once we get rid of references and add in private behavior/properties
