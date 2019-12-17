@@ -3737,7 +3737,7 @@ cloning arguments are passed to the source
 but it's not like the source passes arguments to the arguments
 
 actually clone arguments aren't some secret data passed to the source like previously thought
-// TODO: FIDN REFERENCED SECTION
+// TODO: FIND REFERENCED SECTION
 they are passed to the combiner
 so only the child object can see it
 though the child object can pass it back to the source (if that is part of it's behavior)
@@ -3762,6 +3762,7 @@ so when you combine the concept of `plus3` and `5`, it doesn't matter what order
 however, you do have to specify _how_ they are being combined
 for example, for `divide => a => b => result`, the first argument goes to the numerator, the second argument goes to the denominator
 they have to go to specified locations for the function to make sense
+we can imagine two N-dimensional spaces, with a value `a` at point P in the first space, and value `5` at the same point P in the second space, so when they collide the value `5` overrides `a`
 also sort of like meiosis and gene splicing, where the two sides have to combine at specific places
 also like how in my language, you have to specify what properties each argument goes to
 
@@ -6589,6 +6590,7 @@ parent:
 
 * maybe the "references" inside `foo_properties` are not actually references
 * they are direct bindings to `foo`, statically created during interpretation
+* just like how, in the expression, `a.b.c`, the member access `.c` is directly bound to the result of `a.b`
 * so when the parser/interpreter sees the definition for `foo`, it creates this `foo_properties` object, with each property being a direct binding to a corresponding property in `foo`
 * then `foo_scope` is also created using a combine operation on `foo_properties` and the parent scope
 * thus, these `xxx_properties` and `xxx_scope` objects are static structures created at "compile" time
