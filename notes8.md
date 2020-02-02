@@ -2891,6 +2891,8 @@ note that a cleaner way to make a local variable public is just to create a publ
 		tag: #tag // make #tag public
 	print source.tag // prints 10
 
+(Edit 1/29/2020: we mentioned this method in the previous section "Read-Only Private Variables, Public Mirrors")
+
 are you ever not in tag scope?
 how would you share tag scope?
 

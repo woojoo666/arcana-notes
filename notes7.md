@@ -1850,6 +1850,8 @@ so even if you had cloning access to `foo`, you actually need cloning access to 
 on one hand, we want to make cloning simple, so you should be able to clone anything you can see
 on the other hand, that makes it impossible for somebody to make a viewable, but not clonable property
 
+Edit 1/29/2020: we mentioned read-only properties in "Read-Only Private Variables, Public Mirrors", and discuss it further in "Publishing Private Data"
+
 ### API Calls
 
 use aggregators to mimic the behavior of an "API"?

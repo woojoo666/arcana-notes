@@ -956,6 +956,8 @@ I think we need to analyze how cloning works and how privacy works, separately
 And then see why we run into problems when we try to combine them
 We need to carefully define a unified model of cloning and privacy
 
+### Private Arguments and Closures
+
 How do we pass private arguments?
 Merging isn't enough
 Eg, for the webapp template, how to you pass in a new password
@@ -999,13 +1001,15 @@ If they are so much like function arguments, why not just make them function arg
 Now we don't have to worry about private arguments
 This is essentially a **closure**
 
+(we actually explored this in the previous section "Calling instead of Cloning for Passing in Private Data")
+
 What if we want to turn an existing API with public args, and hide them
 This is a little more annoying
 We have to transfer the properties manually, and we can choose not to transfer some properties
 //TODO: EXAMPLE
 One downside is that private properties are not transferred
 
-It seems like we are seeing the case of shared private properties not being transfered a lot
+It seems like we are seeing the case of shared private properties not being transferred a lot
 In fact, at any point, the caller can always be hiding the child or transforming the child, and in those cases, the shared private property becomes useless
 (talk about the watermark example)
 Transferring shared private properties is just hoping that the caller doesn't do anything to the object afterwards, and exposes it for the callee to be able to access and extract those shared private properties
@@ -1077,6 +1081,8 @@ Perhaps it's best to just assume that the caller is responsible for creating the
 So they can only create properties using the keys that are in scope
 
 When you declare a clone argument, it implictly adds it to the caller scope, even if it's a private key
+
+### Callee Responsible vs Caller Responsible Cloning
 
 I guess what sort of trips me up is that it's technically possible to transfer a callee's private keys
 For the sake of the example, we'll call the caller Joe and the callee Spotify, and the child Child
@@ -1620,3 +1626,1190 @@ in contrast to the react-virtualized library, where you apply the optimization y
 however, note that if a object is declared as "pure functional" but contains private behavior
 then we just have to trust the annotation
 (perhaps this is related to the discussion about "pure public"? look back at the section "Pure Complete and Pure Public")
+
+### Collectors = Collections
+
+renaming "collectors" to "collections"
+simpler and more familiar to programmers
+so you would be like
+
+```
+	foo: collection()
+	foo <: 10
+```
+
+### random ideas // TODO: name these sections
+
+// TODO: ELABORATE ON THESE BULLET POINTS
+
+- compose multiple end-to-end apps, by breaking off a client-side app (with services/databases as arguments) into a template, and then cloning the template inside your server, providing your services/database
+- you can even combine multiple apps on the same page
+- watch out where you break your partitions, eg if you did something like
+
+        foo1:
+             _priv: someVal
+             output: someComplexFn(_priv)
+          foo2:
+             _priv: someComplexFn(someVal)
+             output: _priv
+
+    notice that `foo1` is a lot less secure than `foo2`. Recall that ideally, anything in a public partition is modifiable. That means in `foo1` you could take the reference to `_priv`, and even though you don't know what address it is reading from, you can simply write that value to a public property and read from it. Now `someVal` is exposed. Whereas in `foo2`, all you have is the output of `someComplexFn`, so you don't know how the output was created
+
+so then why do we need scope?
+why not just have direct references to other nodes
+and let the user move references around (if they are public)
+why do we need this intermediate `scope` object, a kind of hub that all references have to go through
+
+scope is ultimately just a system for grouping and declaring idea
+for example, you can create a function `divide` that acts on a `numerator` and `denominator`
+even though you haven't even defined a `numerator` or `denominator` yet
+you can declare in the scope, that these ideas exist
+and that functions or objects can reference them
+
+another potential name: chatter
+kinda like smalltalk
+
+Using Core Functions instead of Javascript Transformations
+
+instead of defining transformations in javascript
+do it in the language itself
+and compile it to functions, that are used in the AST
+this was inspired by when I was browsing Nylo's source code and came across their std/base.ny (see commit d81d3eb368366c93eaae3973883c766d4b51829e)
+though for Nylo it's just a standard library of functions
+whereas I am using it for syntax transformations
+for example, in Nylo to do a conditional you literally call the if() function
+in my language, you would use the if (...) ... else ... syntax, but it gets transformed into a ifElse() function call
+I might not even expose the ifElse() function to the public, and just use it during interpretation
+but then, how do we transform scope and references?
+use this
+what about private vars?
+use regular keys and then don't enumerate them? scramble them in the interpreter?
+
+Concrete example w scope
+Rebinds references
+Note: does not rebind pointee, rebinds pointer
+Imagine a bunch of arrows pointing to A
+It doesnt rebind A itself (otherwise private references would get rebound as well)
+It rebinds anything referencing A that is public, as it has to clone the node anyways, it can clone the node while changing the reference
+Actually, isn't it the opposite?
+If private behavior references A, but A is public, then if you rebind A, the private behavior references the new A
+However, if you have public behavior referencing private B...well you can change that reference as well?
+
+`this` is the only variable that gets rebound during cloning
+Everything else, even scope and scope references, can be implemented on top
+When cloning, you define a new dynamic property accessor `this[x] => f(x)` that determines how to combine the parent objects
+Note that this means we need a way to reference the parents in the dynamic property, eg `parent1`, etc
+Seems sorta ugly
+Is this necessary?
+
+Also, recall that we are generalizing cloning into dynamic property access
+Instead of strictly defining the combining/merging process (right parent overrides left parent)
+We let the programmer define it
+However, seems circular
+We need functional programs to make a dynamic property accessor
+And we need property access and merging in order to make our first programs
+So which comes first? Programs, or dynamic props?
+
+Is it possible to implement the initial dynamic accessor, multiplexing, using only static references or static bindings?
+
+The most basic combiner is a conditional, "pull value from A if it exists, otherwise pull from B"
+Combiners are implemented in functional
+However, remember that in functional, conditionals are implemented using function calls
+But in our language, calls are implemented using dynamic property access, combiners
+Circular
+
+
+We don't need anything special to reference parents during cloning
+If we did something like proxy(a, b)
+Then the parents are just passed in as args
+If we expose merge or combine as a global function
+It would work the same
+Just do something like
+
+merge: mom, dad >>
+  [key] => mom[key] != undefined ? mom[key] else dad[key]
+Wait but then
+Aren't mom and dad also properties of merge?
+That you have to override to pass in args?
+It's confusing because now we have two ways of defining properties, through the dynamic accessor and through the static property definition
+
+We can only retrieve values from this  , so our input parents have to be put onto this before we can use them in the dynamic accessor
+But the dynamic accessor is how we reference variables, so it has to be defined before we can access the input parents
+Circular
+
+
+I guess a fully defined version is
+Everything functional
+Everything private
+Args are passed in like functions
+Public values are defined via accessors
+Any public node can be removed
+
+The only weird thing about this is
+We have to call via the functional method
+Instead of using merging
+
+
+
+Security and merging
+If property access is dynamic, and controlled by the caller
+Then caller can modify private properties
+
+
+Virtual objects
+Convert a function into an object that uses the function as the dynamic property accessor
+Is it still secure?
+
+The current idea is
+Whenever you clone an object
+The new object has its own this value
+And its own dynamic accessor
+And all nodes cloned from the parent object
+All will reference some this[key] 
+And will check the dynamic accessor of the new object to get the appropriate value
+This way, if there is private behavior referencing a public property, the new object can simply override the public property (by providing a custom value for that property in it's dynamic accessor), and doesn't need to modify/access the private behavior
+
+
+Locker room analogy
+Everything is in a locker, even private behavior
+To delete, you set a locker to undefined
+Even if private shared behavior runs into merge conflict , moves to a private locker
+
+
+Maybe regular cloning is callee responsible, so that private shared props are preserved
+Merging is caller responsible, dynamic access is supposed but private shared props are not preserved
+Wait but callee responsible means the caller has to tell the callee all arguments, privacy concerns, see section // TODO: FIND REFERENCED SECTION
+
+Does it make sense to use dynamic accessors to create a new object?
+Every cloned referenced has to reference this[key] to get the clone's value for each parameter
+But if you used a dynamic accessor and did something like `[key] => 5` then all private properties would get overridden too
+Though I guess it would work fine with the default property muxer
+Since private properties of the parents won't ever collide
+
+Imagine a rogue computer, that tries to merge an object Bob and Joe
+It knows Bob and Joe share some private properties
+So it uses default property muxer to combine Bob and Joe, giving Joe's properties precedence
+And all nodes cloned from Bob, during rebinding, it will check this[key] to get the new value, calling the rogue's property accessor
+And for the shared private properties, the property muxer will retrieve the value from Joe
+And so the rogue computer is able to modify the private behavior, without having access to the key
+
+Note: I will be using rebinding as the term for when the nodes of the new object are resolving their references, looking for if a value has been overridden or not
+
+Maybe we should only allow dynamic properties for "external access"
+That is, access from the outside of the object
+So stuff like proxies, only need to route requests coming from outside, to the correct internal object
+But requests coming from the object itself, eg from its own cloned behavior
+Don't use the dynamic accessor
+This prevents the security concerns mentioned above
+
+
+Or maybe the caller has to explicitly provide a list of variables to rebind
+Just like they have to explicitly provide which nodes to remove
+
+But according to the locker room analogy, removing nodes is the same as overriding properties (override with undefined)
+Why did we separate it in the first place?
+(Note: I think we separated it in the section "finite nodes infinite references"?)
+
+Imagine each object as a giant spreadsheet, each cell representing an address, a property
+All properties, private and public, are located somewhere in this spreadsheet
+
+The caller can provide a proxy/virtual object as the arguments for the call/clone
+
+The callee is probably the one responsible for the rebinding of it's private behavior
+Since it doesn't want to expose it's private behavior to the caller
+Now if the callee asks the arguments object to see if any private properties are being overridden
+Recall that the caller can provide a proxy or a virtual object as the arguments object
+Allowing the caller to provide an arguments object with private properties that the caller can't access itself
+
+So the question is
+During rebinding
+Does the callee ask for which properties are being overridden
+Or does the caller send over which properties are being overridden
+
+Overriding is just one way of resolving merge conflicts
+Recall that another method is to simply use overdefined for conflicts
+So perhaps it should be up to the person doing the rebinding, how the parents should be merged
+So maybe it makes the most sense for the callee to ask for which properties are being overridden?
+
+Though actually, if we think in terms of merging/mixins
+The person making the mixins, asks each parent for their properties
+And in this case, the caller would be the one making the mixins
+
+
+No matter how we choose to resolve merge conflicts
+It will involve some sort of logic
+But we can't expect to implement that logic using the language itself
+Since it becomes circular (discussed earlier)
+We have to choose a default method of resolving conflicts
+And define it in the spec and hard code it in the interpreter
+And the other methods of resolving conflicts can be implemented using the language itself
+But at least one method has to be hardcoded into the interpreter
+
+It's kind of like how for a turing machine
+There are tons of variants
+Eg a two-tape turing machine, or three tapes
+But at the end of the day, we have to choose a specific number of tapes, and implement that into the turing machine spec
+And all the other variants can be based on that
+
+
+So I think in conclusion
+Merging and cloning are implemented using mixins / dynamic properties
+Callee has to be the one cloning private properties and rebinding
+And when doing so, there is no reason for callee to ask the caller for anything
+Because doing so could cause security issues
+So by default, merging doesn't 
+
+Mixing/merging doesn't create any nodes
+Has to be done manually
+Doesn't preserve private properties
+
+Cloning, pass in keys for properties that you want to clone
+Preserves caller's private properties, since the callee is doing the mixing, so they know about the private properties that need to be cloned
+
+
+Mixins are caller responsible
+Cloning is callee responsible
+Cloning is a method on every object, implemented using mixins
+An object can disable cloning by overriding it with undefined
+Though there's not really any reason to do so...since if you wanted to prevent behavior from being clones, you could just define it externally and reference it in the object
+
+Another clue for why cloning has to be callee responsible
+Remember that tags are like virtual properties
+What happens if we have a tag that is only visible to one parent?
+It's like a private property
+And only that parent can transfer it over to clones / child objects
+
+
+
+Mixins have to be for two objects
+Or maybe could do it with a list,keep going till undefined?
+Has to be hardcoded in interpreter
+
+
+So cloning is not actually a core operation
+The three core operations are
+Read, write, and mix
+Mix: takes two objects, merges properties and uses overdefined on property collisions
+
+Wait but does mix combine all private properties?
+No, because that would be a security concern
+Whoever calls mix should only be able to merge the properties that they can "see"
+But how do we determine what properties can be "seen"?
+If we use property lists...well then we have to iterate across the property list
+And iteration uses function calls / cloning in the implementation (recall how iteration works in functional langs)
+And function calls / cloning is implemented using "mix"
+Circular
+
+
+Whether or not an object can "see" a property
+Is a vague concept
+Just like scope, it is implemented using language constructs
+perhaps every object needs a keyset that defines what they can "see"?
+
+Sets as a Primitive
+
+maybe Sets are a primitive type
+so we can use sets for property lists and such, and perform set operations
+    and the iteration is handled in the interpreter
+May seem ugly since it seems like a complex primitive (and primitives are usually simple)
+And in functional, lists are not primitives, they are implemented
+But it's kinda like how in turing machine
+The turing machine tape is a "primitive" and a rather complex one at that
+
+Sets are unordered
+so how a set is traversed is up to the interpreter, but the language spec doesn't need to know about it
+Already used by insertionsviewDiscussionLinkEx
+
+So perhaps mixins require two things: a set of keys and a set of objects
+And the mixing will combine all the values for the keys in the keyset, across all objects
+
+
+Wait but if cloning is callee-responsible
+What if the caller wants to add private properties that the callee can't see
+Caller doesn't want to provide those private keys, but the callee needs them to mix those private properties in
+
+Previously, we said that the caller can simply check which private keys already exist on the callee, and only pass those in (since those are the ones that need to be overridden)
+But if it doesn't pass in the other private keys, then they won't be added to the final object
+At least if cloning is callee responsible
+well, unless the caller keeps the private properties on the "caller side"? (recall the dicussions about distributed objects and "cloning over a network")
+
+Actually recall that it isn't enough for the caller to check which keys exist on the callee
+// TODO: FIND REFERENCED SECTION
+Since the callee could have behavior referencing properties that aren't defined yet
+(eg sum: ( a b >> result: a+b), notice how a and b are like function args, not defined yet but the caller is meant to pass them in)
+this is how function parameters often work
+
+So maybe there is no choice but for the callee to ask the caller for values, instead of the caller sending them in
+    // TODO: FIND REFERENCED SECTION
+Along with all the security problems
+
+Reference / Parameter Declaration
+
+What if we declared all references / parameters
+so in the earlier example sum: (a b >> result: a+b), a and b would be undefined, but would have a special undefined value, undefined parameter or something
+thus, the caller could check and see that it needs to pass in values for a and b, even if they are private
+Note that these declarations can still be private, since we aren't enumerating the private keys, just setting the value to something other than undefined
+still seems a bit ugly that we are having this arbitrary special value though...
+
+what if it's a dynamic reference?
+eg foo: (key >> result: this[key])
+now we don't know which property to declare as a parameter
+
+Unless reference declaration was dynamic...?
+so if we had this[a+b], we figure out what a+b is and declare that as a parameter
+if a or b changes, then we re-calculate and declare the new parameter
+so what about in the earlier example, with the dynamic key this[key], where key itself is a parameter
+well first key will be declared as a parameter, and then when the caller provides key, then this[key] will get calculated and then declared as a parameter, and then the caller can provide this[key]
+convergence
+
+I guess this convergence could get arbitrarily long, if we have a chain of dynamic references depending on other dynamic references
+eg a: this[b], b: this[c], c: this[d], ...
+what if there was feedback?
+
+
+Preventing Dynamic Access and Proxies using Encryption
+
+We previously talked about a rogue computer using routing to proxy private variables that it doesn't know about
+// TODO: FIND REFERENCED SECTION
+But we can prevent this
+Recall our discussions on anonymous reads
+And capturing an object into a single function that is passed to the reader
+// TODO: FIND REFERENCED SECTION
+
+Well previously I thought that the rogue computer could simply retrieve the property access functions of it's victims (the objects it is proxying), wrap it in a property muxer, and then pass that to the reader
+But if we instead forced every object to provide a property access object, a static piece of data that is simply encrypted
+Then we can prevent proxying
+For example, let's assume that we have a giant encrypted piece of data
+And if you decrypt it using different keys, you will get the values for those keys
+Now it's impossible for the rogue computer to encrypt and include the private properties that it can't access
+
+// TODO: EXPLAIN THIS MORE
+
+
+So we could prevent proxies and dynamic access in our language
+Do we want to?
+
+
+We need a clear and consistent spec of how we want privacy to work in our language
+
+Note that even if we prevented proxies, we still can't guarantee that a property on an object is actually accessible by that object
+The object could have inherited it
+
+
+in functional languages, many languages support type systems and private/public, and you can either
+   * extend the type (giving you access to all private properties)
+   * instantiate the type (passing in constructor args, and the instance has access to everything you pass in)
+
+in my language, one of the main things I've been trying to achieve is for the caller and callee to both contribute private properties to the child
+which does feel a bit weird
+after a chain of clonings, with each caller contributing some private properties, you end up with a frankenstein of private properties
+if we imagine the address space/matrix, it would look like a bunch of different colored regions mixed together, each "realm" being private and unable to see the other "realms"
+
+
+What's about something like a phone
+The phone has an OS, that is kept secret from the user
+But the user also has personal data, that should be kept secret from the phone
+
+Mixins vs inheritance vs member variables
+Mixins: multiple objects combining into one with merged properties
+Inheritance: overriding a single object with a set of properties
+Member variables: 
+
+
+Conceptually, it seems trivial to have the caller override callee properties without exposing private properties from the caller
+
+
+"Mixed private spaces", aka mixin where the parents each contribute private properties that the others are not aware of
+Breaks single responsibility?
+But then what's the difference between mixed private spaces, and just a network of objects (each containing private info)?
+
+Difference is that for each object, there is a property mixer that needs to resolve merge conflicts across multiple parents
+So with multiple private spaces mixed into one, which parent does the property mixing and binding?
+
+so in that sense, perhaps there has to be single responsibility, and whoever is responsible has to be able to see all properties
+
+Dynamic prop accessor / mixer seems too powerful
+If it can create nodes and such
+and do rebinding
+Or does it do rebinding?
+It's supposed to just be a function that is packaged for readers
+
+
+if sets are a primitive
+and lists are sets
+and we allow dynamic properties
+what if we have x: ([key]: 5) ? isn't x now an infinite list? so if we did setFrom(x) we would have an infinite set?
+can our mixin operator (which takes in a set of keys and set of objects) handle infinite sets?
+
+recall how booleans are implemented in pure functional
+how would we implement booleans using our mixin operator?
+
+not hard:
+TODO: SHOW PROOF
+
+i think this mixin / dynamic property stuff is too complicated
+let's just think in terms of actors
+and what makes intuitive sense
+
+actors are bundles of behavior
+you can read from them
+you can send messages to them
+they can spawn more actors?
+
+maybe the callee isn't restricted to just cloning
+when the caller passes in data, the callee can spawn multiple children, not just a single one
+
+if cloning was callee-responsible, and implemented in the callee using the mixin operator
+the caller still needs to somehow send in the arguments
+how? insertion?
+but insertion can only send data, the caller needs to somehow receive data as well
+
+perhaps the callee puts the result of the clone operation, in a designated property that the caller can find
+it can just use the id of the arguments object, as the key
+so it would look like
+
+callee: ...args >>
+   _clone: // create the clone here
+   [args]: _clone
+
+and then the caller can retrieve it because it has the id of the arguments object as well
+I think I may have discussed this earlier as well (?)
+Lets call this "insertion response retrieval"
+
+
+recall that we used to view cloning as a two-way message passing system
+a way to merge behaviors, like gene splicing or reproduction
+see section "Combiners and Symmetry"
+
+we also used to think that it was caller-responsible
+// TODO: FIND REFERENCED SECTION
+however, we noticed that there's no point to cloning unless private behavior is carried over
+// TODO: FIND REFERENCED SECTION
+which means the callee must be at least in part responsible
+so is it callee-responsible, or a mix of caller+callee responsible?
+(we mentioned recently how dynamic property mixers implies that it should follow single-responsibility principle)
+// TODO: FIND REFERENCED SECTION
+
+perhaps cloning conflates two ideas
+when we define an object, we define how properties already on the object generate other properties
+but when we introduce cloning, it means that we are also defining what behavior can be cloned
+so now we have to worry about two things when defining an object
+
+collectors / collections are actually special
+doesn't seem to make sense to clone them
+  or does it? we discussed cloning collectors previously in the section "Insertion and Cloning"
+doesn't seem to make sense to read from them either
+actors and collectors are distinct entities
+though recall how we represented insertion using pure functional constructs
+// TODO: FIND REFERENCED SECTION
+basically a global flag-watcher system
+
+note that such a system also doesn't have to reveal inserted data
+if an actor wants to insert to a collector
+the collector exposes its public key
+the actor encrypts the data using the public key
+and then the global flag-watcher system propagates the encrypted data to everybody
+the collector tries to decrypt it, and is successful, so adds it to their collection
+
+
+can we implement cloning using insertion?
+
+What if we made it so that when you insert into one object, it inserts into another object, etc, and then eventually returns the result using the insertion-response-retrieval system discussed earlier
+Can we implement the successor function this way
+I guess maybe the integers are represented by how many insertions an object has received, and the successor just inserts another item (maybe an empty object) into the caller?
+
+implementing cloning via insertion makes it so that
+Objects become giant monoliths
+Receiving insertions and sending insertions, and sending responses via insertion-response-retrieval
+Instead of allowing an object to spawn an independent object, with independent behavior
+
+
+Recall my theory that the key part of making a powerful language is repetition
+A way to turn finite information into infinite behavior
+// TODO: FIND REFERENCED SECTION (I think it was in my hand written notes)
+
+The problem with trying to implement cloning with insertion
+Is that we are not creating any new objects
+(though insertion can be modeled using functions, so creating insertion is like creating behavior?
+is there a way to generate infinite insertions?)
+
+Note that with a turing machine, the "runtime" can be infinite, it can take an infinite number of steps for it to halt
+For a functional or actor language, since there are no computational steps, and everything happens at once, what's infinite is the number of calls or spawned objects
+What about a logic language?
+Spawns an infinite number of logic queries
+
+note that the wikipedia for Actor Model
+mentions that an actor should be able to respond to a message by spawning a finite number of actors
+does not mention cloning, but does mention spawning
+
+the wiki made me more confident that insertion isn't enough
+we need a way to spawn actors
+in addition, mixed responsibility is too complicated
+only one parent actor for every spawned child actor
+so what is the mechanism for spawning new actors?
+
+
+what if actors had an "initializer" property
+that was a collector
+and is only visible to the person spawning the actor
+they insert arguments into it, and the child's behavior reads from those arguments
+
+
+we want an actor to have the freedom to spawn children however they want (isn't restricted to just clones)
+but how we define those children, is defined using templates defined externally, outside the actor
+and the actor clones them
+so maybe it comes down to cloning after all?
+
+
+cloning external templates is a bit restrictive though
+because it means the templates are pre-defined
+what if we want to dynamically define the child's behavior
+
+but if parent dynamically defines child's behavior
+what about grandchild? is that defined by the grandparent?
+the problem is, "spawning actors" is too vague
+what behavior belongs on the parent? what behavior belongs on the child?
+right now it seems like all behavior is in the parent
+
+cloning made it simple
+you separate behavior depending on what you want cloned
+so you put behavior on the child, if you want people who clone the child to clone that behavior
+
+however cloning is so asymmetric
+two objects, callee and arguments object
+the callee is responsible for spawning the child
+the caller passes in the arguments object
+
+
+the grandchild's behavior is created by the child, not the parent
+so if the parent wants to dynamically define how the grandchild behaves, they have to define how to define it within the child
+so the child can independently create the grandchild
+
+In functional, we use functions to group behaviors for easy re-use and modularity
+Grouping behaviors is very intuitive
+When we think of an actor, we think of what behavior it contains
+And when we break down behavior into smaller parts, its intuitive to make each part an actor
+
+// TODO: Example with spawn3
+
+One advantage of the spawn model, is that it's easy to prevent cloning
+But it was pretty easy to do so already in the cloning model
+Just move the behavior you don't want cloned, to an external private place
+And expose the values publicly, not the behavior
+
+passive (forced) spawning vs active (reactive) spawning
+
+with the cloning model, any actor can be cloned, cloning behavior is default and passive
+so any actor that wants to prevent it has to actively prevent it
+with a "reactive spawning" model, where the parent reacts to inputs and spawns children actively, the parent can prevent cloning by simply not exposing it
+
+
+With the spawn model, an object can spawn multiple children, and define them within the actor
+But that is a curse as much as a blessing
+Makes it confusing and complicated
+With cloning, each separate child behavior, would be a separate actor
+Simply and intuitive
+With spawning we can do the same (recall that cloning can be implemented using spawning), but we can also define all behaviors in one actor
+So now the programmer has to choose which to do
+
+Maybe we need to take advantage of recursion
+Every actor should represent a single behavior
+We can still use the spawning model
+But we need to make it simpler
+
+We could have an object "spawnFactory" with three properties, "spawnA" "spawnB" and "spawnC"
+All collectors
+And when you insert into one, it spawns the corresponding type
+But note that we could have done something very similar using cloning
+Instead of inserting into "spawnA" you would clone "spawnA"
+The difference is that when you clone "spawnA", you are guaranteed a response
+With insertion, you arent
+
+How do we make sure "spawnFactory" can see the insertions, but outsiders can't?
+maybe a shared private property?
+or maybe the collector inserts into "spawnFactory"? (eg every time "spawnA" gets an insertion, it inserts the data into "spawnFactory" with the tag spawnA
+
+
+### Choice to Spawn
+
+one big problem with cloning
+since it's callee-responsible
+the callee is responsible for duplicating the behavior
+duplicated private behavior, stored on the callee's server
+takes up memory and cpu, and a malicious attacker can overload the callee with clone requests
+the callee could try to prevent it by making all its behavior private, with zero input arguments
+so that when you clone it, you can't change it's behavior, so it never needs to actually create a clone
+it can just fake it by returning itself as the "clone"
+
+Someday server goes down
+
+
+
+Can this "choice to spawn" behavior be implemented in the cloning model?
+
+
+### Choice to Exist
+
+instead of the parent choosing for the children to spawn
+each child can choose to exist
+based on environmental conditions
+
+reads from the environment and decides whether to spawn or not
+
+// TODO: Explain more??
+
+Not exactly free choice
+As the person defining the child, ultimately gets to choose when the child exists or not
+But it does group behavior more intuitively by making each child responsible for its own spawning behavior
+
+Solves 3 problems
+* Asymmetry of cloning
+* Group behaviors for recursion
+* Callee responsible, can choose not to clone/spawn
+
+Spawning from Sets
+
+Wait but
+If we want to spawn the actor in a for loop
+
+// Code example
+
+This feels like the parent is spawning the children
+Not the children spawning themselves
+
+Well one way to think about it is
+When we define objects normally, we are creating a single object that reads from single values around them
+But sets are a primitive too
+// TODO: FIND REFERENCES SECTION
+So we can define a set of objects that read from a set of values
+
+kinda reminds me of the "fan-out" operation I had in the diagram syntax
+
+In a sense, this turns everything into a template
+Before, in the cloning model,
+You create a single object, and the you can clone it multiple times
+A 1-to-many model
+Now, everything starts as a template, and can pop into existence multiple times
+A 0-to-many model
+Similar to functional (functions are templates, inert at first but can be called and executed multiple times)
+
+But then what about depending on a product of sets? A powerset?
+What about a single object depending on multiple values? Eg "foo exists if a && b"
+
+This is like flipping the way we usually think
+Instead of "if a && b then clone foo"
+We think "foo exists if a && b"
+
+how would we implement booleans using spawning?
+
+In order to spawn
+We have to bind an "existence" listener to some variable
+Sets and Loops instead of Recursion
+Parent still has to create the existence listeners
+So I guess you can think of it as the parent spawning the children
+
+However, still very different from cloning
+Recursion isn't possible in the spawn model
+Because we can't clone/call actors to duplicate behavior
+(And recursion requires cloning/calling oneself)
+In order to duplicate behavior, we have to spawn off of a set
+But an object can only be defined once, can't be duplicated
+This way, the parent has full control over the creation of it
+
+So there are two primitives in Firefly
+Objects: key value pairs (unique keys)
+Sets: group of values (can contain duplicates)
+
+
+We mentioned previously how we could return undefined for cloning
+Use functions, the clone function has a return value that can be undefined
+// TODO: FIND REFERENCED SECTION
+
+I guess we could have made a "clone operation" that just works like functional function calls
+And then a "clone function" that uses the clone operation, but could return undefined if the callee doesn't have the resources to complete the clone or something
+
+However, one core aspect of spawning
+Is that the parent controls how many times a child is created
+With cloning, the parent simply exposes the child behavior
+And let's anybody duplicate it
+Which is problematic if the child contains private behavior that must be executed by the parent,
+And the parent has limited resources
+This is a fundamental problem in the concept of cloning
+
+Functional is caller-responsible
+The caller executed the function itself
+In order to do so, the caller has to have the source code
+Which would be a security issue in our language, if the callee wanted to keep it's behavior private
+Cloning has the same issue
+
+
+Now that there are two primitives
+How are they related?
+With objects we can use dynamic keys to mimic infinite lists
+But sets are finite
+But we can also convert objects to sets
+So what happens if we convert an infinite list to a set?
+
+The point of sets is that they are unordered,
+But are objects ordered?
+Even arrays (objects where all the keys are integers) are only ordered because we traverse them in an ordered manner
+But the concept of key value pairs isn't inherently ordered
+
+Spawning vs Cloning: What does it Solve?
+
+One more thing that bothers me is
+A lot of the supposed advantages of spawning over cloning, have quite elegant solutions in cloning
+For example, with spawning, you cannot override properties like you do in cloning
+So cloning may seem unsafe because any public property, you have to worry about it getting overridden
+Which can be dangerous if you have private behavior that depends on that property
+But there's a simple solution: move the value to a private property, and have the public property just point to it
+(But the private behavior reads from the private property not the public one)
+
+foo:
+_val: 10
+val: _val
+someCollector <: _foo*_foo
+
+That way, overriding the public property doesn't affect the behavior
+And it makes a lot of sense too: keep all the behavior private, and expose values to the public using pointers
+(we mentioned this technique previously in the section "Read-Only Private Variables, Public Mirrors")
+
+one can also prevent objects from being cloned using proxies
+see section "Cloning Authorization Revisited and Proxies"
+
+in addition, spawning allows for private arguments
+since cloning is implemented using insertion to send in arguments, and insertions are already private
+however, we already achieved this using closures
+(see section "Private Arguments and Closures". The example is repeated below)
+
+    fooFactory: mypassword >>
+       => input >>
+          => input==mypassword? "success" : "wrong password"
+
+It's clean and simply workarounds like this that made cloning seem like the right choice for so long
+
+So why did we switch to spawning?
+The security issues with merging?
+But then we can simply allow cloning without allowing merging (as in you can't pass in an arguments object, you have to pass in arguments directly)
+Maybe so parent can control child creation? Or to make some objects non-clonable?
+But the parent can control that already, by controlling how much behavior is exposes to the public
+Techniques like proxies, mirrors, aliases
+Was it just because cloning felt asymmetric?
+
+What's the point of implementing cloning using spawning,
+If people end up using cloning 100% of the time
+Might as well have just made cloning the default, and implemented it directly in the interpreter
+and just specify in the spec that cloning can return undefined if the callee wants to
+
+we could have other types of creation other than cloning, also implemented via spawning
+eg mixins
+
+Mentioned in previous section about how cloning feels more like caller responsibility, and is security concern
+
+When we think of actors
+We think of things we communicate with
+Send messages to
+Not something we duplicate
+If everything were cloneable
+It would feel weird to declare, say, an object that represents your profile info
+Because you wouldn't want it being duplicated
+Even if it were private (since it could technically still be cloned by actors that have the private key)
+And it feels weird to have to create a "public mirror" of your profile that exposes public references to a few properties
+Instead of just making your profile public (and having some private properties inside)
+
+### Sets vs Actors: distinct or combined?
+
+now that sets are a primitive
+maybe we can separate the concept of objects and sets a bit further
+specialize the roles a bit
+
+sets are for collecting insertions
+you can only insert into sets
+
+objects are for defining properties
+
+but then that prevents custom insertion behavior
+for example, what if we wanted a collector that was public, but kept insertions in a shared private key for local access only
+example:
+
+foo:
+    _someKey: ()
+    someCollector: collector
+        [_someKey]: _insertions
+bar:
+    foo.someCollector <: 10
+
+(notice that we use `_insertions` to reference any insertions in the current object. It's a special keyword, similar to this)
+we could have used object methods/modifiers instead
+
+foo:
+    _someCollector: collector
+    insertNum: num >>
+        _someCollector <: num
+bar:
+    foo.insertNum(10)
+
+this could be a bit cleaner
+
+feels a bit restrictive though
+i think it would be nice to be able to insert into any object
+and any object can retrieve its insertions using `_insertions`
+
+Consolidate actors and sets
+Means you can use them interchangeably
+Dynamic typing
+Don't have to worry about which type it is
+Dont have to worry about using insertion for some objects, and modifiers/mutations for others
+
+In fact it could be dangerous to have insertions fail on objects, because it doesn't return anything, so there's no way to indicate an error
+
+Actually when we implemented cloning using insertion
+We needed custom insertion
+Arguments objects are inserted
+Only Visible to the callee
+
+Almost the opposite of when we were trying to implement insert() using cloning
+// TODO: FIND REFERENCED SECTION
+
+Sets are the behavior of an object
+Finite
+Property accessor is how that behavior is mapped to the address space
+
+However, sets and objects are used in completely different ways
+You can use the map operator on sets, but not objects
+You can use property access on objects, not sets
+So i guess if you combine objects and sets, it would be like two completely different entities in one variable
+
+Recall how a collector works
+The insertions are public, so anybody can insert and anybody can read the insertions
+However, right now an object's insertions start out private, only accessible via the `_insertions` keyword
+How do we make an object's private insertions available to the public?
+maybe Something like
+
+mycollector:
+   insertions: _insertions
+
+but then you would have to map across `mycollector.insertions`
+How would we make it so you can map across mycollector directly?
+
+
+A note about keysets and valuesets
+They have to be declared
+Not generated
+Since declaring them declared what keys are public
+Implementing Scope using Spawning
+
+
+
+Implementing Scope using Cloning - Circular
+i was re-visiting about how we implemented scope using cloning
+and I found a contradiction
+
+1. scope is implemented using cloning (an external template is cloned with the scope passed in as an arg)
+  1. // TODO: FIND REFERENCED SECTION
+2. scope has to be passed in as a private argument
+3. all references are transformed to property access on this
+  1. // TODO: FIND REFERENCED SECTION
+4. private arguments are implemented using closures, and scope
+  1. see section "Private Arguments and Closures"
+
+circular!
+
+so perhaps implementing scope using the spawn model is the only way
+because the spawning model doesn't require closures to pass in private data
+
+either that or we can just make private arguments a core functionality
+
+### Nicknames
+One benefit of typed languages is function polymorphism
+
+in javascript, you can use Sets() to easily filter dups from an array
+return new Set(my_array)
+however, if you have a custom comparison function between array items to check for equality, it gets a lot more complicated
+let filtered = [];
+for (const item of my_array) {
+    if (!filtered.some(el => el.id === item.id)) {
+        filtered.push(item);
+    }
+}
+
+note that we can't even use Array.includes(), we have to use Array.some(), because we have a custom comparator function
+which leads to some very unintuitive code
+in a typed language with polymorphism, we could re-use includes() with a Comparator as the argument, and it could automatically switch to using the comparator version of the includes() function
+in essence, typed languages are slightly more expressive because they can use the same function name to capture multiple different behaviors
+instead of being forced to re-name the function every time you want to handle a different type of argument
+
+in Firefly, perhaps we can allow nicknames, which are more like workspace settings
+adds a * to the end of the name to show that it's just a nickname, eg filtered.includes*(el => el.id === item.id)
+basically just a way of customizing how a program looks, to make it more readable
+similar to the original ideas behind metaprogramming
+// TODO: FIND REFERENCED SECTION
+
+
+### Loaders (TODO check for duplicate name)
+
+if we simply ignore all loading, and have something like
+someCollector
+webpage:
+    for image in someCollector:
+        <img src={image}/>
+then imagine if someCollector contained 1 mil images
+you want lazy loading + loading indicator
+without cluttering the code
+
+
+
+### // TODO: name these sections
+
+
+Dynamic Access
+Who does the property access
+Mix example
+Key transform (take your key and +1)
+Value transform
+
+Secure computation
+You can run code without knowing what it does
+Almost like cloning, since the callee gives you the code to run
+
+
+Firewalls
+Like dynamic property access
+You get the program, and you can use it however you like, anonymously
+Without worrying about it sending messages out
+
+
+You can't just firewall one node
+A program is made up of a network of nodes
+You have to firewall all of them
+
+
+Whoever creates it controls it
+So to firewall a program
+You have to create it yourself
+You have to be given the source code
+So maybe the callee has to flag a program as "copy-supported", which tells the caller to create the clone themselves, and shares the code for it
+
+Standard functions like forEach or Map
+Surely those can be run by the caller themselves
+
+
+
+Sort of like javascript eval()
+You can read the template/object, and then run it within your scope, using your environment
+If you're given a network of nodes, you can put them in an address space so that each node can reference and insert and read from other nodes in the network, or nodes that you provide in the scope (eg standard functions like forEach or Map), but if they try to read/insert from an outside node, it fails
+
+
+However, if it were truly encrypted, then references to forEach and Map would also be scrambled
+
+
+shallow copy of behavior
+would allow the caller to create and execute their own child
+and they can do it within a firewall
+also would be useful for open source templates
+where the provider of the template doesn't want to bother with executing all calls themselves
+eg the forEach function, whoever calls it should execute it on their own machine, and since it's completely public, there are no security issues with doing so
+
+so then when to do callee-responsible spawning, vs caller-responsible copying?
+
+
+
+
+
+Inheritance
+How do we extend objects with more behavior
+Has to be public?
+
+SomeService: name >>
+    _computeVal: some complex computation
+        => result
+    [someKey]: "protected method"
+    getVal: a,b >>
+        result: _computeVal(a,b)->
+        console.log(name + "finished")
+        => result
+
+MyService: SomeService
+    name: "myservice"
+    _computeSecondVal: some complex computation
+        => result
+    getLargestVal: a,b
+        result1: this.getVal(a,b)
+        result2: _computeSecondVal(a,b)
+        => Math.max(result1, result2)
+
+seems to go back to our previous discussion about public code and behavior
+if you make a property public
+you make it's code public
+and whoever wants to clone it can copy the code
+so if you want to extend a service, you first tell it to spawn a clone, and then you spawn your own object with additional private behavior, and override any properties on the clone that you know of (by passing in a keyset)
+but any private properties are not carried over to the extended object
+since you can only create properties that you are aware of
+And recall that by passing in a keyset, you are declaring what keys you are aware of, so the callee can safely override them, without worrying about proxies or dynamic property accessors causing security issues (discussed earlier)
+(In reality what you are doing is creating new behavior on your end, and then telling the callee to delete its behavior and rebind to your behavior)
+
+
+
+
+Sandboxing and Publishing
+A better name instead of firewalling
+Instead of the callee flagging itself as "copy-supported", the caller can copy any object they want
+And it copies whatever behavior it can see
+You use the keyword sandbox do to a copy
+
+
+
+Callee still has to flag it
+To obfuscate the behavior before making it public
+
+Does three things:
+Obfuscates all private behavior within the scope
+Declares all keys for all behavior
+Sets a flag indicating that it is "published", and anybody who wants to use it has to copy it and execute it themselves
+
+
+now when somebody copies it, they can be sure that it's not making any outside calls
+Because due to how scoping works, any external references are accessed via this 
+    // TODO: FIND REFERENCED SECTION
+And since the caller created the object themselves, they provide every variable in the object's scope
+And even nested objects must get it from the outer scope, so ultimately the caller is aware of all bindings and references,
+and can make sure it all stays within the sandbox
+
+This is true for any copy
+Even if the caller makes a copy of an object that isn't published
+(Aka just copying any public behavior)
+They can't guarantee that they copied everything (since they don't know if there is private behavior or not)
+But they can guarantee that it is sandboxed
+
+
+Notice that obfuscation is important for something like
+Foo:
+    _bar: "hi"
+    _private:
+        a: 10
+        b: 20
+
+Technically bar is already obfuscated, because the key is private and generated and will probably look like some random string of digits like 8103573927492
+The same with `_private`
+But the stuff inside `_private` uses normal public keys, and while they are not normally accessible, a published package would have to expose all nested objects so that the caller can copy them, and so we would have to obfuscate
+
+
+Note that a malicious callee could declare themselves as published, while keeping some behavior private (and thus unable to be copied)
+However, all callers would be copying the callee, and wood end up with broken copies (that are still sandboxed)
+And the callee gains nothing from it
+
+
+
+### Summary of How Subclassing Works
+
+creates clone of parent class
+Spawns child with additional behavior
+mixes clone and child to create subclass
+
+Private properties are not carried over from the parent class (even though the behavior is carried over, it's unaccessible)
+
+You can either carry over private properties (cloning), by exposing all additional properties to the parent class
+Or you can have additional behavior that is private, and not carry over the parent's private properties
+But you can't have both private properties of parent and subclass
+
+This is because ultimately, there has to be a single actor that determines the property mapping of the result
+Can't have two independent actors, or it may lead to conflicts (they both try to put values on the same key, without being aware of eachother)
+Why not have some protocol to resolve conflicts? Eg using overdefined?
+Because such a protocol is basically an actor itself. It needs to be aware of all private properties on each side, in order to resolve the conflicts
+So it all ultimately has to be decided by a single actor
+
+Note that we can have dynamic property accessor, a mux
+
+What about secure cryptography and Secure two-party computation
+Like the dating protocol
+Could we use that to merge?
+Well the problem is not the conflict resolution protocol
+It's control and responsibility
+Guarding against attacks like the "friendly fire attack"
+A new name I came up for when the caller uses a reference to an external arguments object
+
+### Set_spawn Restricted to Self Insertions
+
+instead of the following:
+
+```
+someCollection
+foo:
+    for x in someCollection   // set_spawn off a public collection
+        bar: x*x
+        anotherCollection <: bar
+```
+
+can we design it so each actor can only set_spawn once, off of the actor's internal insertions?
+
+maybe instead of using public collections, we can make the collection
+accept "listeners", and then it inserts into each listener every item
+in the collection, and each listener does it's own set_spawn
+
+```
+foo:
+    collection.listeners <: _bla
+    _bla:
+        set_spawn x >>  // spawn a set from _insertions and name each item "x"
+            bar: x*x
+            anotherCollection <: bar
+collection:
+    listeners:
+        set_spawn listener >>
+            // we somehow need to insert every item
+            // from the collection into each listener
+```
+
+however notice that we need a nested set_spawn
+but that isn't possible if each actor can only set_spawn off their own insertions
+
+in fact, right now our language only has 4 core operators
+
+spawn
+insertion
+property access
+set_spawn
+
+hmm the only way i can think of to create infinite behavior using these operators
+is if scoping worked as well
+or even if the child can access parent at least
+or even if the parent can insert into each child
+
+then you can do something like
+
+```
+foo:
+    set_spawn x >>
+        index: x.index+1
+        foo <: this
+foo <: (index: 0)
+```
+
+notice how, after the initial insertion, each insertion will
+cause another insertion
+
+however, this either requires scope to be available
+or, more simply, for the parent to insert itself into the child
+    which only makes sense if you can only set_spawn off the actor itself
+    because what would "parent" mean in the context of set_spawning off a public collector?
+so in this case, `foo` is inserting itself into each child
+
+actually, perhaps the parent can choose what to insert into the child
+they provide the scope/environment for the child
+and they have sole access to the child
+
+in the section "Choice to Exist", we talked about how children can read from their environment
+but the concept of "environment" is from scope, which is implemented
+so it makes sense that the parent has to pass
+
+
+could you leverage this to mimic nested set_spawns?
+for example, could you replicate the following javascript behavior?
+
+```js
+for (var i = 0; i < array1; i++) {
+    for (j = 0; j < array2; j++) {
+        console.log(i + ',' + j);
+    }
+}
+```
