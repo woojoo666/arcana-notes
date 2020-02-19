@@ -514,7 +514,9 @@ pure public:
 	if the module isn't actually pure public, then it's the module's fault for declaring as such
 this way, you can't have a malicious module
 
+### Templates and Property Access
 
+(continued from "Running a Template" and "Pure Complete and Pure Public")
 
 so three ways we can go about accessing properties of templates
 
@@ -522,12 +524,7 @@ so three ways we can go about accessing properties of templates
 2. evaluate if clone source is "pure complete"
 3. evaluate if clone source is "pure public" (but not necessarily complete),
 	do a manual copy, and defer evaluation of all nested properties
-(4) don't allow modification, which forces all modules to be pure
-
-
-
-
-
+4. don't allow modification, which forces all modules to be pure
 
 
 
@@ -545,7 +542,6 @@ same problem
 
 though what if we restricted modules to either returning a value, or doing an insertion
 	but can't do both
-
 
 
 
@@ -668,7 +664,7 @@ using a different pass to declare the collectors
 * after the project grows and patterns are noticed, and structures are standardized
 * then templates become more useful
 
-### Templates and Property Access
+### Templates and Property Access 2
 
 (continued from previous section)
 
@@ -1850,7 +1846,7 @@ if you wanted to only run the modifier for certain arguments, you would have to 
 	* otherwise, the combined property is `overdefined`
 * notice that this definition is symmetric, so you can invert the order, and call `argumentsObject(sourceObject)` and it would have the same result
 
-
+### Implementing Insertion using Cloning and the `.clones` property
 
 * notice that we can implement insertion using cloning
 * just define a simple `insert()` function and retrieve its calls/clones, `insert.clones`
@@ -2493,7 +2489,7 @@ hashmaps
 * but in Axis, the arguments object is "live", and can contain live behavior
 * all functional does is copy the function, and assign inputs
 
-### Formal Model for Axis Combiners
+### Formal Model for Combiners
 
 * you can't model Axis in functional, because insertion requires some sort of "global awareness"
 * you can think of it as
@@ -2542,7 +2538,7 @@ hashmaps
 
 ### Combiners, Insertion and Privacy
 
-* in the section "Formal Model for Axis Combiners", we use the model
+* in the section "Formal Model for Combiners", we use the model
 
 		combiner(caller, arguments, allObjects) => result
 

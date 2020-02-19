@@ -4259,7 +4259,7 @@ then, the language will know that it only needs to store the `data` object, and 
 * or maybe it creates a manual copy
 * because it can't override private properties anyways right?
 
-### templates ?? and manual copies?
+### Templates and Manual Copies?
 
 * you can use `template` keyword to declare that the following code should not be "run"
 * it is short for just wrapping the block in the `template` object, eg `template foo: ...` is the same as `foo: template(...)`

@@ -927,6 +927,8 @@ Imagine if Joe made a webapp, and set his password
 Somebody could easily expose the password, by cloning their own webapp that displays the password, and then merging it with Joe's webapp
 Though I guess theres a bigger issue: if people are allowed to set their own passwords, then they have to know the private key for the password field, and then everybody would be able to access everybody else's password
 
+### Caller-Responsible Merging By Sending in Props to Override
+
 Actually, the caller can check which shared private keys are actually defined in the callee
 And only send in the ones that are defined
 So that the callee gets the shared properties to override
@@ -1152,6 +1154,8 @@ In cloning, the caller provides a keylist, so whichever keys aren't in the keyli
 Could we do the same for merging and mixins? The caller provides it's keylist to all objects being merged, so they know which properties are getting overriden, and which properties are carried over?
 But then what if two objects try to carry over private properties with the same private key?
 
+### Replicating Full Private Merging using Routing
+
 I guess something key to understand is that there has to be a central entry point for each property, that for every read request, knows if the value should come from the arguments object or the callee
 Basically the one responsible for the merging and overriding (the callee-responsible vs caller-responsible ideas discussed earlier)
 Has to be aware of both values, so they can override the callee if necessary
@@ -1171,8 +1175,10 @@ Or maybe we should never carry over private properties, and the caller can only 
 
 But reads should ideally be private (mentioned this before, //TODO: FIND REFERENCED SECTION)
 So maybe, every time somebody makes a request, they actually retrieve a full copy of the object, and then privately try accessing the property on their own server
+this way, the caller wouldn't be able to replicate full private merging using routing, as mentioned in the prev section
 Or maybe it bundles the object into a single pure function, that when given a key, responds with the value, and has no side effects
 And anybody can retrieve this function and read from it privately on their own machine
+(actually pure functional prop accessors allow the caller to replicate merging, see later section "Property Muxers")
 
 
 Actually, I was wrong earlier
@@ -1491,6 +1497,7 @@ Implemented using a dynamic property:
        [key]: bar[key] | foo[key]
 
 I call this the **property muxer** (property multiplexor)
+(note: this idea was previously touched on in section "Replicating Full Private Merging using Routing")
 
 This can be achieved even if `foo` and `bar` have private properties or dynamic properties
 `foo` and `bar` can even have infinite properties
@@ -1669,7 +1676,7 @@ and that functions or objects can reference them
 another potential name: chatter
 kinda like smalltalk
 
-Using Core Functions instead of Javascript Transformations
+### Using Core Functions instead of Javascript Transformations
 
 instead of defining transformations in javascript
 do it in the language itself
@@ -1677,11 +1684,12 @@ and compile it to functions, that are used in the AST
 this was inspired by when I was browsing Nylo's source code and came across their std/base.ny (see commit d81d3eb368366c93eaae3973883c766d4b51829e)
 though for Nylo it's just a standard library of functions
 whereas I am using it for syntax transformations
-for example, in Nylo to do a conditional you literally call the if() function
-in my language, you would use the if (...) ... else ... syntax, but it gets transformed into a ifElse() function call
-I might not even expose the ifElse() function to the public, and just use it during interpretation
+for example, in Nylo to do a conditional you literally call the `if()` function
+in my language, you would use the `if (...) ... else ...` syntax, but it gets transformed into an `ifElse()` function call
+I might not even expose the `ifElse()` function to the public, and just use it during interpretation
+
 but then, how do we transform scope and references?
-use this
+use `this`
 what about private vars?
 use regular keys and then don't enumerate them? scramble them in the interpreter?
 
@@ -1722,18 +1730,19 @@ Circular
 We don't need anything special to reference parents during cloning
 If we did something like proxy(a, b)
 Then the parents are just passed in as args
-If we expose merge or combine as a global function
+If we expose `merge` or `combine` as a global function
 It would work the same
 Just do something like
 
-merge: mom, dad >>
-  [key] => mom[key] != undefined ? mom[key] else dad[key]
+    merge: mom, dad >>
+      [key] => mom[key] != undefined ? mom[key] else dad[key]
+
 Wait but then
-Aren't mom and dad also properties of merge?
+Aren't `mom` and `dad` also properties of `merge`?
 That you have to override to pass in args?
 It's confusing because now we have two ways of defining properties, through the dynamic accessor and through the static property definition
 
-We can only retrieve values from this  , so our input parents have to be put onto this before we can use them in the dynamic accessor
+We can only retrieve values from `this`, so our input parents have to be put onto `this` before we can use them in the dynamic accessor
 But the dynamic accessor is how we reference variables, so it has to be defined before we can access the input parents
 Circular
 
@@ -1762,10 +1771,10 @@ Is it still secure?
 
 The current idea is
 Whenever you clone an object
-The new object has its own this value
+The new object has its own `this` value
 And its own dynamic accessor
 And all nodes cloned from the parent object
-All will reference some this[key] 
+All will reference some `this[key]`
 And will check the dynamic accessor of the new object to get the appropriate value
 This way, if there is private behavior referencing a public property, the new object can simply override the public property (by providing a custom value for that property in it's dynamic accessor), and doesn't need to modify/access the private behavior
 
@@ -1781,7 +1790,7 @@ Merging is caller responsible, dynamic access is supposed but private shared pro
 Wait but callee responsible means the caller has to tell the callee all arguments, privacy concerns, see section // TODO: FIND REFERENCED SECTION
 
 Does it make sense to use dynamic accessors to create a new object?
-Every cloned referenced has to reference this[key] to get the clone's value for each parameter
+Every cloned referenced has to reference `this[key]` to get the clone's value for each parameter
 But if you used a dynamic accessor and did something like `[key] => 5` then all private properties would get overridden too
 Though I guess it would work fine with the default property muxer
 Since private properties of the parents won't ever collide
@@ -1789,11 +1798,11 @@ Since private properties of the parents won't ever collide
 Imagine a rogue computer, that tries to merge an object Bob and Joe
 It knows Bob and Joe share some private properties
 So it uses default property muxer to combine Bob and Joe, giving Joe's properties precedence
-And all nodes cloned from Bob, during rebinding, it will check this[key] to get the new value, calling the rogue's property accessor
+And all nodes cloned from Bob, during rebinding, it will check `this[key]` to get the new value, calling the rogue's property accessor
 And for the shared private properties, the property muxer will retrieve the value from Joe
 And so the rogue computer is able to modify the private behavior, without having access to the key
 
-Note: I will be using rebinding as the term for when the nodes of the new object are resolving their references, looking for if a value has been overridden or not
+Note: I will be using **rebinding** as the term for when the nodes of the new object are resolving their references, looking for if a value has been overridden or not
 
 Maybe we should only allow dynamic properties for "external access"
 That is, access from the outside of the object
@@ -1802,6 +1811,7 @@ But requests coming from the object itself, eg from its own cloned behavior
 Don't use the dynamic accessor
 This prevents the security concerns mentioned above
 
+### Asking for Overrides vs Sending Them In
 
 Or maybe the caller has to explicitly provide a list of variables to rebind
 Just like they have to explicitly provide which nodes to remove
@@ -1823,11 +1833,11 @@ Allowing the caller to provide an arguments object with private properties that 
 
 So the question is
 During rebinding
-Does the callee ask for which properties are being overridden
-Or does the caller send over which properties are being overridden
+Does the callee _ask_ for which properties are being overridden
+Or does the caller _send over_ which properties are being overridden
 
 Overriding is just one way of resolving merge conflicts
-Recall that another method is to simply use overdefined for conflicts
+Recall that another method is to simply use `overdefined` for conflicts
 So perhaps it should be up to the person doing the rebinding, how the parents should be merged
 So maybe it makes the most sense for the callee to ask for which properties are being overridden?
 
@@ -1885,11 +1895,12 @@ Mixins have to be for two objects
 Or maybe could do it with a list,keep going till undefined?
 Has to be hardcoded in interpreter
 
+### Mix - a Core Operator
 
 So cloning is not actually a core operation
 The three core operations are
-Read, write, and mix
-Mix: takes two objects, merges properties and uses overdefined on property collisions
+Read, write, and **mix**
+Mix: takes two objects, merges properties and uses `overdefined` on property collisions
 
 Wait but does mix combine all private properties?
 No, because that would be a security concern
@@ -1906,7 +1917,7 @@ Is a vague concept
 Just like scope, it is implemented using language constructs
 perhaps every object needs a keyset that defines what they can "see"?
 
-Sets as a Primitive
+### Sets as a Primitive
 
 maybe Sets are a primitive type
 so we can use sets for property lists and such, and perform set operations
@@ -1918,7 +1929,7 @@ The turing machine tape is a "primitive" and a rather complex one at that
 
 Sets are unordered
 so how a set is traversed is up to the interpreter, but the language spec doesn't need to know about it
-Already used by insertionsviewDiscussionLinkEx
+Already used by insertions
 
 So perhaps mixins require two things: a set of keys and a set of objects
 And the mixing will combine all the values for the keys in the keyset, across all objects
@@ -1934,50 +1945,51 @@ At least if cloning is callee responsible
 well, unless the caller keeps the private properties on the "caller side"? (recall the dicussions about distributed objects and "cloning over a network")
 
 Actually recall that it isn't enough for the caller to check which keys exist on the callee
-// TODO: FIND REFERENCED SECTION
+to figure out what overrides to send in
+    as mentioned in section "Asking for Overrides vs Sending Them In"
 Since the callee could have behavior referencing properties that aren't defined yet
-(eg sum: ( a b >> result: a+b), notice how a and b are like function args, not defined yet but the caller is meant to pass them in)
+(eg `sum: ( a b >> result: a+b)`, notice how `a` and `b` are like function args, not defined yet but the caller is meant to pass them in)
 this is how function parameters often work
 
-So maybe there is no choice but for the callee to ask the caller for values, instead of the caller sending them in
-    // TODO: FIND REFERENCED SECTION
+So maybe there is no choice but for the callee to _ask_ the caller for values, instead of the caller _sending_ them in
+    see section "Asking for Overrides vs Sending Them In"
 Along with all the security problems
 
-Reference / Parameter Declaration
+### Reference / Parameter Declaration
 
 What if we declared all references / parameters
-so in the earlier example sum: (a b >> result: a+b), a and b would be undefined, but would have a special undefined value, undefined parameter or something
-thus, the caller could check and see that it needs to pass in values for a and b, even if they are private
-Note that these declarations can still be private, since we aren't enumerating the private keys, just setting the value to something other than undefined
+so in the earlier example `sum: (a b >> result: a+b)`, `a` and `b` would be undefined, but would have a special undefined value, undefined parameter or something
+thus, the caller could check and see that it needs to pass in values for `a` and `b`, even if they are private
+Note that these declarations can still be private, since we aren't enumerating the private keys, just setting the value to something other than `undefined`
 still seems a bit ugly that we are having this arbitrary special value though...
 
 what if it's a dynamic reference?
-eg foo: (key >> result: this[key])
+eg `foo: (key >> result: this[key])`
 now we don't know which property to declare as a parameter
 
 Unless reference declaration was dynamic...?
-so if we had this[a+b], we figure out what a+b is and declare that as a parameter
-if a or b changes, then we re-calculate and declare the new parameter
-so what about in the earlier example, with the dynamic key this[key], where key itself is a parameter
-well first key will be declared as a parameter, and then when the caller provides key, then this[key] will get calculated and then declared as a parameter, and then the caller can provide this[key]
+so if we had `this[a+b]`, we figure out what `a+b` is and declare that as a parameter
+if `a` or `b` changes, then we re-calculate and declare the new parameter
+so what about in the earlier example, with the dynamic key `this[key]`, where `key` itself is a parameter
+well first `key` will be declared as a parameter, and then when the caller provides `key`, then `this[key]` will get calculated and then declared as a parameter, and then the caller can provide `this[key]`
 convergence
 
 I guess this convergence could get arbitrarily long, if we have a chain of dynamic references depending on other dynamic references
-eg a: this[b], b: this[c], c: this[d], ...
+eg `a: this[b], b: this[c], c: this[d], ...`
 what if there was feedback?
 
 
-Preventing Dynamic Access and Proxies using Encryption
+### Preventing Dynamic Access and Proxies using Encryption
 
 We previously talked about a rogue computer using routing to proxy private variables that it doesn't know about
-// TODO: FIND REFERENCED SECTION
+    see section "Replicating Full Private Merging using Routing" and "Property Muxers"
 But we can prevent this
 Recall our discussions on anonymous reads
 And capturing an object into a single function that is passed to the reader
-// TODO: FIND REFERENCED SECTION
+    see section "Private Keys and Anonymous Reads"
 
 Well previously I thought that the rogue computer could simply retrieve the property access functions of it's victims (the objects it is proxying), wrap it in a property muxer, and then pass that to the reader
-But if we instead forced every object to provide a property access object, a static piece of data that is simply encrypted
+But if we instead forced every object to provide a property access object, a _static_ piece of data that is simply encrypted
 Then we can prevent proxying
 For example, let's assume that we have a giant encrypted piece of data
 And if you decrypt it using different keys, you will get the values for those keys
@@ -1995,6 +2007,7 @@ We need a clear and consistent spec of how we want privacy to work in our langua
 Note that even if we prevented proxies, we still can't guarantee that a property on an object is actually accessible by that object
 The object could have inherited it
 
+### "Frankensteins" and Mixed Private Spaces
 
 in functional languages, many languages support type systems and private/public, and you can either
    * extend the type (giving you access to all private properties)
@@ -2019,7 +2032,7 @@ Member variables:
 Conceptually, it seems trivial to have the caller override callee properties without exposing private properties from the caller
 
 
-"Mixed private spaces", aka mixin where the parents each contribute private properties that the others are not aware of
+**Mixed private spaces**, aka mixin where the parents each contribute private properties that the others are not aware of
 Breaks single responsibility?
 But then what's the difference between mixed private spaces, and just a network of objects (each containing private info)?
 
@@ -2038,14 +2051,28 @@ It's supposed to just be a function that is packaged for readers
 if sets are a primitive
 and lists are sets
 and we allow dynamic properties
-what if we have x: ([key]: 5) ? isn't x now an infinite list? so if we did setFrom(x) we would have an infinite set?
+what if we have `x: ([key]: 5)` ? isn't `x` now an infinite list? so if we did `setFrom(x)` we would have an infinite set?
 can our mixin operator (which takes in a set of keys and set of objects) handle infinite sets?
 
 recall how booleans are implemented in pure functional
 how would we implement booleans using our mixin operator?
 
-not hard:
-TODO: SHOW PROOF
+not hard
+basically works the same way as in pure functional
+`True` and `False` are both functions that take two arguments, and have a `_return` value
+`True` takes the first argument, and sets it as the `_return` value
+`False` sets the second argument as the `_return` value
+
+    True: branch1, branch2 >>
+        => branch1
+    False: branhh1, branch2 >>
+        => branch2
+
+and the syntax `if (cond) XXX else YYY`
+becomes
+
+    mix{cond, (branch1: XXX, branch2: YYY)}
+
 
 i think this mixin / dynamic property stuff is too complicated
 let's just think in terms of actors
@@ -2068,9 +2095,9 @@ perhaps the callee puts the result of the clone operation, in a designated prope
 it can just use the id of the arguments object, as the key
 so it would look like
 
-callee: ...args >>
-   _clone: // create the clone here
-   [args]: _clone
+    callee: ...args >>
+        _clone: // create the clone here
+        [args]: _clone
 
 and then the caller can retrieve it because it has the id of the arguments object as well
 I think I may have discussed this earlier as well (?)
@@ -2139,7 +2166,7 @@ What about a logic language?
 Spawns an infinite number of logic queries
 
 note that the wikipedia for Actor Model
-mentions that an actor should be able to respond to a message by spawning a finite number of actors
+mentions that an actor should be able to respond to a message by spawning ["a finite number of new actors"](https://en.wikipedia.org/wiki/Actor_model#Fundamental_concepts)
 does not mention cloning, but does mention spawning
 
 the wiki made me more confident that insertion isn't enough
@@ -2149,7 +2176,8 @@ only one parent actor for every spawned child actor
 so what is the mechanism for spawning new actors?
 
 
-what if actors had an "initializer" property
+what if actors had an `initializer` property
+    kinda like a constructor in typed langs
 that was a collector
 and is only visible to the person spawning the actor
 they insert arguments into it, and the child's behavior reads from those arguments
@@ -2190,7 +2218,7 @@ Grouping behaviors is very intuitive
 When we think of an actor, we think of what behavior it contains
 And when we break down behavior into smaller parts, its intuitive to make each part an actor
 
-// TODO: Example with spawn3
+// TODO: Example with spawn3, an actor that spawns 3 children
 
 One advantage of the spawn model, is that it's easy to prevent cloning
 But it was pretty easy to do so already in the cloning model
@@ -2227,7 +2255,7 @@ With insertion, you arent
 
 How do we make sure "spawnFactory" can see the insertions, but outsiders can't?
 maybe a shared private property?
-or maybe the collector inserts into "spawnFactory"? (eg every time "spawnA" gets an insertion, it inserts the data into "spawnFactory" with the tag spawnA
+or maybe the collector inserts into "spawnFactory"? (eg every time "spawnA" gets an insertion, it inserts the data into "spawnFactory" with the tag `#spawnA`
 
 
 ### Choice to Spawn
@@ -2256,7 +2284,12 @@ based on environmental conditions
 
 reads from the environment and decides whether to spawn or not
 
-// TODO: Explain more??
+so in something like
+
+    if (x > 3):
+        some behavior
+
+`some behavior` is a child actor, that is listening to whether or not `x > 3` to determine whether to spawn itself or not
 
 Not exactly free choice
 As the person defining the child, ultimately gets to choose when the child exists or not
@@ -2267,12 +2300,14 @@ Solves 3 problems
 * Group behaviors for recursion
 * Callee responsible, can choose not to clone/spawn
 
-Spawning from Sets
+### Spawning from Sets
 
 Wait but
-If we want to spawn the actor in a for loop
+If we want to spawn the actor in a for-loop
 
-// Code example
+    parent:
+        for x in list:
+            some behavior
 
 This feels like the parent is spawning the children
 Not the children spawning themselves
@@ -2284,6 +2319,7 @@ But sets are a primitive too
 So we can define a set of objects that read from a set of values
 
 kinda reminds me of the "fan-out" operation I had in the diagram syntax
+    see section "Defaults for Select, Map, and Reduce"
 
 In a sense, this turns everything into a template
 Before, in the cloning model,
@@ -2304,7 +2340,9 @@ how would we implement booleans using spawning?
 
 In order to spawn
 We have to bind an "existence" listener to some variable
-Sets and Loops instead of Recursion
+
+### Sets and Loops instead of Recursion
+
 Parent still has to create the existence listeners
 So I guess you can think of it as the parent spawning the children
 
@@ -2355,7 +2393,7 @@ But are objects ordered?
 Even arrays (objects where all the keys are integers) are only ordered because we traverse them in an ordered manner
 But the concept of key value pairs isn't inherently ordered
 
-Spawning vs Cloning: What does it Solve?
+### Spawning vs Cloning: What does it Solve?
 
 One more thing that bothers me is
 A lot of the supposed advantages of spawning over cloning, have quite elegant solutions in cloning
@@ -2365,10 +2403,10 @@ Which can be dangerous if you have private behavior that depends on that propert
 But there's a simple solution: move the value to a private property, and have the public property just point to it
 (But the private behavior reads from the private property not the public one)
 
-foo:
-_val: 10
-val: _val
-someCollector <: _foo*_foo
+    foo:
+        _val: 10
+        val: _val
+        someCollector <: _foo*_foo
 
 That way, overriding the public property doesn't affect the behavior
 And it makes a lot of sense too: keep all the behavior private, and expose values to the public using pointers
@@ -2383,8 +2421,8 @@ however, we already achieved this using closures
 (see section "Private Arguments and Closures". The example is repeated below)
 
     fooFactory: mypassword >>
-       => input >>
-          => input==mypassword? "success" : "wrong password"
+        => input >>
+            => input==mypassword? "success" : "wrong password"
 
 It's clean and simply workarounds like this that made cloning seem like the right choice for so long
 
@@ -2432,22 +2470,22 @@ but then that prevents custom insertion behavior
 for example, what if we wanted a collector that was public, but kept insertions in a shared private key for local access only
 example:
 
-foo:
-    _someKey: ()
-    someCollector: collector
-        [_someKey]: _insertions
-bar:
-    foo.someCollector <: 10
+    foo:
+        _someKey: ()
+        someCollector: collector
+            [_someKey]: _insertions
+    bar:
+        foo.someCollector <: 10
 
 (notice that we use `_insertions` to reference any insertions in the current object. It's a special keyword, similar to this)
 we could have used object methods/modifiers instead
 
-foo:
-    _someCollector: collector
-    insertNum: num >>
-        _someCollector <: num
-bar:
-    foo.insertNum(10)
+    foo:
+        _someCollector: collector
+        insertNum: num >>
+            _someCollector <: num
+    bar:
+        foo.insertNum(10)
 
 this could be a bit cleaner
 
@@ -2455,9 +2493,11 @@ feels a bit restrictive though
 i think it would be nice to be able to insert into any object
 and any object can retrieve its insertions using `_insertions`
 
-Consolidate actors and sets
+### Consolidating Actors and Sets
+
+there's a few advantages to combining actors and sets into the same type
 Means you can use them interchangeably
-Dynamic typing
+esp important with dynamic typing
 Don't have to worry about which type it is
 Dont have to worry about using insertion for some objects, and modifiers/mutations for others
 
@@ -2466,17 +2506,17 @@ In fact it could be dangerous to have insertions fail on objects, because it doe
 Actually when we implemented cloning using insertion
 We needed custom insertion
 Arguments objects are inserted
-Only Visible to the callee
+Only visible to the callee
 
 Almost the opposite of when we were trying to implement insert() using cloning
-// TODO: FIND REFERENCED SECTION
+    see section "Implementing Insertion using Cloning and the `.clones` property"
 
 Sets are the behavior of an object
 Finite
 Property accessor is how that behavior is mapped to the address space
 
 However, sets and objects are used in completely different ways
-You can use the map operator on sets, but not objects
+You can use the `map` operator on sets, but not objects
 You can use property access on objects, not sets
 So i guess if you combine objects and sets, it would be like two completely different entities in one variable
 
@@ -2486,29 +2526,32 @@ However, right now an object's insertions start out private, only accessible via
 How do we make an object's private insertions available to the public?
 maybe Something like
 
-mycollector:
-   insertions: _insertions
+    mycollector:
+        insertions: _insertions
 
 but then you would have to map across `mycollector.insertions`
-How would we make it so you can map across mycollector directly?
+How would we make it so you can map across `mycollector` directly?
 
 
-A note about keysets and valuesets
+### a note about keysets and valuesets
+
 They have to be declared
 Not generated
 Since declaring them declared what keys are public
-Implementing Scope using Spawning
+
+### Implementing Scope using Spawning
 
 
 
-Implementing Scope using Cloning - Circular
+### Implementing Scope using Cloning - Circular
+
 i was re-visiting about how we implemented scope using cloning
 and I found a contradiction
 
 1. scope is implemented using cloning (an external template is cloned with the scope passed in as an arg)
   1. // TODO: FIND REFERENCED SECTION
 2. scope has to be passed in as a private argument
-3. all references are transformed to property access on this
+3. all references are transformed to property access on `this`
   1. // TODO: FIND REFERENCED SECTION
 4. private arguments are implemented using closures, and scope
   1. see section "Private Arguments and Closures"
@@ -2521,26 +2564,30 @@ because the spawning model doesn't require closures to pass in private data
 either that or we can just make private arguments a core functionality
 
 ### Nicknames
+
 One benefit of typed languages is function polymorphism
 
 in javascript, you can use Sets() to easily filter dups from an array
-return new Set(my_array)
-however, if you have a custom comparison function between array items to check for equality, it gets a lot more complicated
-let filtered = [];
-for (const item of my_array) {
-    if (!filtered.some(el => el.id === item.id)) {
-        filtered.push(item);
-    }
-}
 
-note that we can't even use Array.includes(), we have to use Array.some(), because we have a custom comparator function
+    return new Set(my_array)
+
+however, if you have a custom comparison function between array items to check for equality, it gets a lot more complicated
+
+    let filtered = [];
+    for (const item of my_array) {
+        if (!filtered.some(el => el.id === item.id)) {
+            filtered.push(item);
+        }
+    }
+
+note that we can't even use `Array.includes()`, we have to use `Array.some()`, because we have a custom comparator function
 which leads to some very unintuitive code
-in a typed language with polymorphism, we could re-use includes() with a Comparator as the argument, and it could automatically switch to using the comparator version of the includes() function
+in a typed language with polymorphism, we could re-use `includes()` with a `Comparator` as the argument, and it could automatically switch to using the comparator version of the `includes()` function
 in essence, typed languages are slightly more expressive because they can use the same function name to capture multiple different behaviors
 instead of being forced to re-name the function every time you want to handle a different type of argument
 
 in Firefly, perhaps we can allow nicknames, which are more like workspace settings
-adds a * to the end of the name to show that it's just a nickname, eg filtered.includes*(el => el.id === item.id)
+adds a `*` to the end of the name to show that it's just a nickname, eg `filtered.includes*(el => el.id === item.id)`
 basically just a way of customizing how a program looks, to make it more readable
 similar to the original ideas behind metaprogramming
 // TODO: FIND REFERENCED SECTION
@@ -2549,10 +2596,12 @@ similar to the original ideas behind metaprogramming
 ### Loaders (TODO check for duplicate name)
 
 if we simply ignore all loading, and have something like
-someCollector
-webpage:
-    for image in someCollector:
-        <img src={image}/>
+
+    someCollector
+    webpage:
+        for image in someCollector:
+            <img src={image}/>
+
 then imagine if someCollector contained 1 mil images
 you want lazy loading + loading indicator
 without cluttering the code
@@ -2563,17 +2612,24 @@ without cluttering the code
 
 
 Dynamic Access
-Who does the property access
-Mix example
-Key transform (take your key and +1)
-Value transform
+    Who does the property access
+    how powerful can it be?
+    Property muxers
+        see section "Property Muxers"
+    Key transform: transform the key before re-routing
+        eg, a proxy/wrapper around some `nested_object`, and when you access `wrapper[key]`, it accesses `nested_object[key+1]`
+    Value transform: route to another object, then transform the returned value
+        eg, a proxy/wrapper around some `nested_object`, and when you access `wrapper[key]`, it returns `nested_object[key]+1`
 
 Secure computation
-You can run code without knowing what it does
-Almost like cloning, since the callee gives you the code to run
+    You can run code without knowing what it does
+    Almost like cloning, since the callee gives you the code to run
 
 
-Firewalls
+### Firewalls and Shallow Copies
+
+(previously discussed in "Firewalls and Minimal Scope")
+
 Like dynamic property access
 You get the program, and you can use it however you like, anonymously
 Without worrying about it sending messages out
@@ -2590,12 +2646,11 @@ You have to create it yourself
 You have to be given the source code
 So maybe the callee has to flag a program as "copy-supported", which tells the caller to create the clone themselves, and shares the code for it
 
-Standard functions like forEach or Map
+Standard functions like `forEach` or `map`
 Surely those can be run by the caller themselves
 
 
-
-Sort of like javascript eval()
+Sort of like javascript `eval()`
 You can read the template/object, and then run it within your scope, using your environment
 If you're given a network of nodes, you can put them in an address space so that each node can reference and insert and read from other nodes in the network, or nodes that you provide in the scope (eg standard functions like forEach or Map), but if they try to read/insert from an outside node, it fails
 
@@ -2616,27 +2671,30 @@ so then when to do callee-responsible spawning, vs caller-responsible copying?
 
 
 
-Inheritance
+### inheritance and source code ???
+
+(this section is sorta weird, check out the note at the end)
+
 How do we extend objects with more behavior
 Has to be public?
 
-SomeService: name >>
-    _computeVal: some complex computation
-        => result
-    [someKey]: "protected method"
-    getVal: a,b >>
-        result: _computeVal(a,b)->
-        console.log(name + "finished")
-        => result
+    SomeService: name >>
+        _computeVal: some complex computation
+            => result
+        [someKey]: "protected method"
+        getVal: a,b >>
+            result: _computeVal(a,b)->
+            console.log(name + "finished")
+            => result
 
-MyService: SomeService
-    name: "myservice"
-    _computeSecondVal: some complex computation
-        => result
-    getLargestVal: a,b
-        result1: this.getVal(a,b)
-        result2: _computeSecondVal(a,b)
-        => Math.max(result1, result2)
+    MyService: SomeService
+        name: "myservice"
+        _computeSecondVal: some complex computation
+            => result
+        getLargestVal: a,b
+            result1: this.getVal(a,b)
+            result2: _computeSecondVal(a,b)
+            => Math.max(result1, result2)
 
 seems to go back to our previous discussion about public code and behavior
 if you make a property public
@@ -2648,10 +2706,16 @@ since you can only create properties that you are aware of
 And recall that by passing in a keyset, you are declaring what keys you are aware of, so the callee can safely override them, without worrying about proxies or dynamic property accessors causing security issues (discussed earlier)
 (In reality what you are doing is creating new behavior on your end, and then telling the callee to delete its behavior and rebind to your behavior)
 
+note 2/18/20:
+* honestly I'm not sure exactly what I was talking about in this section lol
+* a lot of this seems incorrect and inconsistent with some of my previous conclusions
+* you don't need the source code of an object in order to extend it
+* cloning an object is the same as extending it
+* and you can clone objects with private behavior
 
 
+### Sandboxing and Publishing
 
-Sandboxing and Publishing
 A better name instead of firewalling
 Instead of the callee flagging itself as "copy-supported", the caller can copy any object they want
 And it copies whatever behavior it can see
@@ -2662,14 +2726,14 @@ You use the keyword sandbox do to a copy
 Callee still has to flag it
 To obfuscate the behavior before making it public
 
-Does three things:
-Obfuscates all private behavior within the scope
-Declares all keys for all behavior
-Sets a flag indicating that it is "published", and anybody who wants to use it has to copy it and execute it themselves
+flagging as "copy-supported" does three things:
+  1. Obfuscates all private behavior within the scope
+  2. Declares all keys for all behavior
+  3. Sets a flag indicating that it is "published", and anybody who wants to use it has to copy it and execute it themselves
 
 
 now when somebody copies it, they can be sure that it's not making any outside calls
-Because due to how scoping works, any external references are accessed via this 
+Because due to how scoping works, any external references are accessed via `this`
     // TODO: FIND REFERENCED SECTION
 And since the caller created the object themselves, they provide every variable in the object's scope
 And even nested objects must get it from the outer scope, so ultimately the caller is aware of all bindings and references,
@@ -2683,13 +2747,14 @@ But they can guarantee that it is sandboxed
 
 
 Notice that obfuscation is important for something like
-Foo:
-    _bar: "hi"
-    _private:
-        a: 10
-        b: 20
 
-Technically bar is already obfuscated, because the key is private and generated and will probably look like some random string of digits like 8103573927492
+    Foo:
+        _bar: "hi"
+        _private:
+            a: 10
+            b: 20
+
+Technically `bar` is already obfuscated, because the key is private and generated and will probably look like some random string of digits like 8103573927492
 The same with `_private`
 But the stuff inside `_private` uses normal public keys, and while they are not normally accessible, a published package would have to expose all nested objects so that the caller can copy them, and so we would have to obfuscate
 
@@ -2714,7 +2779,7 @@ But you can't have both private properties of parent and subclass
 
 This is because ultimately, there has to be a single actor that determines the property mapping of the result
 Can't have two independent actors, or it may lead to conflicts (they both try to put values on the same key, without being aware of eachother)
-Why not have some protocol to resolve conflicts? Eg using overdefined?
+Why not have some protocol to resolve conflicts? Eg using `overdefined`?
 Because such a protocol is basically an actor itself. It needs to be aware of all private properties on each side, in order to resolve the conflicts
 So it all ultimately has to be decided by a single actor
 
@@ -2728,7 +2793,7 @@ It's control and responsibility
 Guarding against attacks like the "friendly fire attack"
 A new name I came up for when the caller uses a reference to an external arguments object
 
-### Set_spawn Restricted to Self Insertions
+### Set_spawn Restricted to Personal Insertions
 
 instead of the following:
 
@@ -2741,6 +2806,8 @@ foo:
 ```
 
 can we design it so each actor can only set_spawn once, off of the actor's internal insertions?
+aka, an object can't set_spawn off somebody else's set
+this basically means public sets don't exist
 
 maybe instead of using public collections, we can make the collection
 accept "listeners", and then it inserts into each listener every item
@@ -2813,3 +2880,849 @@ for (var i = 0; i < array1; i++) {
     }
 }
 ```
+
+after experimenting around for a bit more
+I think it makes sense to allow public sets
+You should be able to read from a set anonymously
+trying to mimic nested set_spawn using only self
+Shouldn't have to do any weird insertion business just to map across a set
+Maybe you can just put `_insertions` onto a public property
+And that exposes it to the public
+And you are accessing it like any other value
+However that makes it so sets and actors are distinct
+And we already talked about the disadvantages of that
+// TODO: FIND REFERENCED SECTION
+Spread operator allows actors to be read/mapped-across like sets
+Also, set_spawn can act across public sets
+The parent still inserts the environment into children spawned from set_spawn
+publish insertions
+It's like declaring properties
+
+### Black Boxes
+
+- Sometimes you need ordered execution to define a type of operation
+- for example, to define addition across a set of items
+- you first define addition across two items, and then use recursion to chain it across a set of items
+- and then you can wrap it in a `setSum` function
+- however, you then would want to treat the function as a "black box"
+- abstract it
+- where the internal implementation can change, all you care about is the behavior
+
+### Ordering Sets
+
+- in fact, in order to sum across a set in the first place, you have to introduce some sort of order
+- so we would need some sort of operation to arbitrarily order the set
+- maybe just use `[...mySet]`
+- however, whoever uses this new ordered list, has to be aware that the order can change anytime
+
+### Implicit Templates
+
+Definitions are only spawned into objects if they are standalone `(some def)` objects
+Otherwise they are templates, implied templates
+For example, in `...(some def)` and `foo(some def)`, `(some def)` is a template
+Only in `x: (some def)` and `foo(10, (some def))` are `(some def)` actual spawned objects
+in something like `foo(some def)`, the template `some def` is passed to the callee, who spawns the child object using the overrides specified in `some def`
+however, to do so, the callee has to be able to read the template
+in the section "Templates and Property Access" and "Templates and Property Access 2", we talked about how all property values should be undefined (since the template has not run yet)
+however, recall how if a property is public, you should be able to see the corresponding partition's source code (first mentioned in section "Cloning and Source Code")
+otherwise the template would be unusable
+
+### Copy Operator `...`
+
+Spread operator `...` is copy operator
+Works on templates
+
+### Logging Example
+
+In some other project, I was working on setting up some logging, and the structure of it looked kinda similar to this:
+
+    LOG_LEVEL_MAP = { error: 5, warn: 4, ... };
+    createConsoleLogger(level) {
+    	if (global.isDevEnvironment && LOG_LEVEL_MAP[level] < LOG_LEVEL_MAP[global.level]) {
+    		return null;
+      }
+      return new consoleLogger()
+    }
+    createFileLogger(options) {
+    	...
+    }
+    export {
+    	loggersForAlice: [
+    		createConsoleLogger('info'),
+    		createFileLogger({
+    			prefix: 'alice_',
+    		}),
+    	].filter(Boolean),
+    	loggersForBob: [
+    		createConsoleLogger('warn'),
+    		createFileLogger({
+    			prefix: 'bob_',
+    		}},
+    	].filter(Boolean),
+    }
+
+I decided to refactor it to something like this:
+
+    LOG_LEVEL_MAP = { error: 5, warn: 4, ... };
+    consoleEnabledForLevel(level) {
+    	if (global.isDevEnvironment) {
+    		return false;
+    	}
+    	return LOG_LEVEL_MAP[level] < LOG_LEVEL_MAP[global.level];
+    }
+    createConsoleLogger() {
+      return new consoleLogger()
+    }
+    createFileLogger(options) {
+    	...
+    }
+    export {
+    	loggersForAlice: [
+    		consoleEnabledForLevel('info') && createConsoleLogger(),
+    		createFileLogger({
+    			prefix: 'alice_',
+    		}),
+    	].filter(Boolean),
+    	loggersForBob: [
+    		consoleEnabledForLevel('info') && createConsoleLogger(),
+    		createFileLogger({
+    			prefix: 'bob_',
+    		}},
+    	].filter(Boolean),
+    }
+
+feels a bit cleaner
+but notice that I basically moved from the child determining whether or not to spawn itself
+(in `createConsoleLogger()`)
+and moved some logic so that the parent determines whether or not to spawn the child
+Often the child does not know the conditions that are necessary for each child to exist
+and instead of passing it into the child, we just keep the logic in the parent and leave the child unaware
+so what does this mean for our language? should firefly continue using the choice-to-exist model?
+previously we talked about how parents being responsible for defining+spawning children, seemed too complicated
+bloating the parent definition
+because if the child spawns grandchildren, then technically the parent would have to define the children, and define how the children spawn grandchildren
+however, I was only considering the possibility that each descendant is defined statically
+but if we had a descendant that was defined dynamically, perhaps through computed properties and insertions
+(almost like somebody else is live-coding the grandchild using insertions)
+then the parent only needs to provide the framework for converting those insertions to properties
+doesn't need to know what the grandchild ends up looking like
+so it doesn't really bloat the parent definition
+
+### Private Shared Clone() Function
+
+maybe the `.clone()` function can be actually be a private property
+accessible by a private key that the "machine" has (aka the machine or server that has all the resources, that is executing all the actors)
+outsiders can't clone the actor
+but any actors created on the same machine, can clone it all they want
+
+### Moving and Re-mapping Properties 2
+
+- could an actor turn a public clone() function into a private one themselves?
+- clone an existing object with a public `.clone()` method
+- into an object with a private but shareable `clone()` method?
+- in order to "move" the behavior to a new property
+- you would have to do "reference moving", discussed in section "Moving and Re-mapping Properties"
+- however, recall that now that cloning and overriding is a behavior that the callee exposes (not a default behavior)
+- the callee receives the clone request (with what properties the caller wants to override), and decides how to spawn the new child
+- so if the callee wants to expose a way to specify reference moving, it can
+
+anatomy of a module
+outgoing: insertion
+incoming: reads, insertions
+internal: spawn, setspawn
+
+### Cloning and Source Code 2?
+
+now that cloning is a behavior exposed by the callee
+the callee doesn't need to expose the source code anymore right?
+templates represent source code
+we don't need to expose source code and value on a public property
+callee has a private property that stores the source code
+uses that to spawn children
+and passes it to children so the children can spawn grandchildren themselves
+templates have to be full public
+if they are meant to be copied, manual copied
+but then what if you want a template with private behavior
+aka, define a method on an object that is meant to be cloned, but is dormant in the beginning
+has no initial object
+
+### Ordering Sets 2: an alternative to set spawn?
+
+what if instead of set spawning
+we had a core `order_set` function that converts a set into an array of form `(0: ..., 1: ..., 2: ..., etc)`
+and then we used that to spawn across a set
+the numerical indices could possibly generated without recursion
+something similar to church numerals?
+a simple successor function like
+
+    successor: num >>
+    	=> (prev: num)
+    zero: ()
+    one: successor(zero)->
+
+wait but we can't use cloning...
+ultimately we need some sort of repeating behavior
+so we need set_spawn
+what if we used dynamic properties?
+
+    startingKey: ()
+    foo:
+    	[key] => (prev: this[key.prev])
+    	[startingKey]: ()
+
+will generate something like
+
+    foo:
+    	_startingVal: ()
+    	[startingKey]: _startingVal
+    	_val1: (prev: _startingVal)
+    	_key1: (prev: startingKey)
+    	[_key1]: _val1
+    	_val2: (prev: _val1)
+    	_key2: (prev: _key1)
+    	[_key2]: _val2
+    	etc...
+
+a few problems with this
+i don't know if this works
+there are infinite items
+i don't know if it is it traversable
+and recall that i suspect that dynamic property access is not anonymous
+you can operate on an actor in 4 ways
+insert into it, `insert{target,item}`
+set_spawn, map across it, `map{target}: item >>`
+read from it, `prop-access{target,key}`
+convert it to an ordered set, `make_ordered{target}`
+could we use `map` to implement property access?
+so instead of doing something like `someExpr(foo.bar)`
+we would package key-val pairs into set items and then do
+
+    map{foo}: item >>
+    	if (item.key = "bar")
+    		someExpr(item.val)
+
+however notice that we are using property access anyways, circular
+also, how would you control public/private access?
+we want some properties to be accessible to some outsiders
+but with this, all outsiders have the same access
+we also might want the operation `any` or `pick_one{target}`, which picks a single random item from the set
+we could implement this using `make_ordered`, just do `make_ordered{target}[0]`
+but could we do the opposite? implement `make_ordered` using `pick_one`?
+this seems preferable because if we only want to pick one item, `make_ordered` introduces unnecessary order for the rest of them
+maybe we can do
+
+    make_ordered: someSet >>
+    	val: pick_one{target}
+    	remaining: collection
+    	map{target}: item >>
+    		if (item != chosen) remaining <: item
+    	next: make_ordered(remaining)
+    
+    x: make_ordered((1,2,3,4,5)) // recall that pick_one chooses randomly
+    x.val                        // returns 3
+    x.next.val                   // returns 1
+    x.next.next.val              // returns 4
+
+something like this
+
+### Reference Equality and Referential Transparency
+
+(note: reference equality was previously mentioned in "Making the Case for Reference Equality", but this is a different topic)
+
+is equality `=` also a core operator?
+in pure functional, `=` is implemented using functions, as well as `and`, `or`, and `true` and `false`
+there is no reference equality
+doing so would break referential transparency (see [https://stackoverflow.com/a/27773792/1852456](https://stackoverflow.com/a/27773792/1852456))
+eg if `f(x) = y`
+then we should be able to replace `y = y` with `f(x) = f(x)`
+however, if `f(x)` creates the function `y`, then each `f(x)` would create a different `y` with a different reference
+and `f(x) != f(x)`
+put another way, referential transparency means that a function call with the same arguments should produce the same value
+This is actually an incredibly useful property because it means we can make optimizations like caching
+Where, if a function is called with the same arguments
+The interpreter can use a cached value
+This is not possible if each call produced a different object
+I guess one way to think about it is, every call has a unique identifier, so that way every call would have different arguments, so results could never be cached
+so what about firefly?
+Note that in Java, equality internally uses the `equals()` method, so `foo == bar` is actually `foo.equals(bar)`
+However this mechanism feels a bit asymmetric and ugly
+Also, `foo` might happen to be a bad actor that always returns `true`
+
+### Identity Theft
+
+we actually talked about referential transparency before
+    see sections "Referential Transparency" and "Referential Transparency II - Referencing vs Nesting "
+in addition, we talked about how to handle equality
+using a unique hash, that actors can override if they want a custom equality function
+    mentioned in previous sections "Part 1.5 (returned from yellowstone)" and "unified primitives?", but these section names might change
+but this `hash` or `objectId` has to be visible to everybody who wants to check equality
+but if it's visible, then what's to stop somebody else from creating an object with the same `objectId`?
+identity theft
+perhaps we need a central authority?
+somebody that assigns everybody a unique address?
+(i guess this is similar to how there is a centralized protocol for everybody to be assigned a unique IP)
+this unique id would be hidden in a private variable that the central authority can access
+and whenever you use the equality `=` operator, it sends both objects to the central authority, who checks the ids of each and compares them
+note that just because the central authority needs access to the id, doesn't mean the central authority has to spawn every object
+the parent can ask for an id from the authority, and the authority will give both an id and a private key
+and the parent will spawn the child, storing the id using that private key
+maybe when you define an entire program, there is a local id assigner,
+and all vars local to that program can use local ids (kinda like local ips in a LAN subnet)
+but once you want to publish an object, and you need to give it an id from the central authority
+maybe ids work kinda like tags?
+they aren't stored in the object themselves, they are stored in an external hashmap
+but to retrieve it from the hashmap, you need the object's id
+circular
+also, it seems a bit intrusive to require all public objects to require a centralized id
+what if you want to exchange messages with a friend?
+do all those messages need to go through the CA (central authority)?
+also seems a bit intrusive to send both objects to the CA to check equality
+why can't the parent check the equality themselves?
+what if the central authority was just an id generator
+and it signed every id with it's private RSA key
+and then you could use the central authority's public RSA key to verify that the id is valid
+so the object never actually passes through the CA
+seems a bit reliant on public-private key encryption though...
+are we sure it's secure?
+Also, if the equality function is executed by the parent
+Then an bad actor can easily retrieve the ID of an object
+And then spawn children with that ID
+And since it's a copy, it also copies the CA's signature
+So either:
+
+1. Objects dont create their ID
+2. 
+
+We don't want a CA built into the language
+Such a mechanism should be built on top of the language
+So if somebody wanted to use something different, they can
+However, we want objects to be able to publish their IDs for others to see
+But prevent people from impersonating others by copying their ID
+This sort of goes against many of the ideas that iv had before
+That any piece of data can be copied and passed around anonymously
+Though copying isn't bad, as long as it's obvious who the "author" or "owner" of the id is, and who's the imposter
+
+### Double-Sided Equality
+
+Perhaps the way it works is similar to the Java `equals()` method
+Except it checks the result both ways
+Aka, `foo = bar` turns into `foo.equals(bar) && bar.equals(foo)`
+And then each object checks the id of the other against its own private internal id, and returns true if they are equal
+If a bad actor always returns true, the other actor still has to agree in order for the equality operator to return true
+And the internal id is hidden, in fact the entire behavior of the `equals()` method can be hidden, so the bad actor can't copy/replicate it
+This method also guarantees that equality is commutative
+But wait, if the internal id is hidden, then in `foo.equals(bar)`, how does `foo` compare its internal id to `bar`'s id if it can't even access `bar`'s id?
+likewise for `bar.equals(foo)`
+and if `bar` ever gives `foo` its id, then `foo` can copy it
+What if instead of storing the id like `(id: fs8ubd9zq2e)`, we instead store it like `([fs89bd0zq2e]: true)`
+that is, the secret id is stored as a key, not a value
+in `foo.equals(bar)`, `foo` simply takes its internal id, `fooId`, and checks `bar[fooId]` to see if it exists
+likewise for `bar.equals(foo)`
+this way neither side reveals their id to the other
+in addition, this takes advantage of anonymous reads, because if reads weren't anonymous, then each side would be revealing their IDs to the other
+So I guess that shows that equality can be implemented via core operations
+note that there still needs to be somebody that generates ids and prevents collisions
+but this can happen in a distributed fashion:
+the parent generates unique ids for children,
+and then children generates unique ids for grandchildren using its own id as a prefix or something,
+etc etc
+earlier we talked about implementing order_set using pick_one
+but what if set contains duplicates
+instead, pick_one should return the picked item and the "rest"
+what if we created a fn that was stable only when one item was removed
+something like
+    
+    for item in set:
+    	if (!
+
+What about other set operations, should they be core operations as well?
+Things like
+cardinality? or `size()`?
+is_empty? (This could be implemented using `size()`)
+Even something like `set.contains(item)`
+This is a little more complicated since sets can contain duplicates
+So maybe `contains` should return the number of occurrences?
+Or maybe we need another function for that, `occurrences`?
+Now there are 4 operations on sets
+`make_ordered`, `pick_one`, `occurrences`, and `size`
+Note that they can all be implemented via `make_ordered`
+But as mentioned previously, `make_ordered` introduces unnecessary order for most of them
+// TODO: FIND REFERENCED SECTION
+Or maybe we can fix that with post-optimizations
+Eg `make_ordered{set}[0]` can be optimized to only retrieve the first item and ignore ordering the rest
+But if we ever make the ordered set public, then we can't make any optimizations anymore
+Though arguably once it's public, you shouldn't optimize it anyways
+Since reads are anonymous
+In fact, anonymous reads prevents lazy-loading
+Since we don't know when to lazy load
+set operations represent awareness of the set as a whole
+if we only had insertion and set_spawn, then there is no awareness of the set
+eg `foo` and `bar` insert into `master` , and `master` spawns `child` for each insertion
+then we could instead simply have `foo` and `bar` spawn the `child` objects directly
+no need to use insertion and set_spawn
+if we think about it from a distributed processing perspective
+lets say *n* objects insert into `master`, and then `master` spawns a `child` process for every insertion, and each process runs on a separate machine
+instead, we could have had those *n* objects spawn those processes themselves, there is no point for a central `master` machine
+so perhaps we can go the post-optimizations route
+and make the only set operation `make_ordered` or `convert_to_array`
+because all other set operations (cardinality, is_empty, pick_one) can all be implemented from that
+or maybe we can take inspiration from databases
+databases are not inherently ordered
+but you can pick a column (eg `timestamp`) and order by that
+so maybe we can do the same? allow a set to be ordered by a given key?
+perhaps has to be given a comparator too
+what if there is no key/column to sort by? uses random numbers
+will do the same if the comparator returns "=="
+can we implement this using set_spawn?
+Maybe we can define some rules that are only stable when a single item is chosen, otherwise it resets
+Converges to a single item being chosen
+Note that, even if we took the ordered column, and just converted that column to keys
+
+    foo:
+       for item in _insertions:
+          [item.timestamp]: item
+
+We still can't do much with it
+Because we don't know where the keys are
+If we had a starting key, like the smallest one
+Then we could iterate upwards to find the rest
+Even if we had a random key
+We could iterate upwards and downwards to find the rest
+But since we don't have a single key, we can't do this
+Also how does this handle duplicate keys?
+So it seems like the main thing is to implement pick_one
+To get a single value from a set
+After all, that is what reductions are all about
+We need to reduce a set of values to a single value
+Capture the set into a single value
+What if we did
+
+    pick_one:
+      rest: collector
+      for item in _insertions:
+         if (this.first = undefined | (this.first != overdefined & item.someKey < this.first.someKey))
+            first: item
+         else
+            rest <: item
+
+Many things happening here
+First, a random item is chosen and since `first` is undefined, the item will be placed on `first`
+(this is sorta like mutual exclusivity. Something has to start, and the process has to go in discrete steps)
+For all the rest of the items, if an item has a smaller value, then it will also be placed on `first`
+This will cause `first` to become overdefined, and all items on `first` will be thrown off
+Another random item will be chose to be placed on `first`
+Rinse and repeat
+The only time it will stabilize is if the item on `first` happens to be the smallest item
+In addition, note how duplicates are handled
+If the smallest item is on `first`, but there is a duplicate item with that value, it still won't be placed on first because we use `<` not `<=`
+Will only cause a collision if it's smaller, not if it's equal or larger
+This takes advantage of randomness
+Has to be purely random
+Kinda reminds me of atoms
+Maybe a bunch of atoms vying for a single spot
+But only one makes it
+Though atoms usually have an affinity or something to compare
+And the one with the largest affinity would win
+Maybe we can just have a `min` or `max` function
+this `pick_one` implementation also feels a little ugly because
+notice how we are defining the `first` property for the `pick_one` object, 2 levels deeper than usual
+we aren't defining it directly within the `pick_one` block
+we are doing it within the `for` loop and within the `if` block
+looks ugly
+what if we set operations like graphql
+in graphql, you query a set of objects just like you would query a single object
+the operation is simply repeated for every item in the set
+eg
+
+    query students {
+    	name
+      id
+      classes {
+        classId
+        teacher {
+          name
+        }
+      }
+    }
+
+`classes` returns an array of classes
+`teacher` returns a single teacher
+yet the syntax for querying on each, looks the same
+the query on `classes` just acts on every single item in the array
+however we can't really do this if we want sets and objects to be combined
+because if we access a property on an object/set, are we accessing the property on the object or every item in the set?
+for the nested definition ugliness
+maybe we can "carry out" the definition using spread operators
+
+    foo:
+    	...for item in someSet:
+    		...if (cond)
+    			[item.key]: item.value
+
+I believe we actually used this method previously
+// TODO: FIND REFERENCED SECTION
+How are public set items accessed anyways
+With properties, its simple: you give and key and it gives a value
+Another way of doing it is: you decrypt it using the key to get the value
+Maybe accessing public set items works the same way?
+There is a special key used to access the items?
+Or perhaps a common protocol for accessing items
+What if you had to convert insertions to an ordered list in order to publish them
+Aka, public sets don't exist,
+instead you simply map the insertions to the properties `(0: ..., 1: ..., 2: ..., etc`
+And thus, accessing these items is simple
+The protocol is just start at `0` and go upwards
+this is essentially making `make_ordered` the default behavior for publishing sets
+One of the problems with ordered execution
+That I mentioned in the Readme
+Is the shopping example
+Instead of saying the order to retrieve items, I simply declare what items need to be retrieved
+And the interpreter retrieves them in whatever order is optimal
+But perhaps this is still possible with `make_ordered`
+because while the items are now "ordered" in a sense, that order is not determinate
+it can change at any time
+so if somebody did something like `foo: somePublicSet[0]`
+the interpreter can still re-order the items in whatever order is optimal, and then return the first item to `foo`
+in a sense, we can still think of `(0: ..., 1: ..., 2: ..., etc)` as simply an unordered set of key-value pairs
+whether or not to treat the `0, 1, 2, etc` keys as ordered, is up to the person traversing/reading the object
+hmm but the problem is
+it also forces multiple readers to agree on the same order
+if we just had a public unordered collection, and had multiple readers take the first 5 items or something
+each reader could end up with a different set of 5 items
+perhaps this collection is a trillion items spread on datacenters across the globe
+it would be fastest for each reader to simply ask the closest datacenter for 5 items
+and as such, readers on opposite sides of the globe may get different items
+however, if we mapped the items to properties
+now every reader would have to get the same 5 items
+because we are essentially declaring the order
+Insertions and cloning
+What does our spawn model imply about the relationship between insertions and cloning
+Before we said insertions are cloned
+But cloning is an insertion itself
+So if all insertions are cloned, then we end up in an infinite loop of cloning
+Possible to implement pick_one without any order?
+So that each reader would possibly get a different item?
+Two types of unordered set
+Sets of Key-value pairs
+Sets of values
+Once you turn values into Key-value pairs, you introduce some order
+And multiple readers have to start agreeing
+What if key-value pairs were an ordering on top of value sets
+As in, if you have a set of `(key: 5, value: "hi"), (key: 7, value: "bye")` then that corresponds to `(5: "hi", 7: "bye")`
+This is basically how we implement hashmaps
+// TODO: FIND REFERENCED SECTION
+Also note that we are still using key-value pairs in each item
+eg the item `(key: 7, value: "bye")` uses the keys  `key` and `value`
+So it's circular
+I feel like we explored this idea before
+// TODO: FIND REFERENCED SECTION
+Maybe this relates to the idea of black boxes
+(see section // TODO: FIND REFERENCED SECTION)
+You can implement set operations from other set operations
+But there has to be at least one defined at the core
+But instead of arbitrarily choosing one
+We assume one has been defined and leave it up to the interpreter to choose one to define
+You need Key-value pairs to establish order
+Order and consistency
+In functional, everything is ordered (function arguments thru currying, linked lists are ordered, etc)
+Otherwise everybody accessing a set might get different behavior
+Key-value pairs are to ensure a consistent result for all readers
+Perhaps consistency can be achieved in other ways, eg reading the value of items and ordering it or something
+Hmm, in the real world there is no "consistency" and "agreement"
+Multiple readers might agree that an apple is red
+But at the quantum level, everybody will get different measurements for position/velocity
+According to Schrodinger's wave equations
+It's all probabilistic
+Likewise, `pick_one` is also probabilistic
+If you want to increase the odds for a certain item being chosen
+Simply include it multiple times in the set
+Recall how by default, behavior defined inside an object goes into private variables
+Eg if you did `foo: a+(b*c)`
+The `*` operator would be in a private variable
+This is kinda how I think about Key-value pairs
+They define concepts and relationships
+So they need to have addresses so that other concepts can reference them
+So that bindings can be defined to create a giant graph of relationships
+If everything were probabilistic, it would be really difficult to define these graphs
+Since you can't reference concepts/nodes anymore, you can only reference probabilistic sets of nodes and you won't know which one you'll get
+Another way of thinking is the locker room analogy
+It honestly feels like this concept of unordered sets is worlds apart from Key-value pairs
+And trying to mash them together into a single object type
+Is too forced
+Though recall that the only sensible way to separate objects and collectors
+// TODO: FIND REFERENCED SECTION
+Is to make collectors full-public (anyone can insert, anyone can view)
+And if an actor wanted to accept insertions without making them publicly viewable
+They would have to use modifiers/methods
+Eg `myObject.insert(item)` instead of `myObject <: item`
+Also you end up with two types of objects
+Which feels ugly
+
+
+
+
+### Nondeterminism and Unordered Sets
+
+I guess what makes these unordered sets different is
+**nondeterminism**
+This is something that functional and imperative languages don't have
+One reader could get a difference answer than another reader
+Though this is only true if we allow this `pick_one` or `pick_subset` behavior
+If we forced the reader to define some ordering before picking a subset
+Then it becomes deterministic again
+Eg you can't say "gimme 5 items", but you can say "gimme the most recent 5 items"
+This is sort of how databases work
+And I guess for databases, if you don't specify an ordering, it has a default `_id` or `_key` that it uses
+Also we don't need to force an ordering when operating on the entire set
+Eg `set_spawn`
+Since that's already deterministic
+Also note that, even if we force an ordering when retrieving subsets
+The interpreter can optimize it however it likes
+Set itself doesn't need an internal ordering
+So should we allow nondeterminism?
+Note that the functional representation of insertions
+// TODO: FIND REFERENCED SECTION
+Basically flag watcher model
+Would result in ordered sets
+And ordered traversal
+Since the sets would actually be linked lists
+
+### 
+
+Let's say we made sets separate from objects
+And we made set operations deterministic
+the only way to write to a set is via insertion
+To read from a set, you can either `set_spawn` directly or use `make_ordered` and then act on it like you would a list
+Well `size` and `occurrences_of` are both deterministic without needing `make_ordered`, so maybe we'll add those in as well
+But at this point, wouldn't it make sense to make these properties of sets, so you could be like `mySet.occurrences_of(15)`
+But that would make sets objects
+So maybe it's like functions and objects in JavaScript
+You can access properties on both objects and functions
+But you can only call functions
+Note that if we had completely separate operators for sets vs lists
+(eg if sets used set_spawn and lists used forEach or something)
+Would be basically like having two separate types
+Even if we mashed them into the same type
+Because if we had some function `foo` that operates on multiple items
+We would have to worry about whether to pass in our items as a set or a list
+(if `foo` used set operators, we'd have to pass in a set, and vice versa)
+Ordering introduces a lot of unnecessary info
+For example, if we used arrays, we would need to establish that arrays all start at 0 and have numerical indices
+If we used linked lists, we would need to establish that `node.next` gives the next node and `node.value` gives the node value
+All this is unnecessary info when it comes to set operations
+
+### Ordered vs Unordered Sets - Speed
+
+If it's deterministic
+Maybe it doesn't matter if it's ordered
+All optimizations would still work
+for example, if we think of a database
+
+    _key   firstname   lastname
+    -----------------------------
+    0      bob         the builder
+    1      jane        doe
+    2      alice       smith
+
+`_key` might look like array indices
+but that isn't necessarily how it's represented internally in the database
+the database 
+so is there any difference?
+i guess difference would be whether or not to expose regular list operations like `slice()`, `indexOf()`, `last()`, etc, for public sets
+also consistency: whether or not multiple readers should expect consistency
+but remember, reads are anonymous
+you have to give the reader some way to iterate/traverse across the set
+and if you give them some method
+then they can share that method with others
+so it becomes consistent anyways
+unless you could somehow make it so that every person who reads it could get a different result
+there is another big difference
+if an insertion gets removed
+users would expect `make_ordered` to return a non-sparse array
+but that would be suboptimal
+since removals in an ordered array are O(N)
+So maybe we should used a linked lists for public sets?
+so i guess the main difference between making public sets unordered vs ordered
+is expectation
+if we make public sets the same as arrays, with indices `0, 1, 2, ...`
+then users would expect to be able to access arbitrary indices in O(1) using familiar syntax like `mySet[15]`
+but they also might expect updates (eg if an insertion is added/removed) to be O(1) as well, which isn't possible with ordered arrays
+if public sets were linked lists
+then users wouldn't expect to access arbitrary indices in O(1), because the syntax `mySet[15]` doesn't work anymore
+in addition, the expectation for insertion addition/removals to be O(1) can also be maintained
+however, users might also expect to be able to check existence of an item in O(1) as well (because usually sets have the method `mySet.has(item)`)
+a third way we can represent sets is using a histogram
+ aka a hashmap of `<item, # of occurrences>`
+this keeps insertions/removals at O(1)
+and also keeps `.has()` at O(1) as well
+(note: to make this histogram iterable, it would have to be a linked hashmap, not just a hashmap)
+so should we make all public sets internally represented using linked hashmaps?
+well shouldn't it depend on how it's used?
+if users are often accessing items at direct indices, like `mySet[15]`
+then we should use an array
+if insertions are constantly being added/removed
+then we should use a linked hashmap or linked list
+and if we are to be consistent with out idealogy
+of keeping things at a high level of abstraction
+and not worrying about internal implementation
+then we should technically expose *all* of these methods, `.has()`, `.slice()`, direct indexed access, etc etc
+so the users can use it however they like
+so is that what publishing insertions does?
+if you do
+
+    publishedInsertions:
+        ..._insertions
+
+then it automatically adds all these methods onto the object
+(which would also include mapping the items to indices `0, 1, 2...`, so that array access is possible as well)
+hmm that makes sense for how the `Collection` class/object should work
+kinda like how Javascript `Array` has so many methods on its prototype
+likewise, when you declare a collection in Firefly, `foo: collection()`
+you are instantiating a new instance of `Collection`
+and it comes with all the methods
+but when it comes to a raw unordered set, shouldn't it be as barebones as possible?
+so when you do `..._insertions`, it just publishes the set, but then you can manually add methods like `slice()` or `has()` if you want?
+well what if we made `_insertions` an instance of `Collection`
+and then you can make it public by putting it on a public property
+
+    foo:
+        myInsertions: _insertions
+
+or you can turn the containing object into a Collection itself
+
+    foo:
+        ..._insertions
+
+or you can manually add methods to the containing object
+
+    foo:
+        forEach: _insertions.forEach
+        slice: _insertions.slice
+        occurrences: _insertions.occurrences
+        size: _insertions.size
+
+(actually having ordered array indices makes updates much slower, see the next section "Anonymous Reads and Lazy Evaluation" for details)
+
+### Anonymous Reads and Lazy Evaluation
+
+hmm recall that because reads are anonymous
+we can't really optimize based on what methods are being called
+so doesn't that make every collection object slow
+because no matter what implementation we use (linked list, array, linked hashmap)
+we will have to keep every property up to date
+since we don't know which ones are being read
+so for example, if we chose the linked hashmap implementation
+we would still have to keep the array representation `0: ..., 1: ..., 2: ...` updated
+which is an O(N) operation for insertion additions/removals
+This seems like a big drawback
+I guess maybe readers can self-report what properties they need
+But if any single reader doesn't self report
+Then the object has to update everything
+Maybe a parent can keep track of all references and reads to a private variable?
+Is that even possible?
+well it gets complicated because a nested child can insert it into an outsider
+this is akin to sharing a private link with a group, but then a group member sends it to somebody outside the group
+
+    parent:
+        _somePrivateCollection
+        child:
+            someOusider <: _somePrivateCollection
+
+or the child could publish it onto itself
+this is akin to a group member posting the private link publicly
+
+    parent:
+        _somePrivateCollection
+        child:
+            myParentsPrivateCollection: _somePrivateCollection
+
+however, if all the nested children and grandchildren are executed on the same machine, and by the same interpreter
+then the interpreter can track every object that has access to that private collection
+and can see if it is ever leaked (eg if it is inserted to an outsider, or published to a public property)
+I wonder if it's possible to make it so reads are anonymous, but it's still possible to tell if a property is read or not
+as in, an object can tell which properties are observed and which aren't
+but for observed properties, they can't tell who is observing it, or how many people are observing it
+very early on we talked about big library objects
+with tons of properties
+but using observability to only compute what's needed
+see section "Observed Outputs"
+that might not be possible anymore, with anonymous reads
+what about something like react-virtualized
+where it only renders the visible part of a long list
+
+### Collections vs Arrays
+
+I think for now, we should simply make `Collection`s behave like linked hashmaps
+so they don't have ordered indices, like an array
+and you can convert a collection to an array if you want using `to_array()`
+but you have to keep in mind that updates will be much slower for the array
+
+### Using Keys to Store Information
+
+something i noticed
+originally we thought of values as actual behavior
+and keys as just pointers to behavior
+but actually, we can represent an array of values, `(0: "foo", 1: "bar", 2: "zed" ...)`
+as a histogram, a hashmap of items-to-occurrences
+so in this case it would be `(foo: 1, bar: 1, zed: 1, ...)`
+this shows that keys represent just as much information as values
+they are two sides of the same coin
+key-value duality
+or more accurately, array-hashmap duality
+it shows that instead of using values to store information (like in an array)
+we can also use keys to do so, like in a hashmap
+I guess keys can be thought of as references
+After all, it has to check for equality
+"behavior" is any insertions or spawns
+But what happens if a reference to a key goes "offline"
+As in, the machine that owns the key literally goes offline
+So anybody referencing the key can't check for equality
+(recall that equality requires calling the `equals()` method on each operand)
+Well I guess it should just return false
+If it's offline, nothing can be equal to it
+And this isn't really any different from a value going offline
+In fact, this idea that keys are references
+Is nothing novel
+I guess all it shows is how simple properties work
+It's really just an equality operator that checks against the internal keyset
+
+### Calculator problem and tightening loops
+
+problem: create a simple calculator app
+* this is modeled after the iPhone calculator or Windows calculator
+* 10 digit keys (0-9) and 4 operations (+,-,*,/), "=" key and reset "C" key
+* display shows the last inputted number, or the result if "=" is pressed
+* display never shows an operation
+* pressing "=" multiple times will repeat the previous operation (no-op if no previous operation, eg only a number was inputted)
+* pressing multiple operators after eachother, will just change the operator (eg if you press `+` and then `-`, it just switches the current operator to `-`)
+
+
+normal approach: state diagram + react
+
+my approach:
+create state var of tokens
+    eg if you press `1` `2` `+` `4` `=`,
+    the states are `tokens: [12, "+", 4, "="]`
+bind the display to states
+
+    display: if (tokens.last = "=") result
+        else tokens.filter(isNumber).last
+
+
+visualizations:
+start with button inputs
+create state var, and show expanded view
+map out what the display should show for each state in expanded view
+
+something that I noticed state variables do
+they "tighten loops"
+instead of having a giant feedback loop for setting and getting values
+(eg get some value, apply a bunch of transformations, and at the end we set it)
+we tighten loops to basically each input
+    inputs can be button presses, clicks, basically raw I/O
+each input is a state var, a tight feedback loop of states over time
+instead of applying transformations between getting the old value and setting the new value
+we move the transformations out, so the state variable is just a list of raw captures of the input
+and then the transformations are applied to that list of states
+so that all the values in the main logic just trickle down from transformations on these chains of states
+
