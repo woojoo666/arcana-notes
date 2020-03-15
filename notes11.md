@@ -1128,6 +1128,8 @@ Also notice how this only works with finite objects though (objects with finite 
 Because the callee is programmatically iterating through the provided arguments and merging them in
 Though I guess this is the case for any clone/merge
 
+### Caller-Provided Keylist
+
 Why is it so natural to expect private properties to carry over during cloning
 And yet problematic during merging
 It's because during cloning, the callee knows that every argument that was passed in, is from the caller's scope
@@ -1151,7 +1153,7 @@ That way neither side exposes keys that the other side doesn't know about
 
 Does this make merging and cloning the same?
 In cloning, the caller provides a keylist, so whichever keys aren't in the keylist, the callee knows the caller isn't trying to override those values, and its safe to carry those values over to the child
-Could we do the same for merging and mixins? The caller provides it's keylist to all objects being merged, so they know which properties are getting overriden, and which properties are carried over?
+Could we do the same for merging and mixins? The caller provides it's keylist to all objects being merged, so they know which properties are getting overridden, and which properties are carried over?
 But then what if two objects try to carry over private properties with the same private key?
 
 ### Replicating Full Private Merging using Routing
@@ -1171,10 +1173,12 @@ The caller can replicate full private merging, by simply:
 So maybe we should just merge private properties, since the child can replicate that behavior anyways?
 Or maybe we should never carry over private properties, and the caller can only create properties on the child that are in caller-scope (caller-responsible)?
 
-### Private Keys and Anonymous Reads
+### Private Keys and Anonymous Reads, Property Bundles
 
-But reads should ideally be private (mentioned this before, //TODO: FIND REFERENCED SECTION)
+But reads should ideally be private
+    mentioned previously in sections "Indirect Writes, and Pass-By-Reference Model" and "Unified Access - Read/Clone/Insert Privileges")
 So maybe, every time somebody makes a request, they actually retrieve a full copy of the object, and then privately try accessing the property on their own server
+    (I later call this a **property bundle**, since we are bundling all properties into a static object)
 this way, the caller wouldn't be able to replicate full private merging using routing, as mentioned in the prev section
 Or maybe it bundles the object into a single pure function, that when given a key, responds with the value, and has no side effects
 And anybody can retrieve this function and read from it privately on their own machine
@@ -1371,7 +1375,8 @@ What about semi-private (aka some behavior inside is hidden) functions?
 Can you mark a semi-private function as pure functional? How would you enforce it?
 I think you can't enforce it
 What if a bad actor marked their private function as "pure functional" but it actually had side effects (and the function ran completely on their machine so nobody could inspect it, and they could keep track of every access)
-Though recall that, to make reads private, we want to capture and encrypt the entire object into one function, `key => OBJECT => value` 
+Though recall that, to make reads private, we want to capture and encrypt the entire object into one function, `key => OBJECT => value`
+    see section "Private Keys and Anonymous Reads, Property Bundles"
 That the reader can call privately and securely, anonymously
 In order to bundle the object into a fully portable function, the property-access behavior has to be completely captured in the bundle
 And we can't do that if the dynamic property function contains cloning of 3rd-party semi-private behavior
@@ -1986,12 +1991,13 @@ We previously talked about a rogue computer using routing to proxy private varia
 But we can prevent this
 Recall our discussions on anonymous reads
 And capturing an object into a single function that is passed to the reader
-    see section "Private Keys and Anonymous Reads"
+    see section "Private Keys and Anonymous Reads, Property Bundles"
 
 Well previously I thought that the rogue computer could simply retrieve the property access functions of it's victims (the objects it is proxying), wrap it in a property muxer, and then pass that to the reader
 But if we instead forced every object to provide a property access object, a _static_ piece of data that is simply encrypted
 Then we can prevent proxying
 For example, let's assume that we have a giant encrypted piece of data
+encrypted property bundle
 And if you decrypt it using different keys, you will get the values for those keys
 Now it's impossible for the rogue computer to encrypt and include the private properties that it can't access
 
@@ -2000,6 +2006,13 @@ Now it's impossible for the rogue computer to encrypt and include the private pr
 
 So we could prevent proxies and dynamic access in our language
 Do we want to?
+
+one thing we can do is
+make static property access the default
+and static property bundles are the default protocol
+but if an object uses dynamic prop access, or proxying, or some other special protocol
+they have to declare it
+and the reader has to agree to use it, understanding that it might compromise anonymity or security
 
 
 We need a clear and consistent spec of how we want privacy to work in our language
@@ -2300,7 +2313,7 @@ Solves 3 problems
 * Group behaviors for recursion
 * Callee responsible, can choose not to clone/spawn
 
-### Spawning from Sets
+### Spawning from Sets (`set_spawn`)
 
 Wait but
 If we want to spawn the actor in a for-loop
@@ -2317,6 +2330,7 @@ When we define objects normally, we are creating a single object that reads from
 But sets are a primitive too
 // TODO: FIND REFERENCES SECTION
 So we can define a set of objects that read from a set of values
+a `set_spawn`
 
 kinda reminds me of the "fan-out" operation I had in the diagram syntax
     see section "Defaults for Select, Map, and Reduce"
@@ -2921,6 +2935,7 @@ Definitions are only spawned into objects if they are standalone `(some def)` ob
 Otherwise they are templates, implied templates
 For example, in `...(some def)` and `foo(some def)`, `(some def)` is a template
 Only in `x: (some def)` and `foo(10, (some def))` are `(some def)` actual spawned objects
+
 in something like `foo(some def)`, the template `some def` is passed to the callee, who spawns the child object using the overrides specified in `some def`
 however, to do so, the callee has to be able to read the template
 in the section "Templates and Property Access" and "Templates and Property Access 2", we talked about how all property values should be undefined (since the template has not run yet)
@@ -2993,11 +3008,12 @@ I decided to refactor it to something like this:
 
 feels a bit cleaner
 but notice that I basically moved from the child determining whether or not to spawn itself
-(in `createConsoleLogger()`)
+    (in `createConsoleLogger()`)
 and moved some logic so that the parent determines whether or not to spawn the child
 Often the child does not know the conditions that are necessary for each child to exist
 and instead of passing it into the child, we just keep the logic in the parent and leave the child unaware
 so what does this mean for our language? should firefly continue using the choice-to-exist model?
+
 previously we talked about how parents being responsible for defining+spawning children, seemed too complicated
 bloating the parent definition
 because if the child spawns grandchildren, then technically the parent would have to define the children, and define how the children spawn grandchildren
@@ -3022,6 +3038,7 @@ but any actors created on the same machine, can clone it all they want
 - into an object with a private but shareable `clone()` method?
 - in order to "move" the behavior to a new property
 - you would have to do "reference moving", discussed in section "Moving and Re-mapping Properties"
+
 - however, recall that now that cloning and overriding is a behavior that the callee exposes (not a default behavior)
 - the callee receives the clone request (with what properties the caller wants to override), and decides how to spawn the new child
 - so if the callee wants to expose a way to specify reference moving, it can
@@ -3035,13 +3052,18 @@ internal: spawn, setspawn
 
 now that cloning is a behavior exposed by the callee
 the callee doesn't need to expose the source code anymore right?
+
 templates represent source code
+
 we don't need to expose source code and value on a public property
+
 callee has a private property that stores the source code
 uses that to spawn children
 and passes it to children so the children can spawn grandchildren themselves
+
 templates have to be full public
 if they are meant to be copied, manual copied
+
 but then what if you want a template with private behavior
 aka, define a method on an object that is meant to be cloned, but is dormant in the beginning
 has no initial object
@@ -3063,6 +3085,7 @@ a simple successor function like
 wait but we can't use cloning...
 ultimately we need some sort of repeating behavior
 so we need set_spawn
+
 what if we used dynamic properties?
 
     startingKey: ()
@@ -3088,11 +3111,15 @@ i don't know if this works
 there are infinite items
 i don't know if it is it traversable
 and recall that i suspect that dynamic property access is not anonymous
+
+
+
 you can operate on an actor in 4 ways
 insert into it, `insert{target,item}`
 set_spawn, map across it, `map{target}: item >>`
 read from it, `prop-access{target,key}`
 convert it to an ordered set, `make_ordered{target}`
+
 could we use `map` to implement property access?
 so instead of doing something like `someExpr(foo.bar)`
 we would package key-val pairs into set items and then do
@@ -3105,6 +3132,7 @@ however notice that we are using property access anyways, circular
 also, how would you control public/private access?
 we want some properties to be accessible to some outsiders
 but with this, all outsiders have the same access
+
 we also might want the operation `any` or `pick_one{target}`, which picks a single random item from the set
 we could implement this using `make_ordered`, just do `make_ordered{target}[0]`
 but could we do the opposite? implement `make_ordered` using `pick_one`?
@@ -3130,6 +3158,7 @@ something like this
 (note: reference equality was previously mentioned in "Making the Case for Reference Equality", but this is a different topic)
 
 is equality `=` also a core operator?
+
 in pure functional, `=` is implemented using functions, as well as `and`, `or`, and `true` and `false`
 there is no reference equality
 doing so would break referential transparency (see [https://stackoverflow.com/a/27773792/1852456](https://stackoverflow.com/a/27773792/1852456))
@@ -3137,12 +3166,16 @@ eg if `f(x) = y`
 then we should be able to replace `y = y` with `f(x) = f(x)`
 however, if `f(x)` creates the function `y`, then each `f(x)` would create a different `y` with a different reference
 and `f(x) != f(x)`
+
 put another way, referential transparency means that a function call with the same arguments should produce the same value
+
 This is actually an incredibly useful property because it means we can make optimizations like caching
 Where, if a function is called with the same arguments
 The interpreter can use a cached value
 This is not possible if each call produced a different object
+
 I guess one way to think about it is, every call has a unique identifier, so that way every call would have different arguments, so results could never be cached
+
 so what about firefly?
 Note that in Java, equality internally uses the `equals()` method, so `foo == bar` is actually `foo.equals(bar)`
 However this mechanism feels a bit asymmetric and ugly
@@ -3155,39 +3188,50 @@ we actually talked about referential transparency before
 in addition, we talked about how to handle equality
 using a unique hash, that actors can override if they want a custom equality function
     mentioned in previous sections "Part 1.5 (returned from yellowstone)" and "unified primitives?", but these section names might change
+
 but this `hash` or `objectId` has to be visible to everybody who wants to check equality
 but if it's visible, then what's to stop somebody else from creating an object with the same `objectId`?
 identity theft
+
 perhaps we need a central authority?
 somebody that assigns everybody a unique address?
 (i guess this is similar to how there is a centralized protocol for everybody to be assigned a unique IP)
+
 this unique id would be hidden in a private variable that the central authority can access
 and whenever you use the equality `=` operator, it sends both objects to the central authority, who checks the ids of each and compares them
 note that just because the central authority needs access to the id, doesn't mean the central authority has to spawn every object
 the parent can ask for an id from the authority, and the authority will give both an id and a private key
 and the parent will spawn the child, storing the id using that private key
+
 maybe when you define an entire program, there is a local id assigner,
 and all vars local to that program can use local ids (kinda like local ips in a LAN subnet)
 but once you want to publish an object, and you need to give it an id from the central authority
+
 maybe ids work kinda like tags?
 they aren't stored in the object themselves, they are stored in an external hashmap
 but to retrieve it from the hashmap, you need the object's id
 circular
+
 also, it seems a bit intrusive to require all public objects to require a centralized id
 what if you want to exchange messages with a friend?
 do all those messages need to go through the CA (central authority)?
+
 also seems a bit intrusive to send both objects to the CA to check equality
 why can't the parent check the equality themselves?
+
 what if the central authority was just an id generator
 and it signed every id with it's private RSA key
 and then you could use the central authority's public RSA key to verify that the id is valid
 so the object never actually passes through the CA
+
 seems a bit reliant on public-private key encryption though...
 are we sure it's secure?
+
 Also, if the equality function is executed by the parent
 Then an bad actor can easily retrieve the ID of an object
 And then spawn children with that ID
 And since it's a copy, it also copies the CA's signature
+
 So either:
 
 1. Objects dont create their ID
@@ -3196,6 +3240,7 @@ So either:
 We don't want a CA built into the language
 Such a mechanism should be built on top of the language
 So if somebody wanted to use something different, they can
+
 However, we want objects to be able to publish their IDs for others to see
 But prevent people from impersonating others by copying their ID
 This sort of goes against many of the ideas that iv had before
@@ -3210,25 +3255,37 @@ Aka, `foo = bar` turns into `foo.equals(bar) && bar.equals(foo)`
 And then each object checks the id of the other against its own private internal id, and returns true if they are equal
 If a bad actor always returns true, the other actor still has to agree in order for the equality operator to return true
 And the internal id is hidden, in fact the entire behavior of the `equals()` method can be hidden, so the bad actor can't copy/replicate it
+
 This method also guarantees that equality is commutative
+
 But wait, if the internal id is hidden, then in `foo.equals(bar)`, how does `foo` compare its internal id to `bar`'s id if it can't even access `bar`'s id?
 likewise for `bar.equals(foo)`
 and if `bar` ever gives `foo` its id, then `foo` can copy it
+
 What if instead of storing the id like `(id: fs8ubd9zq2e)`, we instead store it like `([fs89bd0zq2e]: true)`
 that is, the secret id is stored as a key, not a value
 in `foo.equals(bar)`, `foo` simply takes its internal id, `fooId`, and checks `bar[fooId]` to see if it exists
 likewise for `bar.equals(foo)`
 this way neither side reveals their id to the other
 in addition, this takes advantage of anonymous reads, because if reads weren't anonymous, then each side would be revealing their IDs to the other
+
 So I guess that shows that equality can be implemented via core operations
 note that there still needs to be somebody that generates ids and prevents collisions
+
 but this can happen in a distributed fashion:
-the parent generates unique ids for children,
-and then children generates unique ids for grandchildren using its own id as a prefix or something,
-etc etc
-earlier we talked about implementing order_set using pick_one
-but what if set contains duplicates
+    the parent generates unique ids for children,
+    and then children generates unique ids for grandchildren using its own id as a prefix or something,
+    etc etc
+
+### Set Operations
+
+(continued from Ordering Sets 2)
+
+earlier we talked about implementing make_ordered using pick_one
+but what if set contains duplicates?
+
 instead, pick_one should return the picked item and the "rest"
+
 what if we created a fn that was stable only when one item was removed
 something like
     
@@ -3239,43 +3296,59 @@ What about other set operations, should they be core operations as well?
 Things like
 cardinality? or `size()`?
 is_empty? (This could be implemented using `size()`)
+
 Even something like `set.contains(item)`
 This is a little more complicated since sets can contain duplicates
 So maybe `contains` should return the number of occurrences?
 Or maybe we need another function for that, `occurrences`?
+
 Now there are 4 operations on sets
 `make_ordered`, `pick_one`, `occurrences`, and `size`
 Note that they can all be implemented via `make_ordered`
 But as mentioned previously, `make_ordered` introduces unnecessary order for most of them
 // TODO: FIND REFERENCED SECTION
+
 Or maybe we can fix that with post-optimizations
 Eg `make_ordered{set}[0]` can be optimized to only retrieve the first item and ignore ordering the rest
 But if we ever make the ordered set public, then we can't make any optimizations anymore
 Though arguably once it's public, you shouldn't optimize it anyways
 Since reads are anonymous
+
 In fact, anonymous reads prevents lazy-loading
 Since we don't know when to lazy load
+
+
 set operations represent awareness of the set as a whole
 if we only had insertion and set_spawn, then there is no awareness of the set
+
 eg `foo` and `bar` insert into `master` , and `master` spawns `child` for each insertion
 then we could instead simply have `foo` and `bar` spawn the `child` objects directly
 no need to use insertion and set_spawn
 if we think about it from a distributed processing perspective
 lets say *n* objects insert into `master`, and then `master` spawns a `child` process for every insertion, and each process runs on a separate machine
 instead, we could have had those *n* objects spawn those processes themselves, there is no point for a central `master` machine
+
 so perhaps we can go the post-optimizations route
 and make the only set operation `make_ordered` or `convert_to_array`
 because all other set operations (cardinality, is_empty, pick_one) can all be implemented from that
+
+### Ordering by a Given Key or Column
+
 or maybe we can take inspiration from databases
 databases are not inherently ordered
 but you can pick a column (eg `timestamp`) and order by that
 so maybe we can do the same? allow a set to be ordered by a given key?
+
 perhaps has to be given a comparator too
+
 what if there is no key/column to sort by? uses random numbers
 will do the same if the comparator returns "=="
+
 can we implement this using set_spawn?
 Maybe we can define some rules that are only stable when a single item is chosen, otherwise it resets
 Converges to a single item being chosen
+
+
 Note that, even if we took the ordered column, and just converted that column to keys
 
     foo:
@@ -3290,11 +3363,15 @@ Even if we had a random key
 We could iterate upwards and downwards to find the rest
 But since we don't have a single key, we can't do this
 Also how does this handle duplicate keys?
+
+### Implementing pick_one (or pick_first) for ordered values
+
 So it seems like the main thing is to implement pick_one
 To get a single value from a set
 After all, that is what reductions are all about
 We need to reduce a set of values to a single value
 Capture the set into a single value
+
 What if we did
 
     pick_one:
@@ -3316,20 +3393,30 @@ The only time it will stabilize is if the item on `first` happens to be the smal
 In addition, note how duplicates are handled
 If the smallest item is on `first`, but there is a duplicate item with that value, it still won't be placed on first because we use `<` not `<=`
 Will only cause a collision if it's smaller, not if it's equal or larger
+
 This takes advantage of randomness
 Has to be purely random
 Kinda reminds me of atoms
 Maybe a bunch of atoms vying for a single spot
 But only one makes it
+
 Though atoms usually have an affinity or something to compare
 And the one with the largest affinity would win
 Maybe we can just have a `min` or `max` function
+
+### Nested Definitions and Alternative Syntaxes
+
 this `pick_one` implementation also feels a little ugly because
 notice how we are defining the `first` property for the `pick_one` object, 2 levels deeper than usual
 we aren't defining it directly within the `pick_one` block
 we are doing it within the `for` loop and within the `if` block
 looks ugly
-what if we set operations like graphql
+I call this "nested definitions" or "nested property definitions"
+and we talked about these much earlier
+    // TODO: FIND REFERENCED SECTION
+
+
+what if we designed set-operations like graphql
 in graphql, you query a set of objects just like you would query a single object
 the operation is simply repeated for every item in the set
 eg
@@ -3349,8 +3436,11 @@ eg
 `teacher` returns a single teacher
 yet the syntax for querying on each, looks the same
 the query on `classes` just acts on every single item in the array
+
 however we can't really do this if we want sets and objects to be combined
 because if we access a property on an object/set, are we accessing the property on the object or every item in the set?
+
+
 for the nested definition ugliness
 maybe we can "carry out" the definition using spread operators
 
@@ -3361,23 +3451,29 @@ maybe we can "carry out" the definition using spread operators
 
 I believe we actually used this method previously
 // TODO: FIND REFERENCED SECTION
+
+### Public Sets vs Public Properties
+
 How are public set items accessed anyways
 With properties, its simple: you give and key and it gives a value
 Another way of doing it is: you decrypt it using the key to get the value
 Maybe accessing public set items works the same way?
 There is a special key used to access the items?
 Or perhaps a common protocol for accessing items
+
 What if you had to convert insertions to an ordered list in order to publish them
 Aka, public sets don't exist,
 instead you simply map the insertions to the properties `(0: ..., 1: ..., 2: ..., etc`
 And thus, accessing these items is simple
 The protocol is just start at `0` and go upwards
 this is essentially making `make_ordered` the default behavior for publishing sets
+
 One of the problems with ordered execution
 That I mentioned in the Readme
 Is the shopping example
 Instead of saying the order to retrieve items, I simply declare what items need to be retrieved
 And the interpreter retrieves them in whatever order is optimal
+
 But perhaps this is still possible with `make_ordered`
 because while the items are now "ordered" in a sense, that order is not determinate
 it can change at any time
@@ -3385,6 +3481,8 @@ so if somebody did something like `foo: somePublicSet[0]`
 the interpreter can still re-order the items in whatever order is optimal, and then return the first item to `foo`
 in a sense, we can still think of `(0: ..., 1: ..., 2: ..., etc)` as simply an unordered set of key-value pairs
 whether or not to treat the `0, 1, 2, etc` keys as ordered, is up to the person traversing/reading the object
+
+
 hmm but the problem is
 it also forces multiple readers to agree on the same order
 if we just had a public unordered collection, and had multiple readers take the first 5 items or something
@@ -3395,18 +3493,25 @@ and as such, readers on opposite sides of the globe may get different items
 however, if we mapped the items to properties
 now every reader would have to get the same 5 items
 because we are essentially declaring the order
+
 Insertions and cloning
 What does our spawn model imply about the relationship between insertions and cloning
 Before we said insertions are cloned
 But cloning is an insertion itself
 So if all insertions are cloned, then we end up in an infinite loop of cloning
+
+
 Possible to implement pick_one without any order?
 So that each reader would possibly get a different item?
+
 Two types of unordered set
-Sets of Key-value pairs
-Sets of values
+1. Sets of Key-value pairs
+2. Sets of values
+
+
 Once you turn values into Key-value pairs, you introduce some order
 And multiple readers have to start agreeing
+
 What if key-value pairs were an ordering on top of value sets
 As in, if you have a set of `(key: 5, value: "hi"), (key: 7, value: "bye")` then that corresponds to `(5: "hi", 7: "bye")`
 This is basically how we implement hashmaps
@@ -3416,26 +3521,32 @@ eg the item `(key: 7, value: "bye")` uses the keys  `key` and `value`
 So it's circular
 I feel like we explored this idea before
 // TODO: FIND REFERENCED SECTION
+
+
 Maybe this relates to the idea of black boxes
 (see section // TODO: FIND REFERENCED SECTION)
 You can implement set operations from other set operations
 But there has to be at least one defined at the core
 But instead of arbitrarily choosing one
 We assume one has been defined and leave it up to the interpreter to choose one to define
+
 You need Key-value pairs to establish order
 Order and consistency
 In functional, everything is ordered (function arguments thru currying, linked lists are ordered, etc)
 Otherwise everybody accessing a set might get different behavior
 Key-value pairs are to ensure a consistent result for all readers
 Perhaps consistency can be achieved in other ways, eg reading the value of items and ordering it or something
-Hmm, in the real world there is no "consistency" and "agreement"
+
+Hmm, in the quantum world there is no "consistency" and "agreement"
 Multiple readers might agree that an apple is red
 But at the quantum level, everybody will get different measurements for position/velocity
 According to Schrodinger's wave equations
 It's all probabilistic
+
 Likewise, `pick_one` is also probabilistic
 If you want to increase the odds for a certain item being chosen
 Simply include it multiple times in the set
+
 Recall how by default, behavior defined inside an object goes into private variables
 Eg if you did `foo: a+(b*c)`
 The `*` operator would be in a private variable
@@ -3445,16 +3556,20 @@ So they need to have addresses so that other concepts can reference them
 So that bindings can be defined to create a giant graph of relationships
 If everything were probabilistic, it would be really difficult to define these graphs
 Since you can't reference concepts/nodes anymore, you can only reference probabilistic sets of nodes and you won't know which one you'll get
+
 Another way of thinking is the locker room analogy
+
 It honestly feels like this concept of unordered sets is worlds apart from Key-value pairs
 And trying to mash them together into a single object type
 Is too forced
+
 Though recall that the only sensible way to separate objects and collectors
 // TODO: FIND REFERENCED SECTION
 Is to make collectors full-public (anyone can insert, anyone can view)
 And if an actor wanted to accept insertions without making them publicly viewable
 They would have to use modifiers/methods
 Eg `myObject.insert(item)` instead of `myObject <: item`
+
 Also you end up with two types of objects
 Which feels ugly
 
@@ -3473,13 +3588,17 @@ Then it becomes deterministic again
 Eg you can't say "gimme 5 items", but you can say "gimme the most recent 5 items"
 This is sort of how databases work
 And I guess for databases, if you don't specify an ordering, it has a default `_id` or `_key` that it uses
+
 Also we don't need to force an ordering when operating on the entire set
 Eg `set_spawn`
 Since that's already deterministic
+
 Also note that, even if we force an ordering when retrieving subsets
 The interpreter can optimize it however it likes
 Set itself doesn't need an internal ordering
+
 So should we allow nondeterminism?
+
 Note that the functional representation of insertions
 // TODO: FIND REFERENCED SECTION
 Basically flag watcher model
@@ -3496,9 +3615,11 @@ To read from a set, you can either `set_spawn` directly or use `make_ordered` an
 Well `size` and `occurrences_of` are both deterministic without needing `make_ordered`, so maybe we'll add those in as well
 But at this point, wouldn't it make sense to make these properties of sets, so you could be like `mySet.occurrences_of(15)`
 But that would make sets objects
+
 So maybe it's like functions and objects in JavaScript
 You can access properties on both objects and functions
 But you can only call functions
+
 Note that if we had completely separate operators for sets vs lists
 (eg if sets used set_spawn and lists used forEach or something)
 Would be basically like having two separate types
@@ -3506,6 +3627,7 @@ Even if we mashed them into the same type
 Because if we had some function `foo` that operates on multiple items
 We would have to worry about whether to pass in our items as a set or a list
 (if `foo` used set operators, we'd have to pass in a set, and vice versa)
+
 Ordering introduces a lot of unnecessary info
 For example, if we used arrays, we would need to establish that arrays all start at 0 and have numerical indices
 If we used linked lists, we would need to establish that `node.next` gives the next node and `node.value` gives the node value
@@ -3527,46 +3649,55 @@ for example, if we think of a database
 `_key` might look like array indices
 but that isn't necessarily how it's represented internally in the database
 the database 
+
 so is there any difference?
 i guess difference would be whether or not to expose regular list operations like `slice()`, `indexOf()`, `last()`, etc, for public sets
 also consistency: whether or not multiple readers should expect consistency
+
 but remember, reads are anonymous
 you have to give the reader some way to iterate/traverse across the set
 and if you give them some method
 then they can share that method with others
 so it becomes consistent anyways
 unless you could somehow make it so that every person who reads it could get a different result
+
 there is another big difference
 if an insertion gets removed
 users would expect `make_ordered` to return a non-sparse array
 but that would be suboptimal
 since removals in an ordered array are O(N)
 So maybe we should used a linked lists for public sets?
+
 so i guess the main difference between making public sets unordered vs ordered
 is expectation
 if we make public sets the same as arrays, with indices `0, 1, 2, ...`
 then users would expect to be able to access arbitrary indices in O(1) using familiar syntax like `mySet[15]`
 but they also might expect updates (eg if an insertion is added/removed) to be O(1) as well, which isn't possible with ordered arrays
+
 if public sets were linked lists
 then users wouldn't expect to access arbitrary indices in O(1), because the syntax `mySet[15]` doesn't work anymore
 in addition, the expectation for insertion addition/removals to be O(1) can also be maintained
 however, users might also expect to be able to check existence of an item in O(1) as well (because usually sets have the method `mySet.has(item)`)
+
 a third way we can represent sets is using a histogram
  aka a hashmap of `<item, # of occurrences>`
 this keeps insertions/removals at O(1)
 and also keeps `.has()` at O(1) as well
 (note: to make this histogram iterable, it would have to be a linked hashmap, not just a hashmap)
+
 so should we make all public sets internally represented using linked hashmaps?
 well shouldn't it depend on how it's used?
 if users are often accessing items at direct indices, like `mySet[15]`
 then we should use an array
 if insertions are constantly being added/removed
 then we should use a linked hashmap or linked list
+
 and if we are to be consistent with out idealogy
 of keeping things at a high level of abstraction
 and not worrying about internal implementation
 then we should technically expose *all* of these methods, `.has()`, `.slice()`, direct indexed access, etc etc
 so the users can use it however they like
+
 so is that what publishing insertions does?
 if you do
 
@@ -3575,6 +3706,7 @@ if you do
 
 then it automatically adds all these methods onto the object
 (which would also include mapping the items to indices `0, 1, 2...`, so that array access is possible as well)
+
 hmm that makes sense for how the `Collection` class/object should work
 kinda like how Javascript `Array` has so many methods on its prototype
 likewise, when you declare a collection in Firefly, `foo: collection()`
@@ -3582,6 +3714,7 @@ you are instantiating a new instance of `Collection`
 and it comes with all the methods
 but when it comes to a raw unordered set, shouldn't it be as barebones as possible?
 so when you do `..._insertions`, it just publishes the set, but then you can manually add methods like `slice()` or `has()` if you want?
+
 well what if we made `_insertions` an instance of `Collection`
 and then you can make it public by putting it on a public property
 
@@ -3614,19 +3747,21 @@ since we don't know which ones are being read
 so for example, if we chose the linked hashmap implementation
 we would still have to keep the array representation `0: ..., 1: ..., 2: ...` updated
 which is an O(N) operation for insertion additions/removals
+
 This seems like a big drawback
 I guess maybe readers can self-report what properties they need
 But if any single reader doesn't self report
 Then the object has to update everything
 Maybe a parent can keep track of all references and reads to a private variable?
 Is that even possible?
-well it gets complicated because a nested child can insert it into an outsider
-this is akin to sharing a private link with a group, but then a group member sends it to somebody outside the group
 
-    parent:
-        _somePrivateCollection
-        child:
-            someOusider <: _somePrivateCollection
+well it gets complicated because a nested child can insert it into an outsider
+    this is akin to sharing a private link with a group, but then a group member sends it to somebody outside the group
+
+        parent:
+            _somePrivateCollection
+            child:
+                someOusider <: _somePrivateCollection
 
 or the child could publish it onto itself
 this is akin to a group member posting the private link publicly
@@ -3639,14 +3774,17 @@ this is akin to a group member posting the private link publicly
 however, if all the nested children and grandchildren are executed on the same machine, and by the same interpreter
 then the interpreter can track every object that has access to that private collection
 and can see if it is ever leaked (eg if it is inserted to an outsider, or published to a public property)
+
 I wonder if it's possible to make it so reads are anonymous, but it's still possible to tell if a property is read or not
 as in, an object can tell which properties are observed and which aren't
 but for observed properties, they can't tell who is observing it, or how many people are observing it
+
 very early on we talked about big library objects
 with tons of properties
 but using observability to only compute what's needed
-see section "Observed Outputs"
+    see section "Observed Outputs"
 that might not be possible anymore, with anonymous reads
+
 what about something like react-virtualized
 where it only renders the visible part of a long list
 
@@ -3667,10 +3805,12 @@ as a histogram, a hashmap of items-to-occurrences
 so in this case it would be `(foo: 1, bar: 1, zed: 1, ...)`
 this shows that keys represent just as much information as values
 they are two sides of the same coin
-key-value duality
+**key-value duality**
 or more accurately, array-hashmap duality
+
 it shows that instead of using values to store information (like in an array)
 we can also use keys to do so, like in a hashmap
+
 I guess keys can be thought of as references
 After all, it has to check for equality
 "behavior" is any insertions or spawns
@@ -3678,11 +3818,14 @@ But what happens if a reference to a key goes "offline"
 As in, the machine that owns the key literally goes offline
 So anybody referencing the key can't check for equality
 (recall that equality requires calling the `equals()` method on each operand)
+    (see section "Double-Sided Equality")
+
 Well I guess it should just return false
 If it's offline, nothing can be equal to it
 And this isn't really any different from a value going offline
 In fact, this idea that keys are references
 Is nothing novel
+
 I guess all it shows is how simple properties work
 It's really just an equality operator that checks against the internal keyset
 
@@ -3726,3 +3869,1760 @@ we move the transformations out, so the state variable is just a list of raw cap
 and then the transformations are applied to that list of states
 so that all the values in the main logic just trickle down from transformations on these chains of states
 
+
+a good example of this is in the section "Optimizers"
+but a similar and simpler example is rolling average
+let's use a rolling window of size 3
+in imperative:
+
+```js
+let window = [];
+
+function onNewData(x) {
+    window = window.push(x).slice(-3); // push and then get last 3
+    updateDisplay(average(window));
+}
+```
+
+in firefly using state variables
+
+```
+data: state
+onNewData: @time x >>
+    data.push(x)
+
+window: data.slice(-3)
+display: average(window)
+```
+
+imperative is uglier because you have to think about what operations you need to do every update
+with firefly dataflow, you can just model it using simple relationships
+
+let's say we now want a window of size 7
+we probably want to optimize it now to keep track of the previous rolling average
+
+```js
+let window = [];
+let prevSum = 0;
+
+function onNewData(x) {
+    if (window.length == 7) {
+        prevSum -= window[0];
+    }
+    window = window.push(x).slice(-7); // push and then get last 7
+    prevSum += x;
+    updateDisplay(prevSum/window.length);
+}
+```
+
+this might seem like it would be difficult in firefly
+but it isn't
+
+
+also maybe an alternating version
+shows you rolling average of last 3, skipping one in between,
+so `[1,2,3,4,5,6,7,8,9,10]` (`10` being the last datapoint), it would return `(6+8+10)/3`
+
+
+or maybe it takes pairs
+for the last 6 values `a,b,c,d,e,f`, it returns `a*b+c*d+e*f`
+
+or maybe its a delayed rolling average
+rolling average of indices `n-10` to `n-3`
+
+all these are pretty trivial in imperative too tho
+need some example where ordered execution is messy
+perhaps one where order changes, or requires multiple updates/executions per item
+
+
+### Source Code and Partitions
+
+* previously we talked about how public properties = public source code
+* but if you think about it
+* normally, every property only corresponds to one node
+* so it's really not much "source code" if it's just a single node
+  * though it does include any bindings or references from that node to any other public properties
+* however, with partitions it makes a bigger difference
+* because you can see a whole group of nodes
+
+* so i guess the significance of seeing source code
+* is with partitions
+
+### Implementing Choice to Exist
+
+* started thinking about how to actually implement spawning and "choice to exist" (see section "Choice to Exist) in my interpreter
+
+* something that was quite elegant about cloning
+* templates and cloning matched almost 1-to-1 with source code and interpretation
+* the source code is the template
+* the interpreter clones the template to create a live object
+
+* but now we have moved away from cloning, and are now using spawning
+* is there a similar relationship?
+
+* well actually, there's no reason why we have to use source code to spawn objects
+* we can spawn objects however we like
+* cloning is like, taking a Lego set and following the instructions to build a model
+* but you don't have to follow the instructions, you can just create whatever comes to mind
+
+* spawning is like that
+* you aren't restricted to looking at some source code, and copying it
+* spawning is just the raw ability to create objects
+* but how you create those objects is left to the creator
+
+* in our specific case though, for now, we want our interpreter to use source code
+* so it will look very similar to cloning
+
+        source code =[interpreter]=> object
+
+* recall when we talked about how spawning felt ugly
+* because the parent has to define child behavior, including how the child spawns the grandchild, and so on
+* so it seemed like the topmost parent would basically have to define everything
+* everything ends up being defined in one place, one mega object
+* instead of having things defined in modules, like we have in functional
+    // TODO: FIND REFERENCED SECTION
+
+* but then we solved this using "choice to exist"
+
+* well now, while designing the interpreter
+* it does feel like everything is defined in one mega object
+* the source code
+* the source code defines the root program, which defines the nested modules, and the modules within those, etc
+* it's all defined in one giant source code
+
+* so how do we modularize and break this up?
+
+### Recursive Interpreters
+
+* well we can break it up into smaller interpreters
+* an interpreter for each object
+   * (which we were kinda already doing, see section "Modular Parsing - Localizing Syntax Errors")
+* when an object wants to spawn a child
+* it first has to have a reference to the source code for that child
+* and then when it wants to spawn it, it calls the interpreter on the source code
+* then that child, might contain references to more source code, for the grandchildren
+
+* so instead of having one object contain the definition for everything
+* instead, each definition holds a _reference_ to other definitions
+
+* note that, theoretically, an object doesn't have to spawn children off source code
+* as mentioned earlier
+* this is just the mechanism we are using now
+
+### Child Interpreters vs Static Compilation
+
+* every parent object has two options
+1. imbue the child with the ability to spawn their own turing complete objects
+   * eg give the child a complete and unadultered interpreter
+   * in which case, the child would spawn grandchildren by creating a new interpreter and running the grandchild's source code with it
+   * something like `new_interpreter(grandchild_source_code)`
+2. customize the child's interpreter, so that it can only spawn certain objects
+   * maybe it is statically bound to a few source codes, those are the only objects it can spawn
+   * we are essentially taking `new_interpreter(grandchild_source_code)` and static compiling it into `spawn_grandchild()`
+   * so the child does not have the freedom to spawn any source code it wants anymore
+   * the `spawn_grandchild` function spawns an interpreter specifically tailored to run the grandchild, nothing else
+
+### Class Names and Reflection
+
+* sometimes when writing object-oriented code
+* it can be useful to be able to get the classname of the current class
+* Java uses reflection for this
+* javascript also has mechanisms to get the name of the current prototype
+* can we have any mechanism for this?
+
+
+### Lazy Evaluation, DIY Properties, Lazy Properties, Public Cache
+
+* something like `.values`
+* is an O(N) operation using `.keys`
+* a bit slow, would be cumbersome to force an object to update it every time
+	* (on second thought perhaps not because an object's keys changes rarely...?)
+
+* perhaps we can make `.values` a function
+* so any object that wants it actually has to call it themselves
+* make it "copy-supported" (see section // FIND REFERENCED SECTION)
+* so that the caller has to do the operation themselves
+* retrieve the keys, and read every corresponding value
+
+* but maybe the caller can keep a cache of it
+* call it #values or something
+
+* `.values()->` is a bit ugly
+* would be nice if the syntax still looked like `.values`
+* even though it's a function
+
+* maybe instead of a property, an object can declare a pure public function
+* so that readers can calculate the property themselves
+* these are called **DIY properties**
+
+* or maybe we can have **lazy properties**
+* somebody has to request it, before it will get calculated
+* but that makes it a non-anonymous read
+* and the expectation should be that any read, aka any `.someProp` syntax is anonymous
+
+* well actually we could make requests anonymous
+* because insertions are also anonymous
+* for some lazy prop `lazyProp`
+* creates a corresponding `lazyPropRequests`
+* and anybody requesting a read, inserts `true` into the request box
+* so the object knows to calculate it
+
+* this is not quite anonymous reads though
+* because while the reader is anonymous
+* the behavior of the object can change depending on if it is read or not
+* (eg, the object could have some other prop `foo` that is disabled when `lazyProp` is enabled)
+
+* whereas "DIY props" are truly anonymous reads
+
+
+### Recursive Interpreters II
+
+(continued from "Recursive Interpreters")
+
+* its important to notice this distinction
+* the parents spawn the child, but they don't necessarily define it
+* they could pull the definition from somebody else, or from some public repo
+* but they create the behavior, turn it alive
+* every object has to have an "interpreter"
+* in order to spawn child objects
+* the power to spawn any object, frees them from the responsibility of defining any specific object
+* the parent doesn't have to define every child explicitly
+* because it has the power to create any child
+* so the definitions can be stored elsewhere
+
+
+* something i noticed while using notion
+* they dont have great offline support
+* but they treat everything as an object
+* every line of text, every page, every collection of pages
+   * this is pretty much what i wanted to achieve with Facets and Cono
+* so right now you can only have one object offline at a time
+* any single page, or collection of pages
+
+* i realized that my language would work pretty much the same way
+* server side rendering, client side rendering, and offline clientside caching
+* all are just optimizations and modifications on the page
+
+### Implementing Properties using Insertions?
+
+* the wiki for actor model states that actors can only
+  * send messages
+  * spawn actors
+  * receive messages
+
+* but my model also has "properties"
+
+* so it seems like properties should be able to be implemented using the above 3
+
+* we want reads to be anonymous
+* but maybe they could be implemented using insertions
+* since insertions are also anonymous
+
+* reader simply inserts an empty object and the key that they are requesting
+* callee finds the value for that key, and then inserts it into the empty object
+
+* basically pass-by-reference, commonly used in imperative:
+
+```js
+function foo(input, errorObj) {
+    try {
+        return someComplexCalculation(input);
+    catch (e) {
+        errorObj.error = e;
+    }
+}
+
+var errorObj = {};
+var result = foo(10, errorObj);
+console.log(result ? `Success! ${result}` : `Error: ${errorObj.error}`);
+```
+
+### A Static `Message` Type
+
+( continued from prev section, "Implementing Properties using Insertions?")
+
+* but we talked previously about how
+* in order for the callee to do anything useful with the insertion
+* the insertion has to have properties itself, like `readRequest: (key: "foo", value: ())`
+    * see section "Public Sets vs Public Properties"
+* so circular??
+
+* not quite actually
+* because these insertions can have a static structure, like a `Message` type
+* perhaps a two-value tuple like `key: ..., value: ...`
+* and so it's different from objects with properties, which are dynamic and can have an arbitrary number of properties
+* (and I suspect this is what standard actor model languages are doing)
+
+### Property Access using Insertions - Nested Definitions and other Implications
+
+* if we show that property access is just insertion,
+* it shows that "nested property definitions" are totally valid
+   * see section "Nested Definitions and Alternative Syntaxes"
+* because if property access is just made up of functions that take in a key and return a value
+* there's no reason why some of that behavior can't be defined in nested conditionals or for-loops
+
+* but this also allows for dynamic prop accessors
+* which is dangerous, allows for proxying and "friendly fire attack" and such (mentioned previously)
+
+* remember how we wanted property access to be able to capture it into a single object
+  * see section "Private Keys and Anonymous Reads, Property Bundles"
+* note that this implies finite objects, objects must be finite
+
+
+* this is interesting
+* if we restrict inserted objects to be finite
+* (forgot where I was going with this)
+
+### Standard Actor Model vs My Actor Model - Inserting Actors
+
+* so the actor model defined in wikipedia distinguishes "actors" from "messages"
+* and I suspect that in standard actor models, there is a `Message` type with a static structure
+  * (eg the `key,value` tuple mentioned in section "A Static `Message` Type")
+* so that actors can filter for certain messages and such
+* but I don't have this distinction
+* perhaps I can come up with my own formulation
+
+in my model, every actor can
+1. send actors to other actors
+2. display a finite number of properties / unordered set items
+3. spawn a finite number of actors
+4. traverse over all received actors
+5. convert the set of received actors into an ordered array
+
+
+* note that the last one (ordering sets) is required if we want to calc things like size as well
+* note that reason why wiki's actor model doesn't require this ordering-sets requirement,
+* is because the wiki's actor model isn't persistent and reactive like mine
+* so messages are already ordered by time
+
+### Where does scope come from?
+
+* all references come from scope
+* so where does scope come from
+
+* we originally talked about it being "statically bound"
+    * // TODO: FIND REFERENCED SECTION
+* but we don't want scope to be special or integrated into the interpreter,
+* because scoping is a tree-like mechanism
+* and we talked about how the real world is graph-like, and tree-like mechanisms are mere approximations
+* so these tree-like mechanisms are just utlities, libraries, that should be implemented on top of the core
+
+### Inserting Scope and Static References
+
+* perhaps scope can be inserted
+* but how do we ensure that nobody else can insert a "fake" scope, and confuse the child
+* if scope had some public identifier, `is_scope: true`,
+  then a bad actor could insert a fake scope with the same identifier
+* maybe use a private key that is generated by the parent
+* and the child's definition is modified to statically reference that key
+
+        parent:
+            _scope_key // some generated private key
+            _scope:
+                [_scope_key]: true
+                ...
+            child <: _scope
+            child:
+                _scope: _insertions.filter(item => item[_scope_key] = true)
+
+### set_spawn, scope, for-loops
+
+* what about set_spawn?
+* in a set_spawn, each child needs to be able to reference an individual item in the collection
+
+        for item in someCollection:
+            item * item // some behavior that references "item"
+
+* we need to insert the item into the scope before passing the scope to the child
+
+* note that the syntax for set_spawn is to simply do a for-loop on a Collection
+
+* however, a for-loop isn't always a set_spawn
+* for example, a for-loop uses `forEach` for arrays
+
+* also note that `map` is different from `forEach`
+* `map` takes in a function, not a template, and then aggregates the output of each function call
+* this also prevents the input `item` from being exposed on the output object
+
+        result: arr.map((item => item*item))
+
+* notice that even though `item` is passed into every child function, the result objects don't see it anymore
+
+
+* do we need a `forEach` or `map` for collections?
+* what if we want to take the result of the set_spawn, and put it into another collection?
+* you can just use insertion
+
+        result: Collection
+        for item in mySet:
+            foo: item*2
+            result <: this
+
+* you can even use functions, and only collect the function results
+
+        result: Collection
+        for item in mySet:
+            foo: item*2
+            => foo + 100
+
+            result <: this->
+
+### if-statements exploration?
+
+* how do if statements work?
+* first, the parser transforms the if-else statement into a function call,
+    * `if_else(condition, trueBranch, falseBranch)`
+* then we define the function `if_else` as follows
+
+        if_else: condition, trueBranch, falseBranch >>
+            booleanFn: condition = true
+            resultBranch: booleanFn(trueBranch, falseBranch)->
+            => resultBranch()->
+
+things to notice:
+* just like functional, booleans are functions, they take two arguments and:
+    * the `true` function will return the first arg,
+    * the `false` function will return the second
+* `condition = true` is not redundant, since `condition` can be _truthy_, it isn't necessarily a boolean
+* so we use `condition = true` to convert it to a boolean
+* and then we use the boolean as a function, to get the correct branch
+* and then finally, we spawn the branch and then return the result
+
+### References and Static Binding
+
+(continued from section "Inserting Scope and Static References")
+
+* passing in scope via insertions is a little ugly
+* because when the child references `_insertions`
+* we probably want to filter out the scope insertion from this collection of insertions
+
+* also, having the parent create a private key,
+* and then manually modify the child to sift through insertions to find it
+  * as talked about in section "Inserting Scope and Static References"
+* seems a little overkill
+* can we just make the child reference it directly?
+
+* lets assume the child filters through insertions to find the scope object
+* then the child still has to retrieve references to all the other objects
+* via the scope object
+* so whatever mechanism the child is using to store these references to other objects
+* can't it use the same mechanism to store a reference to scope
+* instead of retrieving it from insertions?
+
+* recall that we can model property access via insertion and a static `Message` type
+  * see section "A Static `Message` Type"
+  * where each `Message` is a tuple of `(key: ..., value: ...)`
+* so maybe that's whats happening
+* you get the scope insertion
+* and then you send messages to the scope insertion asking for the objects/value in scope
+* and then it sends them back by inserting them into the message you originally sent
+
+* what are references?
+
+* seems like we want pass-by-reference
+* but we don't want centralized address system
+* is it possible?
+
+
+* actually isn't `[_scope_key]` a reference too
+  * the key we mention in "Inserting Scope and Static References"
+* and we are statically binding that
+* somehow the child has to already have `_scope_key`
+* in order to search the insertions and find the inserted scope
+
+
+* duck typing
+* all that matters is the interface
+* if property access returns the same properties, and insertions go to the same place, its the same object
+* how that property access is implemented may depend
+* for example, if A was bound to B, and they were on the same machine, then it could use memory addresses
+* however, if A and B were on different networks, it may need to use web APIs to connect to eachother
+
+### Constants and Static Embedding
+
+* in fact, i think it would be impossible _not_ to statically bind some constants
+* even if we wanted to just retrieve the first insertion
+* `make_ordered(_insertions)[0]`
+* the `0` is a reference to a constant
+
+* perhaps when we create the "definition" for the child
+* creating these bindings between properties,
+    * eg `foo: bar.zed` creates a property node `foo` that reads the reference `bar` and accesses the property `"zed"`
+* defining the structure of these bindings
+* is the same thing as statically hard-coding a reference
+
+* note that for every child, scope is only passed in once
+* and only passed in from the parent
+* when you want to override references in that scope, you have to pass in an "arguments object"
+* to specify what values to override
+* and that arguments object is created with its own scope
+* and notice that for the arguments object, the scope is only passed in once as well
+
+
+* also notice that every child always has at least one reference: the reference to itself
+* i guess it will also have the reference to its insertions
+
+* if insertions were ordered, then the parent could make sure the scope was the first thing inserted
+* and then the child would retrieve it from the first
+
+* however, at that point, the parent and child are agreeing to some static protocol for passing scope
+* so it's basically the same as statically binding the scope variable
+
+* i guess the only difference between a static reference
+* and a regular reference (that goes through scope)
+* is that you can override scope
+
+* the idea behind overriding scope
+* was the ability to override anything, change anything
+* is it possible to create objects, where absolutely anything is overridable?
+
+### Constants and Static Embedding - Turtles All the Way Down
+
+(continued from prev section "Constants and Static Embedding")
+
+* we can get around the ugliness of the scope insertion getting mixed with all other insertions
+* create a private collector that parent has access to
+* this is exactly the `initializer` method i talked about earlier
+* // TODO: FIND REFERENCES SECTION
+* however, we still need a private shared key for this to work
+* and we'll have to statically embed this key on the child
+
+* even if we try to make constants passed in via scope
+* we would want it in a private var, to prevent outsiders from overriding it
+* but that private key is a constant itself
+* so that will need to be statically embedded
+
+* not to mention, if every constant is retrieved from scope, each will need a corresponding key
+* eg, instead of `"foo"`, you would use `scope[_constant][_foo]`
+* but `_foo` is another constant, where are we going to get that one?
+* turtles all the way down
+
+* so I think constants have to be statically embedded too
+
+* however, constants like strings and numbers are still concepts that are technically defined by the user
+* for example, in functional, numbers are implemented using successor functions
+* they aren't special or anything
+
+* so these constants have to come from somewhere, provided by somebody
+* makes the most sense for the parent to provide them
+* and the parent can get them from its own parent
+
+* so when the parent spawns a child, it statically embeds/binds constants
+* to it's own constants and values
+
+
+* maybe every time you do a prop access
+* it is done via static binding
+
+* well we can use successor fn
+* or some sort of iterator
+* but we still need to access the successor fn first
+* so that would have to be static
+
+* think as if prop access was a function (like it would be in functional)
+* to get any prop, you need a key
+* so we need a key at least in the beginning
+* each key can only get one value, so for every value we need a key
+* well a value can be a set of values
+* however, since its unordered, we would need another key to order it
+* we can also use the same key over and over
+* eg if the first value was an iterator, and we kept calling `next` to get all the values in order
+
+* but we need at least one key
+* and then possibly some protocol (eg iterator) for the rest of the keys
+
+### Constants and Static Embedding - a Single Layer of Abstraction
+
+(continued from prev section "Constants and Static Embedding - Turtles All the Way Down")
+
+* well but whats nice is if we treat any constant as a reference
+* and we need another constant to bind it
+  * eg `"hello world"` becomes `_scope[_STRING_hello_world]`, requiring an additional constant `_STRING_hello_world`
+* that new constant is abstracted away
+* so all the behavior inside the definition is still mutable, overridable
+* including constants referred to inside the definition
+* and as mentioned in the section "Constants and Static Embedding", that was the point to begin with
+  * the ability to override anything defined in the object
+
+* so every reference is provided via static bindings/embeddings
+
+* so really the only thing we need to provide is a mechanism for re-binding references
+* a way to change or override any reference _that is declared in the body of the object definition_
+* that is the mechanism provided by our syntax
+
+* what we are basically doing is taking every reference in the object definition
+* and propping them up one layer of abstraction, hoisting them
+* propping these dynamic, mutable references onto a layer of static references
+* so since these static references are just static keys generated by the parent and embedded in the child
+* if somebody wanted to override one of these references
+* they could get the corresponding static key from the parent
+
+* if the user wanted to rebind/override a reference a level deeper
+* eg in the example earlier, if they wanted to rebind the constant `_STRING_hello_world`
+* well that constant would first be referenced in the object definition
+  * because you can only override variables that are declared in the source code, naturally
+* and since its referenced in the object definition
+* the interpreter will hoist it, creating a static key and putting it on top
+* and you would be able to override it using that static key
+
+### Implementing Static Embeddings - Initializer vs Parent Reference
+
+* so if scope is implemented, we still need a way for the parent to provide variables
+* which is basically what these static bindings and embeddings come down to
+
+* a child can bind directly to values in the parent
+* scope is an extension of that
+* providing the child with variables at any level in the scope, not just the direct parent
+* and it does this by passing scope down the chain
+
+* should we use initializer
+    * parent figures out what values the child needs
+    * puts them on the child's initializer list
+    * and the child references the values from the initializer list
+* or allow child to directly reference parent vars
+
+* initializer requires a lot of intermediate variables
+
+* how does it work when a child needs a value from the grandparent?
+* if the child directly references the parent,
+    the parent first has to put the value onto one of its properties so the child can reference it
+* with the initializer, the parent doesn't need to put the value onto one of its properties
+    it just needs to put the value on the child's initializer list
+
+* how would the syntax look for each one?
+
+* really, since all this is happening in the interpreter, it doesn't matter either way
+* the programmer won't see it
+* these are both just mechanisms for static binding
+
+* i don't want to spend too much time creating another "core language"
+* that runs underneath firefly
+
+* so for now i'll go with the simplest solution
+* allow the child to directly reference the parent
+* using a `_parent` reference
+* that gets transformed into static bindings by the interpreter
+
+* so there are currently 3 special reference keywords
+* `this`, `_insertions`, and `_parent`
+* all other references, are short for `this[_scope_key].foo`
+
+### Implementing Static Embeddings - exploration
+
+* so lets see how this works out in the actual implementation:
+
+        object:
+            _scope:
+                for key in _keyset:
+                    [key]: this[key]
+                for key in _parent.scope:
+                    if (key in _keyset))
+                        [key]: _parent.scope[key]
+
+* wait but notice the `_parent.scope`
+* this is problematic
+* the parent's scope is private
+* shouldn't be accessible via a public property
+
+* it's not enough for the child to simply have a reference to the parent
+* plenty of other actors and objects could also have a reference to the parent
+* but the child should have special access
+* to private values and variables in the parent
+
+* or perhaps another way to put it is
+* the parent can insert whatever values it wants to the child
+
+### Implementing Static Embeddings - Passing a Mapping
+
+* consider the following
+
+        grandparent:
+            _foo
+            parent:
+                child:
+                    => _foo
+
+* remember that `_foo` is a private variable,
+* so it corresponds to some randomly generated address that is hidden from the public
+* somehow, the child needs to be able to reference it
+* the parent needs to be able to say, "any time the child references the string `_foo`,
+  I need to map it to the corresponding address that `grandparent` generated"
+* so the parent needs this mapping between the string "_foo" and the correponding address
+* and the grandparent needs to pass this in
+
+* so this mapping is how private variables work
+
+* it actually seems separate from how scoping works
+* scoping works even if all variables were public
+
+* works in conjunction with scoping
+* scoping determines who this address mapping is passed to
+
+### Implementing Static Embeddings - static substitution
+
+* this mapping between private vars declared in the child, and static addresses that the parent generates
+* is used to substitute all references to these private vars with their corresponding static addresses
+* but this substitution has to be static
+
+* if we make it dynamic, can be dangerous
+* lets say some child contains `_foo`, a static reference to a value in the parent
+* and this substitution mechanism will replace it with a static binding to the value in the parent
+* what if the child interpreter spawns a grandchild that happens to also have `_foo` in its source code
+* these are different references, so we need to make sure the substitution mechanism doesn't touch it
+* static bindings are between parent and child, shouldn't affect anybody else
+
+* these bindings are created when the template is defined, not when the object is created
+
+* mm actually i think it's fine if a child interpreter spawns some grandchild source code that contains "_foo"
+* every object has it's own interpreter
+* the parent doesn't have to pass in the address mapping for "_foo" to every child interpreter
+* only to the children that were created within the scope
+
+### Implementing Static Embeddings - exploration II
+
+(continued from prev section "Implementing Static Embeddings - static substitution")
+
+* hmm so `_foo` corresponds to some generated address
+* can we represent that in code?
+* so something like
+
+        _foo: some value
+
+* would get transformated to
+
+        _fooKey: ()
+        [_fooKey]: some value
+
+* and then `_fooKey` would be passed to child scopes,
+* and anytime they reference `_foo` it transforms to `_scope[_fooKey]`
+
+* however, note that we have another private var, `_fooKey`, does that require the same transformation?
+* circular
+* (revisit: I think here I'm getting a little confused about what's happening in the program and what's happening in the interpreter)
+
+### Keys Require Keys?
+
+* so far we have been running under the assumption that every value/node needs an address
+* locker room analogy
+* and public values are just values whose addresses are declared in the public `keyset`
+
+* however, we also noticed that keys represent the same information as values
+    * see section "Using Keys to Store Information"
+* so every key is also a value
+* so if every value needs a key
+* and keys are values
+* that means every key needs a key
+* circular!
+* we end up creating a key for every key, turtles all the way down
+
+* this is different from the circular logic we discussed in section
+  "Constants and Static Embedding - Turtles All the Way Down"
+* in that section, we shows that we need to static embedding some keys
+* however, here, we show that keys themselves need keys
+* so how can we static embed a key?
+
+### A Base Library of Constants
+
+(continued from prev section, "Keys Require Keys?")
+
+* well perhaps...a key is a static reference to an outside value
+* this is also mentioned in the section "Using Keys to Store Information"
+
+* but then there needs to be some sort of "base" library of constants
+* to reference against
+* 
+* how are those constants created?
+* is it possible to generate numbers with a successor function, like in functional?
+
+### Comparison with Functional, and how Functional handles References
+
+* how does functional handle references?
+* functions have ordered arguments, and the function body just references these arguments
+* so in a sense, functions key their arguments by index `0`, `1`, `2`, ...
+* and then the function body references those arguments by their index, `args.0`, `args.1`, etc
+* and these natural number indices are provided at the interpreter level, provided from the start
+
+* or even simpler, the function body probably binds directly to the arguments
+* no need for these intermediate indices
+
+* however, for our language, having these intermediate keys are useful
+* because we are binding scope directly and accessing values on scope via these keys
+* however, each key is a direct reference,
+    * eg using the example explored in section "Implementing Static Embeddings - exploration II"
+    * the reference `_foo` is replaced with `_scope[_fooKey]`,
+    * where `_fooKey` is a direct reference to the address of `_foo`
+* these addresses and constants are provided to the child interpreter
+
+
+* also, sometimes local references can be replaced with a direct binding
+
+        _foo: ( spawn something ... )
+        bar: do something with _foo
+
+* in the example above, we wouldn't need an address for `_foo`,
+* we can just bind the reference in `bar` directly to the object created in `_foo`
+
+
+* functional doesn't just bind to arguments
+* also has scope, since functions need to be able to refer to other functions
+* these references are also probably statically bound
+
+* my scoping mechanism is recursive
+* each nested scope references their direct parent
+* so static references go to the direct parent as well
+
+* however, for scope composition to work
+	* (aka passing scope down hierarchy, inheriting scope from parent and adding+shadowing vars)
+* we have to transform references into scope accesses
+
+### Equality and Property Access - circular
+
+* to create the constants and natural numbers in the top level scope
+  * as we said was necessary in the section "A Base Library of Constants"
+* we can create various empty objects
+* and use those as keys
+* maybe one represents the `next` key, and another represents the `value` key
+* so we can create a linked list
+
+* if they are empty objects though, how does an actor check equality with them
+* because property access, is just checking the input key against the keyset
+
+* to check equality, we use the method outlined in section "Double-Sided Equality"
+* we first need two boolean values, `true` and `false`
+    * (these are implemented like they are in pure functional)
+* then, for a given object, we need a private var `_id` that stores the value `true`
+    * the private key can just be an empty object
+* and the object has an `equals()` function, that takes in another object,
+  and checks `_id` of that object and returns the value
+* note that we don't need the string `equals` for this to work,
+* we can use another empty object to represent the `equals` key
+
+* actually no, because we can't access `equals` or `_id` without equality
+* because property access uses equality
+* circular
+
+### Syntax Exploration - Bracket-Notation Property Access
+
+* when doing bracket-notation property access
+* use `.[key]` instead of `[key]`
+* looks cleaner when chaining multiple accesses, eg `foo.[key].[key2].[key3]`
+* note that we don't want to use `.(key)` (as explored in an earlier section)
+* because the sytax `(key)` could look like we are declarng a nwe object
+
+### How does Functional Return Multiple Items?
+
+* an equality check implies dynamic prop access
+* which got me thinking about how to implement booleans without prop access
+
+* note that in functional, booleans work by taking two functions and calling one of them
+* but recall how we dont have cloning/calling, only spawning
+* so the equivalent would be
+* taking two objects, and inserting into one of them
+* and each object is doing a set_spawn, so whichever one gets an insert, will spawn some behavior
+
+* we can think of pure functional as similar to our objects
+* except there is a default output
+* whereas our objects have no default, every property acts as an output
+
+* got me thinking, how does functional handle returning multiple items?
+
+* you could return linked list
+* but linked lists are complicated constructs on their own
+* and you have to worry about retrieving `nextNode` and `currValue`and such
+
+
+* it returns a function, and you call that function
+* and inside that function it can have as many returns as it wants
+* closure
+
+    let res = returnMultiple()
+    returnMultiple(function (a, b, c) {
+        do stuff with a b c here
+    })
+
+* its interesting because its so different from a single return
+* wth a single return, you just use it directly
+* with multiple, you have to pass a callback
+* i guess you could use the callback method for single returns too
+
+        let res = returnSingle()
+        doStuff(res)
+
+        let fn = returnSingle
+        fn(function (res) {
+            doStuff(res)
+        })
+
+### Callbacks for Property Access
+
+(continued from prev section "How does Functional Return Multiple Items")
+
+* could we use the same method for prop access?
+* every time you access an object, you call it like a function, and pass a callback
+* and the callee calls your callback with all it's properties
+* so instead of
+
+        print(foo.a)
+        print(foo.b)
+        print(foo.c)
+
+* you would do
+
+        foo((a b c =>
+            print(a)
+            print(b)
+            print(c)
+        ))
+
+* whats useful about this is
+* the references to `a` `b` and `c` become static bindings
+* so we don't need to worry about giving `foo` a key, doing some equality check to find
+  the corresponding value, and then passing the value back
+* there is no equality check or prop access mechanism necessary anymore
+* you access properties simply by statically binding to the values passed back in the callback
+* (note that this prop-access-function `foo` is pure functional,
+   so you don't have to worry about calling it multiple times)
+
+* these aren't static references, the child is not referencing the parent
+* the parent directly sets some (private) vars on the child
+* and the child accesses them
+* the child only accesses itself, so the parent has to manually
+  set some values on the child to initialize it
+
+* if we think in terms of graphs
+* the child is a graph of nodes referencing other nodes
+* but some of these nodes don't have values, they are just referenced by other nodes
+* almost like function arguments
+* declared but not set
+* the parent is responsible for setting those values, binding those nodes
+* however, with high level constructs like scoping,
+  the programmer largely doesnt have to deal with this mechanism directly
+
+### Callbacks for Property Access - Private Props
+
+* with this functional representation of prop access
+* we could even add in the concept of private variables, shared private vars
+* you pass in a keyset
+* and it calls the callback with the corresponding values
+
+    foo(("a" "b" "c"), (a b c =>
+        print(a)
+        print(b)
+        print(c)
+    ))
+
+* well actually, we could simply make every prop access separate
+* you pass a key, it passes back the value
+    foo("a", (a => print(a))
+    foo("b", (a => print(b))
+    foo("c", (a => print(c))
+
+* but i guess this comes back to the original problem with prop access
+* how is it implemented
+* how does it find the corresponding key
+* equality check?
+
+* so perhaps it's best to just return all the values in one callback
+* note that there is an inherent ordering of the arguments too
+* and the callee passes the values in that order
+
+* but this can really just be syntactic
+* when you declare an object, you declare the properties
+
+    foo:
+        a: 10
+        b: 20
+
+* the interpreter generates the property access function
+* and then when you access the properties, internally the interpreter will transform it
+* so `print(foo.b)` becomes
+
+    foo((a b => print(b))
+
+* how do private props work?
+
+### Static Property Access
+
+(continued from previous section "Callbacks for Property Access - Private Props")
+
+* also this implies static prop access
+* which may be exactly what we want
+* seeing how dynamic prop access leads to so much circular logic
+
+* also dynamic prop access prevents anonymous reads
+
+* static prop access is also like the encryption method
+  * see section "Private Keys and Anonymous Reads, Property Bundles"
+* you get a giant encrypted package from the object
+* eac key is a decryption key, use it on the package to get the corresponding value
+
+### Common Protocols, Address Spaces
+
+* static prop access requires a common protocol
+* eg the decryption protocol
+* whoever wants to read an object, has to know which protocol to use to read it
+
+* eg if an entire group of objects is running on a single machine
+* they might simply use addresses and reference equality to reference eachother, access properties
+
+* objects on the world wide web, might use IP addresses, and GET requests to access eachother
+
+* perhaps every object declares what protocol they are using to provide properties
+* on some sort of special property
+* so readers can see what protocol to use to retrieve those properties
+
+* maybe the protocol is declared as a pure function
+* and the readers just copy that function,
+  and execute it on their own machine to access the properties it needs
+* eg, Alice exposes the RSA decryption function,
+  and a list of property values RSA-encrypted by their keys
+* Bob, who has a list of keys that he wants to access,
+  copies the RSA decryption function,
+  and then goes through the list of encrypted prop values,
+  decrypting whichever ones he can using the keys he has
+
+### Equivalence of Address Spaces
+
+* address spaces and references
+* many different ways to represent an "address"
+* you can use numbers
+* or strings
+* or some other kind of object, with custom defined equality and comparator function
+
+* so maybe we should just choose one type of address space
+* and convert all other types of addresses into that one
+
+* order is a mapping
+* really, any such address space can be mapped to any other
+* each address space is just an ordered set
+* so we can choose one address space, like the natural numbers
+* and everything else can be mapped to it
+
+### Alternatives to Fully Dynamic Prop Access
+
+* i think we can say at least one thing for sure
+* prop access cannot be fully dynamic
+
+* maybe we can make one prop special
+* that is, a special property that anybody can access statically
+* eg the `_return` or `=>` property
+* we could use this prop to represent the output of a function, and write functional code
+* and then implement everything else on top of functional
+
+* but is one special property enough?
+
+
+* maybe we can have dot-accessed props be special
+  * eg `foo.bla` is a static access, `foo['bar']` is a dynamic access
+* because they are always going to be static strings
+* kinda like how in python dictionaries, you access attributes like `myDict.items()` and values like `myDict['someKey']`
+
+
+* maybe we can have reference equality
+
+* maybe we can make a special property `_addr`
+* you can set it
+* but it has to be a number
+* and the interpreter is responsible for the equality
+
+### How many static properties is enough?
+
+* in the prev section, "Alternatives to Fully Dynamic Prop Access"
+* we asked if one static property was enough to fix our language mechanics
+
+* one static property is not enough
+* recall how we talked about implementing multiple returns in functional
+* and we could use the multiple args
+* or a linkedlist
+* but a linkedlist requires two args
+* `next` and `value`
+
+* so maybe we need at least two
+* because to establish order
+* we need to compare objects against eachother
+* same reason why comparator fn needs two args
+* once we can establish the ordering of every pair of objs
+* we can establish the total order
+
+(actually wait but isnt it possible to formulate a fn with multiple args, into a curried chain of functions with single args?)
+(well but currying still relies on statically binding each arg at each step)
+(so thats equivalent to static binding multiple args)
+
+* 2 is a weird number though
+* relies on chaining to establish order
+* but we previously talked about how we wanted to avoid using chaining everywhere
+    // TODO: FIND REFERENCED SECTION
+* eg we shouldnt think about 1+2+3+4 as ((1+2)+3)+4
+* we should think of it as `sum(1 2 3 4)`
+* order is treated as a high level construct
+* we should be able to declare a list (1 2 3 4) as ordered
+* instead of manually chaining together pairs to do so
+
+* in fact, maybe we can think of order as a mapping between a list, and the natural numbers
+* the natural numbers is just an arbitrary ordered list to map against
+
+* we talked about this in the section "Equivalence of Address Spaces"
+
+### Address Space as an Abstract Concept
+
+(continued from sections "Equivalence of Address Spaces" and "How many static properties is enough?")
+
+* actually an address space doesnt need to be ordered
+* it just needs to prevent collisions
+* basically just an infinite set of unique ids
+
+* so all we need is this abstract concept of an address space
+* and all possible addresses, eg numbers or strings, get converted to items in this address space
+
+### Math and Order Theory
+
+* though does an infinite unordered set exist?
+* how would you generate infinite items without some sort of order?
+* generating items using some sort of recursion, means some items are generated before others, implying order
+
+* i feel like this is getting order theory, which is out of my domain
+
+* the formal term for an "unordered set" is an [Antichain](https://en.wikipedia.org/wiki/Antichain)
+* I believe infinite antichains probably exist
+
+* the problem is, in order to use a key to retrieve a value, or in other words, to retrieve an item at an address,
+  at the very least, addresses have to be able to be checked for equality
+
+
+### Math, First Order Logic, and ZFC Set Theory Axioms
+
+* I was looking at https://math.stackexchange.com/questions/877211/example-of-first-order-logic-without-equality
+* and they mention that to test for equality of sets, they use this notation:
+
+$$
+X = Y \quad \text{means} \quad  (\forall n)(n \in X \leftrightarrow n \in Y).
+$$
+
+* I noticed that they have the notation $\forall$ and $\in$
+* these are core operators
+* in a sense, $\forall$ corresponds to `set_spawn`
+* so what does $\in$ corresponds to?
+* what about $\exists$? `pick_one`?
+
+
+* note that along with the quantifiers $\forall$ and $\exists$, ZFC set theory only has one operator, the $\in$ operator
+* you can actually implement set equality using it
+* first define `subset`, and then define "A = B if A is subset of B and B is subset of A"
+
+* in firefly, perhaps we should do the same
+* set membership, `a in A` is a core predicate
+* and to test equality, `a = b`, simply wrap `b` in a set `B` and check if `a in B`
+
+* worth noting that the 3rd axiom of ZFC, the [Axiom Schema of Specification](https://en.wikipedia.org/wiki/Zermelo%E2%80%93Fraenkel_set_theory#3._Axiom_schema_of_specification_(also_called_the_axiom_schema_of_separation_or_of_restricted_comprehension))
+* it says that set-builder notation has to be restricted to a domain
+* which means this restricted set-builder notation can be implemented using `set_spawn` and conditionals
+* note that set theory and set-builder notation only needs logical conjunction
+* logical union can be achieved via the 5th axiom [Axiom of Union](https://en.wikipedia.org/wiki/Zermelo%E2%80%93Fraenkel_set_theory#5._Axiom_of_union) and the formula
+
+$$
+\cup {\mathcal {F}}:=\{x\in A:\exists Y(x\in Y\land Y\in {\mathcal {F}})\}
+$$
+
+* note that the axiom of infinity says there is at least one infinite set
+* i think this is needed because with the 3rd axiom
+* you need to restrict any set definition to a domain
+* so if you want to define any infinite set, eg even numbers or something
+* you need at least one infinite set to establish an infinite domain for other sets
+
+* perhaps this is why firefly needs an address space
+* establishes an infinite domain
+
+### ZFC Set Theory vs Type Theory (Lambda Calculus)
+
+* its interesting to note the difference between ZFC and lambda calculus (functional)
+* heres a good summary
+* https://math.stackexchange.com/questions/2130269/why-did-mathematicians-choose-zfc-set-theory-over-russells-type-theory
+
+* bascally, set theory and ZFC is based on set membership
+* but jt still required a foundation of predicate logic
+* eg $\forall$, $\exists$, $\land$
+
+* type theory and lambda calculus is a lot simpler
+* only requires two operators:
+1. abstraction (the $\lambda$ operator): function definition
+2. application ($\.$ operator): apply the fn to an argument
+
+### Generating Keys using Successor Function and Random Chance
+
+* maybe a functional version of firefly wouldnt need addresses
+* just a natural number generator (successor fn) with a random chance of stopping at any point
+* generates keys for objects
+
+### Wikipedia for Bound vs Free Variables
+
+* to get a better idea of how functional does "static binding"
+* worth mentioning the formal definition for [bound vs free vars on wikipedia](https://en.wikipedia.org/wiki/Free_variables_and_bound_variables)
+* for an example like this:
+
+$$
+\sum_{k=1}^{10} f(k,n)
+$$
+
+* $n$ is a free variable and $k$ is a bound variable
+* in other words, the value of this expression depends on a user-provided value of $n$
+* but the value of $k$ is already defined
+
+### Firefly vs Functional - Level of Abstraction
+
+* if we can implement firefly using functional
+* why not?
+* why not just make everything ordered
+* at the top level, with all the syntax sugar and abstractions
+* we can still make it look unordered?
+
+* because we want our language to start at that higher level of abstraction
+* shouldn't matter how the lower level is implemented
+* this is the level of abstraction we want
+* eg, instead of trying to implement `spawn(...)`, or sets/collections
+* just treat them as an axioms
+
+### Why We Need Address Spaces - so we can reference more than one thing
+
+* feels ugly to mix insertions and static bindings
+* but insertions aren't enough
+
+* by not having an address space
+* we are effectively making it so every actor only has one thing they can reference:
+* insertions
+* and even though insertions is a set
+* since it's unordered, its impossible to do anything useful with it
+* without some sort of ordering system
+* so effectively, every actor only has access to a single entity
+* and i don't think that's useful
+
+### Addresses as a Primitive
+
+(continued from prev section "Why We Need Address Spaces")
+
+* and yeah it does feel ugly to mix insertions and static bindings
+* recall how we explored a model that uses a primitive Message object
+  * see section "A Static `Message` Type"
+* with two static keys, "key" and "value" or "address" and "message"
+* in that model, we didn't need static bindings
+* everything was done via insertions
+* and the object just statically references the two special keys, "key" and "value"
+
+* well now that we have made an address space basically a primitive
+  * see section "Address Space as an Abstract Concept"
+* there are an infinite number of these "special keys"
+* these addresses can be used or referenced within every object
+* and are statically bound
+
+* but these keys are all shared across all objects
+* any object can reference them, or use them
+
+* addresses are a primitive that anybody can access
+
+* so now we can use the `(key: ..., value: ...)` insertion system
+* since `key` and `value` get converted to addresses
+* so when the object is reading the `key` and `value` of insertions, it works like static references
+
+* but now that we have infinite static keys to choose from,
+* it is a lot more flexible
+* and we don't have some arbitrary number of special keys
+
+### Address Equality?
+
+* in addition, for prop access to work properly
+* we have to be able to check address equality
+* i guess we could do this using set membership, the $\in$ operator
+* but perhaps we should just make address equality a primitive operator, for simplicity
+
+### Bound Variables vs Addresses as a Primitive
+
+* like even in functional
+* functions use currying so that each function only needs one argument
+* however, in the body of the function, it takes a reference to another function,
+  and statically binds the argument
+* and then it returns that altered function
+* it statically binds the arg
+* by embedding the value in the source code
+  * you can think of taking the source code of the referenced fn,
+    and substituting the parameter with the arg value
+  * this is why referential transparency is important in functional.
+    its so we can do this substitution
+* so in a sense, that source code is now referencing the arg
+* the difference is that it's not a reference, it's embedded
+* so it uses the language itself, (whether it be haskell, lisp, etc), to represent the value
+* the source code, including the embedding, is static and standalone
+
+* so even if we modeled actors like functional
+* every actor gets a single argument, its insertions
+  * which are unordered so it can't distinguish between each one
+* and we give every actor a single output (some special property, eg the `=>` property)
+* we would still need static binding
+
+* in a sense, our address space _is_ the source code
+* since we each node is stored at an address
+  * just like in source code, every character is stored at a position in the document
+* so static references, statically binding references to other actors
+* is analogous to how functional embeds argument values into the source code
+
+### How Are Actors Converted to Addresses?
+
+* recall how we talked about how keys store as much info as values
+    * see section "Using Keys to Store Information"
+* well this was when keys could be objects/actors
+* now, keys are addresses, a new primitive type
+* separate from actors
+* so now, actor/object keys are passed in like any other value (using insertions)
+* but then...how are they converted to addresses
+
+* how are actors converted to addresses
+
+### Revisiting Object Keys and the `.equals()` method
+
+* maybe our equality method could work now
+  * see section "Double-Sided Equality"
+* using `.equals()` and checking the input key against all other keys
+* because now, we don't have to worry about the `.equals` method being a property access itself
+* because maybe the `.equals` method could actually be a static address
+
+
+* even tho addresses are primitive, they arent exposed to user
+* more like internal mechanism
+
+* if we could have a centralized address system
+* all of this would be trivial
+* would basically be like an id for every object
+
+* but how to make decentralized?
+* actor has to provide id? otherwise equality fails?
+* but then identity theft
+* reader provides list of keys that it wants
+* readee returns corresponding list of addresses
+* safe because it knows the reader has access to those keys
+* also we want full anonymous reads
+* forcing thr reader to provide the keys it wants access to, breaks anonymity
+* can we tweak this mechanism to work
+
+* using a `equals()` method is still bad because
+* it is dynamic
+* if an object overrides the `equals()` method to have side effects, it breaks anonymous reads
+
+### How Are Actors Converted to Addresses? Part II
+
+* imagine if we had objects that represent people, `Bob` and `Alice`
+* imagine using them as keys
+* how can you?
+
+* what about webpages
+* what if we wanted to tag webpages with content
+* how could you?
+
+* webpages do have a unique web address
+* so maybe thats the id
+
+* need some centralized id system
+* or maybe at least if you want to be able to key using objects, those objects need an id
+
+* but if we go back to the webpages example
+* a webpage could be a single page app
+* have internal state that you can't access
+* so the web address isn't enough to uniquely identify it
+* if you interact with the site, and it changes without changing the address
+* then sending the address to somebody wouldn't send over that internal state
+
+hmmm
+
+### DataFlow and the React.js Model
+
+* sometimes it can be tempting to try to render something based on
+  whather some other component is being rendered
+* but react does not allowing state changes during render
+* we can think of UI is a system of events=>state vars=>state=>UI
+* functional reactive
+
+* now feedback can start to come into play when multiple actors interact with eachother
+* but the UI system is a layer on top, and does not have feedback
+* we can think of it as a bottom and top layer
+* in the bottom layer we have a network of nodes interactig
+* the top layer is how each node is displayed, the ui of each node
+* and state flows from the bottom to the top
+* and events flow from the top to the bottom
+
+### An Argument Against a Single Source of Truth
+
+* react redux forces a single source of truth
+* but i think it's best to modularize it
+* into multiple data stores
+
+* one way to think about it is using state machines
+* with $N$ states, $N^2$ transitions
+* so if you have a ton of states, the number of transitions to worry about blows up
+* and often we care about what happens during each transition
+  * eg when the user opens the webpage, when they minimize the webpage, etc
+
+* if you split it into smaller machines
+* less transitions to worry about
+* splitting it into two machines with $N/2$ states each, halves the total number of transitions
+* even though you have the same amount of states
+
+### Pass by Value vs Pass by Address
+
+(continued from section "How Are Actors Converted to Addresses? Part II")
+
+* actually sharing a web address isnt the same as sharing an object
+* a web address points to a template for a web page
+* tHe client's browser instantiates the template to create the dynamic web page
+
+* sharing the web app object
+* would be like sharing the browser + interpreter + client state
+* which is feasibly possible
+
+* however, the client would still have to give you some sort of id right?
+
+
+* normally, if you have a reference to an actor/object
+* you can use that reference all you like
+* no need to use the object as a key and add extra tags/properties to it
+* just use the object directly, and any extra info you need, just declare as properties in the scope or something
+* the main use case for using it as a key and add extra tags/properties to it
+* is if later you have dynamic reference, so you don't know which object it's pointing to right now
+* (eg if it were an inserted object, you don't really have control over what is inserted)
+* so you use the object as a key, to retrieve whatever info you had stored about that object earlier on
+
+* in that sense, equality is rather important
+
+
+* all this is crucial for tagging
+* if the object has to provide an id in order to be addressable
+* then anybody could easily prevent objects from being tagged
+* could lead to a hostile ecosystem where everybody is preventing everybody else from tagging their objects
+* almost like an internet system where websites prevented users from bookmarking them, or from posting the website to reddit
+
+* but i think tagging is useful, i want people to be able to tag whatever they want
+
+### Pass by Value vs Pass by Address II
+
+* if bob gives alice an apple
+* and then later gives an apple
+* how does alice know its the same apple? 
+* why cant bob create two instances of apple, but make the world treat them the same
+* just like how 1+3 is treated the same as 4
+
+* in the real world this isnt possible
+* only one person can hold the object at a time
+* the object only exists once
+* so each instance is different
+
+* however, if you want to be able to pass objects around
+* well how do you tell two apples apart?
+* by their properties?
+* what if they have the same properties?
+* i guess if you could hold them both at the same time, they are different
+
+* pass by value or by reference
+* pass by value is passing the apple around
+* pass by reference would be like, passing the GPS coordinates of the apple
+* passing around the address of the object
+* which is useful because the address is unique and can be used for tagging
+* requires the apple to be stationary
+* and requires a global address system (in this case, GPS coords)
+
+* this is why imperative langs can use pass by reference
+* the interpreter runs in a single address space
+
+### Passing Addresses Across Different Address Spaces
+
+* well maybe it could work across address systems
+* alice tells bob the position of the apple within her house
+* however, this position only makes sense within alice's house
+* bob is not in that address space, so he needs to convert it to his own address space
+* bob knows where alice's house is, so prepends her house's address to the position given by alice
+* to form a new address
+* bob tells charlie that address
+* charlie and bob are in the same address space (maybe in the same city or something)
+* so the address provided by bob is enough for charlie to find the apple
+* no need to prepend another address
+
+### Creation Address, Insertions, and Identity Erasure
+
+* but insertions
+* are like passing around an object
+* anonymous
+* so you wouldnt be able to insert an address
+* because you would have to provide the parent address space
+* which would give away the parent
+
+
+* another perspective:
+* do we tag addresses or objects?
+* because if we try to tag an objects by its address
+* the object at that address might change
+
+* every object is created by some parent
+* so it does have some root address, some "creation address"
+* and that address will only contain that object
+* however, maintaining addresses across multiple address spaces
+* requires a chain of addresses
+* basically giving up the identity of all parents along the way
+
+
+* "erasure"
+* inserting an object erases it's identity in a way, since it has to be anonymous
+* you can insert an object into multiple collectors
+* and if its insertion-by-value and not by address
+* then it's impossible for those collectors to tell if they were the same object or not
+
+* in fact, the same could be said about inserting an object twice into a collector
+* with "erasure", the collector has no way of telling if they are two different objects or a single one inserted twice
+
+* what if its pass-by-reference until it gets inserted into a collector
+* at which point the collector creates a new address for the object
+* and then it gets passed-by-reference again
+* in essence, every time you insert, it resets the address
+
+
+* pass-by-value might make it impossible to address most objects
+* because items have to provide their own address
+* and everybody might use different systems or standards
+
+* if we reset address during insertion
+* breaks equality
+* if you insert an item into a collector
+* then compare the inserted item with the original
+* different addresses, so equality fails
+* so we would still need some internal object id or something to fix equality
+
+* if we have erasure
+* we need internal ids
+
+### Pass by Value vs Pass by Address III
+
+* another example
+* if an actor publishes a private object onto two public properties
+* then either:
+  1. readers have to rely on the object's attributes to determine equality
+  2. the public properties expose the address of the object, not the object itself
+
+
+* if you want to talk to an object
+* you need to talk to it's server+port+address
+* so you have to know its address right?
+
+* but that's more implementation
+* from a high level perspective
+* you are just talking to an object
+* doesn't matter how you got to that object
+
+### Property Access Mechanisms - Exploration
+
+* maybe every object has a default hidden id and`equals()` implementation
+
+* i think it's fine if we use dynamic prop access for object keys, eg using the `equals()` method
+* basically, the actor contains a private keyset
+* and a mapping between keys and addresses
+* and whenever a prop access request comes in (via an insertion)
+* the actor checks all keys to see if any match
+* and if so, gets the corresponding address, retrieves the value at that address
+* and gives it to the requester
+
+* it's still anonymous?
+* since insertions are anonymous?
+
+* however, dynamic prop access means actors can record all requests
+* and can record keys that it doesn't know about
+* a danger alluded to in section "Caller-Provided Keylist"
+
+* maybe actors provide an obfuscated keyset
+* requesters can check if a key is in the keyset
+* but they can't enumerate the keys
+* can check membership, but can't set_spawn
+
+### Embedded Addresses
+
+* note that now that addresses are a primitive
+* you can reference addresses directly within any object
+* can be statically embedded inside objects too
+* it's the only global primitive, everybody understands it
+
+### Implementing Iteration using Spawning and Recursion
+
+* maybe `set_spawn` is possible on set of addresses
+
+* maybe iteration is possible
+* we can use recursion
+* and its fine because we are reading templates
+* not cloning live objects
+
+* an actor spawns children
+* by reading from templates anyways
+* every actor contains an interpreter
+    * see section "Recursive Interpreters"
+
+* so we could have an actor Bob that inserts into Alice
+* and Alice returns the source code for Bob
+* Bob spawns it
+* and the cycle continues
+
+* can result in infinite objects
+* but this was possible with set_spawn too
+* eg if for every insertion, Bob spawns Charlie,
+* and every Charlie inserts an item into Bob
+
+* however, infinite objects will cause the interpreter to hang
+
+* luckily, while iteration does use recursion, it does not create infinite behavior
+* you have to call "next()" to iterate
+
+* but wait `next()` is a clone operation
+* how do we implement this with insertion
+
+
+* hmm how did we solve the issue with infinite recursion references
+* every reference is prop access on scope
+* but then that level deeper is implemented with static binding
+* which we now know is just hard-coded addresses
+
+* so what about object-keys
+* well at some point you need to map the object to an address
+* and it cant be hardcoded
+* because the reader wont know what address you hard-coded
+* the reader needs to map it to the same address that you did
+
+### Functional Property Access - Implementing Property Access using Sandboxing and Equality
+
+* man all of this would be a lot easier if all objects had a unique address
+* that anybody could access but nobody could modify
+* like how memory addresses work in normal imperative programs
+
+* maybe im thinking about this too low level
+* maybe i can just make prop access an axiom
+* a protocol built into the interpreter that the language just references
+* the protocol asks the object for the keyset
+* the keyset is provided as an obfuscated black box
+  * a mechanism we explored in the section "Private Keys and Anonymous Reads, Property Bundles"
+* but what it does internally, is given a key, checks equality against the keys in the set
+* but its pure functional, so the reader doesnt have to worry about leaking/exposing any private keys unnecessarily
+  * since we don't want the object to be able to record property access requests, as discussed in section "Property Access Mechanisms - Exploration"
+* the reader can execute the entire black box on their own machine, firewalled and sandboxed
+
+* each object key in the keyset have to provide an `equals()` method
+* so that the object can construct the black box that checks equality against each key in the keyset
+* in addition this `equals()` method has to be pure functional (so that the black box can be pure functional)
+
+* wait..then that's it!
+* we just need a pure functional `equals()` method
+* and then all of this can be implemented
+* and a pure functional isEquals method is trivial, can use hard-coded addresses
+
+### Implementing Sandboxing using Spawning and Restricted Scope
+
+* i guess the last thing is
+* spawning source code in a sandbox, has to be an axiom too
+* in order to implement the property access protocol
+
+* actually, sandboxing is trivial
+* just control the scope
+* even if the source code is obfuscated
+* it will need a reference to external actors if it wants to insert into them
+* so just don't provide those
+* just provide primitives like numbers and strings, and some lib functions like `forEach()`
+
+### the Connection between Addresses as a Primitive and Key-Value Duality
+
+* we previously discussed how object-keys contain just as much information as values
+    * see section "Using Keys to Store Information"
+* because they are objects after all
+* interestingly, addresses as a primitve, demonstrates key-value duality quite well
+* object-keys are in fact just values
+* values stored in a keyset,
+* and when a reader asks for a property, they provide a key, which is checked against the keyset
+* and if there's a match, a corresponding value is retrieved
+* but ultimately, all values and object-keys are stored on top of addresses
+
+### Is Spawning Source Code an Axiom?
+
+* this is only possible because of one more axiom
+* the ability to read and copy source code
+
+* the object defines the function for accessing its properties
+* and displays it on a designated property, the `_prop_access` property
+* readers read from that property to get the property access function
+* and copy it and run it sandboxed
+
+### Universal Constants
+
+(continued from prev section, "Is Spawning Source Code an Axiom?")
+
+* note that this `_prop_access` property doesn't need to be "public"
+* because its a static address that everybody already knows about
+* in a sense, its a static address hard-coded into every interpreter
+* a **universal constant**
+* in addition, "public" doesn't exist anyways, "public" is just determined by what keys are exposed on the `keyset` property
+* `keyset` being yet another universal constant
+
+
+* if an object doesn't put anything on their `_prop_access` property, or puts a broken function there
+* it will be as if the object doesn't expose any properties
+
+### Sets of Addresses
+
+* what about sets, `set_spawn`, and public sets?
+* how do they fit in now that addresses are a primitive?
+
+* maybe public sets are just sets of addresses
+* and when you access them, it automatically retrieves the values at those addresses
+* so something like
+
+        foo:
+            myset: ("hi", "bla", "foo")
+
+* is internally represented as
+
+        foo:
+            myset: (_1, _2, _3) // note: these are addresses not private vars,
+                                // I haven't decided how to represent addresses yet
+            _1: "hi"
+            _2: "bla"
+            _3: "foo"
+
+* but `console.log(foo.myset)` will still output `("hi", "bar", "foo")`
+
+* so the values are actually still stored on the parent object
+* which keeps to the tradition that all values are stored at an address
+
+* however, this "flattening" of the structure, storing values in the parent
+* what if we did this with nested objects
+* what if nested objects were simply bundles of addresses to values in the parent
+* feels wrong, but why?
+
+* well if we took this to the extreme, and made _all_ objects just bundles of addresses pointing to values in a single mega-object
+* well this is essentially like how java/javascript/imperative interpreters work
+* but it requires a single address space
+* centalized
+
+* and that's the problem
+* if nested objects contained addresses pointing to values in the parent
+* then you couldn't pass those nested objects around, without also passing around the parent
+* if you pass around a reference, the receiver has to know the context for that reference
+
+* and so we would have the same problem is public sets were just sets of addresses
+* you wouldn't be able to pass the set around, without passing around the context for those addresses, aka the parent
+
+### A Reflection on The Past Month Exploring Circular Logic and Axioms
+
+* I think it's worth mentioning
+* my revelation about addresses as a primitive (section "Addresses as a Primitive")
+* was just a week ago (3/7/2020)
+* and it feels like since there, i've been making a ton of progress
+* like all the pieces are falling into place
+
+* i had been fumbling around with so much circular logic, constantly confusing me
+* and it feels like once i put that axiom down, set down that first foundational block
+* everything else could be built on top of it
+
+* interestingly enough, I was actually really close to the idea of addresses as a primitive back in the section "A Base Library of Constants"
+* I talked about how keys reference keys, so ultimately at the root we need a base library of constants
+* that anybody could use as keys/addresses
+* and they would statically bind to these addresses (aka static embedding)
+* which is basically exactly what addresses as a primitive achieves
+
+* perhaps if I had looked back at my notes
+* I would have reaized this sooner
