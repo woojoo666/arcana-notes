@@ -5626,3 +5626,668 @@ hmmm
 
 * perhaps if I had looked back at my notes
 * I would have reaized this sooner
+
+###
+
+recall that earlier, I suspected that dynamic property access could compromise anonymity and security
+    see sections "Property Muxers", "Preventing Dynamic Access and Proxies using Encryption", "Ordering Sets 2"
+we thought it would allow bad actors to proxy or impersonate other objects,
+    or impersonate private properties that it doesn't have access to (see "Property Muxers" section)
+so I thought that we shouldn't have dynamic property access as an axiom
+
+however, now we do
+this "Functional Property Access" protocol is dynamic, it's a function
+
+however, its run sandboxed
+no danger of it leaking info to any actors
+since you aren't providing those actors in the scope, when you are spawning the function
+
+what about property muxers
+which used dynamic property access 
+the property mux function is pure functional
+so if it is proxying another pure function (that could still contain private behavior)
+it could embed that pure function within the property access function
+and then when you copy it
+
+however, ever since we made spawning the default, not cloning
+we can design cloning such that actors can only re-bind references that they have access to
+    // TODO: FIND REFERENCED SECTION
+in addition, since it's run in a sandbox, there's literally no danger of a data leak, or exposing any of your private keys
+
+
+
+
+### Firefly Model and Syntax - Primary, Secondary, and Tertiary Forms
+
+I divide all the mechanisms/concepts into three layers:
+
+axioms (primary forms):
+* addresses (declare and access)
+* actors
+* insertion
+* spawning
+* sets/collections
+* set_spawn
+* set operations (pick_one, make_ordered)
+
+corollaries (secondary forms, what people would _think_ are primary forms):
+* equality
+* object keys
+* scoping
+* cloning
+* conditionals
+* set cardinality/size
+
+sugars (tertiary forms, relatively simple to implement using secondary forms):
+* tags
+* state variables
+* for-loops
+* lists/arrays
+* functions
+
+
+
+
+what is difference between primary secondary and tertiary?
+the primary forms are necessary, form the foundation for the language
+but they are too low level, so they mostly aren't exposed to the programmer
+    (eg spawning, addresses, static references)
+secondary forms are the core of the language, constructs used by the programmer that can only be constructed using primary forms
+tertiary forms are forms that can be constructed via secondary forms
+
+
+
+
+static binding
+isn't actually static
+since everything is reactive
+
+what it means
+is values passed from the parent to the child _interpreter_
+not the child
+but the interpreter that is creating the child
+
+
+
+something worth mentioning
+i actually used to think that every insertion would also be stored at an address
+so every time you made an insertion
+it would look like
+
+        foo:
+            _a: someCollector <: someValue
+
+i did this so that you could override or remove insertions
+however, this seems unnecessarily complicated
+much simpler is to just make it so that actors can be receive or send any number of insertions
+completely separate from the address system
+if you want to allow callers to override/remove insertions
+just wrap it in another actor
+
+        foo:
+            _a:
+                someCollector <: someValue
+
+
+
+all values have to be stored at an address
+so this includes insertions
+
+what are Collections
+they aren't an actual object
+they are an interface
+with the methods `set_spawn` and `pick_one` and `make_ordered`
+
+
+might be possible now to actually only allow for self insertions
+and then they are published on a special property
+if you want to publish them
+
+### Cloning vs Copying, Set_Spawn vs Recursion
+
+now there are two ways to generate infinite behavior
+1. set_spawn (spawn an object per insertion)
+2. recursion (child reads its own source code and spawns another child from it)
+arguably redundant
+
+* note that recursion wasn't possible before (at least using "primary forms")
+  because you could only spawn or set_spawn off a static source code
+    * cloning was made a "secondary form", implemented using set_spawn,
+    * so any recursion that uses cloning may look like recursion, but in reality it's just using set_spawn
+* however, now that we allow actors to dynamically reference source code, an actor could theoretically reference
+  its own source code, and spawn itself
+
+
+* set_spawn and recursion represent different ways of creating infinite behavior
+* set_spawn, the behavior is statically defined and created multiple times
+    * spawned by the callee
+* recursion, the template is passed around or referenced
+    * spawned by the caller
+
+this distinction of where something is being spawned
+eg for cloning, happens on the callee, since they have the private behavior, the caller shouldn't have to create behavior that it doesn't have control over
+but for copying/sandboxing, happens on the caller, since they have full control, they want to restrict the scope
+
+really, we shouldn't think about it in terms of implementation
+and where it is spawned, is thinking in terms of implementation
+
+from a language standpoint, the main difference is
+who is providing the environment
+with cloning, the callee provides the environment, so they can provide private actors to insert into and such
+with copying, the caller provides the environment, so it can restrict any side effects
+
+
+this is different from functional
+where after a variable has been bound
+it can't be modified
+
+note that templates are still a black box
+you can't necessarily tweak and modify the internals however you like when you spawn it
+however, you can choose what inputs and values to provide
+
+wait but if you can't modify internals
+how do you embed addresses?
+
+well at least for nested children
+the parent can't modify internals, because they are defining the child
+
+however, if an actor imports a definition from elsewhere
+then they only have access to the internals that are made public
+and won't be able to do static binding otherwise
+
+
+### Splitting Modules into Separate Files while Maintaining Scoping
+
+this is also very powerful since you can do stuff like
+
+        foo:
+            ...someExternalFile.ffly
+
+and you can basically split up objects into multiple files
+but still have scoping!
+
+
+### React and Lifting State
+
+in react, parent components cannot directly access the state of child components
+this might seem unintuitive
+but it is to encourage child components to lift their state to the parents
+if the parents use it
+basically, instead of the child storing the state themselves
+the parent passes event handlers to the child
+and the child uses those to send updates to the parent
+
+this way, instead of having state maintained in multiple places
+this pattern encourages state to be maintained in a shared ancestor, the lower common ancestor
+
+in firefly, parents would be able to access child state without issue
+could encourage bad design?
+
+
+
+the way static binding/embedding works
+you reference `_some_name` in the code
+and then when the interpreter constructs an Actor
+they pass in a mapping `Actor(mapping)` where `mapping` looks something like
+
+        _some_name: 178374229
+        _some_other_name: 381947392
+
+and it substitutes the references with those addresses
+embeds the addresses in the child template
+
+so for initializers, we can just create a standard
+and make `_initializer` a convention for this sort of pattern
+and you would use it like
+
+        fooDef:
+            _static_props: _this.[_initializer].pick_one()
+            print(_static_props.name)
+            print(_static_props.age)
+
+        parent:
+            _initializer: Address.random()                 // generate a random address
+            fooDef2: fooDef.embed(_initializer)            // embed that address into the definition
+            foo: new Actor(fooDef2)                        // spawn an actor from the definition
+            foo.[_initializer] <: (name: "Joe", age: 13)   // insert initial values into the initializer
+
+
+
+one neat thing about this is
+everything is self contained
+in functional, bound variables retain some knowledge of their environment
+in a way, they are bound to their parent function
+
+whereas, in firefly
+the child may have some hard-coded embedded addresses
+but that is it
+everything else is provided via insertions
+so the child does not have any static bindings to the parent
+or any bindings to the environment
+it just has some embedded addresses, and uses those addresses to extract data from insertions
+
+
+
+### Anonymous Property Access - Language vs Implementation
+
+when it comes to anonymous reads
+it's important to distinguish between language and implementation
+
+reads are anonymous in the language specification of firefly
+eg, if somebody does `foo.bar`, there is no way for `foo` to specify some behavior to run when the property is read
+
+this is very different from
+say, running `foo` on a server the logs all requests
+that is the implementation of the language
+
+but the language specification, _assumes_ that reads are anonymous
+
+all is important because, by assuming reads are anonymous
+readers can make optimizations, like caching the value, and then on subsequent reads, just pull from the cache
+and even if `foo` is on a server that logs all requests
+they can't stop readers from caching values
+from the reader's point of view, they are still following the language spec
+so `foo` can't guarantee that the log contains all property accesses
+if they try to add a side effect to the property access, it won't be accurate
+
+
+contrast this with javascript, which allows you to create property getters and setters
+with javascript objects, you don't know if a property access will have side effects
+until the inspect the source code of the object
+
+in a language like javascript, where reads are not necessarily anonymous
+those optimizations cannot be made, because you might be breaking the language spec,
+say if some property's getter has a side effect, but you don't execute that side effect when reading the property
+
+
+this also means that, by the language specification
+functions and property access are fundamentally different
+in a functional language, they are the same
+
+
+
+### Templates Revisited
+
+in the section "Cloning vs Copying, Set_Spawn vs Recursion"
+we talk about how the main difference between cloning and copying
+which is who provides the environment
+
+in fact, this ties back to templates
+
+
+in a sense, they are all the same thing
+
+
+notice how private behavior is handled
+
+
+before we mentioned how templates are somehow "unbound" when they start
+but then they get bound on the first clone
+see section "Templates and Deferring Evaluation"
+
+but that explanation was a bit weird and hand-wavy
+we can do better now
+
+if we bring this back to how cloning is implemented
+it makes sense
+since the original parent is a "factory" that is set_spawning each child
+they can provide the environment
+
+we can even consider templates as "live" actors
+but since they aren't given an environment, they don't actually do anything
+
+### Cloning and Source Code Revisited
+
+(continued from prev section)
+
+so everything is a template
+
+this kinda goes against our prototypal mindset though
+
+we can bring back the prototypal principles
+by allowing live objects/actors to be copied
+
+any node that is visible
+you can read both it's value, and how that value is generated
+you can see what template the node is spawned from, and its inputs/outputs
+you can see both the node, and the edges going into/out of the node
+with one big caveat: in order to see any edge, both endpoints have to be visible
+so if we have `foo: a+_b`, when you read `foo` you can see the `+` operator as well as the input reference `a`
+but since `_b` is private, not visible, we can't see that it is an input to the `+` operator
+
+source code = value
+    explained in section "Cloning and Source Code"
+is sort of like how in functional
+referential transparency, function calls can be substituted by their value
+
+### Cloning and Source Code Revisited - Address and Indirect References
+
+i need to formalize this idea of "spawning source code"
+after all, it's an axiom
+and it's necessary for object-key access to work properly
+
+in earlier notes, we imagined that when you read a node
+you can see its inputs
+eg for a node like `foo(a, b, c)`, you would see the clone node with `a` `b` and `c` going into it
+
+however, that was when we thought cloning was an axiom
+in fact, now, the references `a` `b` and `c` are now indirect
+they go through source
+and now they use primitive addresses
+so can we still see them?
+
+
+locker room analogy
+every property and node is stored at a locker, an address
+and certain lockers are public
+the "locker room" represents the entire source code of that actor
+
+is there a point to having "semi-public" source code?
+as in, make it so that actors can copy "what they see"
+that's one of the major side effects of trying to combine value and source-code
+
+but why not just have source code be a completely separate concept
+and it's either all public or not at all
+
+not to mention, this idea of "semi-public" doesn't make sense for templates
+for templates, it's not like certain parts will be visible while certain parts aren't visible
+remember, for templates, you shouldn't be able to access properties
+    see section "Templates and Property Access 2"
+if it's a template, you can only do one thing which is spawn it
+
+### Dynamic Spawning, Modifying Templates, and Metaprogramming
+
+it's worth noting that we don't use recursion yet
+while spawning does require source code, the source code is static
+we don't have syntax mechanisms for dynamically retrieving/creating source code and spawning it
+
+however, we would need such mechanisms for sandboxing and copying
+
+
+javascript doesn't need the concept of "source code" within the language
+it does have `eval()`
+but most stuff is just interpreted line by line
+the language isn't aware of itself (aside from eval())
+
+maybe we can do the same
+most of the time you just set_spawn or spawn from static source code
+
+
+however, one benefit of having this "source code" datatype being defined in the language
+is that it provides tools for constructing and modifying source code
+instead of having to modify it as a string
+you can add properties, remove properties, move bindings, etc
+_metaprogramming_
+
+however, maybe we can save this for later
+and for now, just work with static source code
+
+we still need to make sandboxing/copying work (in order implement object-key property access)
+but we can make it for static code templates
+and assume that the template source is private, you can only copy the template, but you can't see its internals or figure out how it works
+(in other words, the source code is always obfuscated)
+
+
+###
+
+another argument for making source code a primitive datatype
+source code is a naturally recursive structure
+you take the source code for an object and spawn it
+and that object may reference more source code, and spawn child objects
+recursive interpreters
+and just using raw strings for source code, can't capture that pattern
+
+
+what does it mean to control the environment
+environment is passed in via insertions
+so it's not really special
+so what is the difference between cloning and copying?
+
+
+
+### Object-Key Property Access Revisited - how are we accessing the keyset?
+
+(continued from "Functional Property Access - Implementing Property Access using Sandboxing and Equality")
+
+revisiting the object-key property access mechanism
+
+for any spawned object
+it can't directly reference external objects
+they have to be passed in
+most of the time they are passed in via the `_scope` object
+
+however, recall how the object-key property access mechanism works
+you spawn the function yourself
+then pass in a key
+and it will compare it against the list of internal keys
+using the `.equals()` method of each key
+and if it finds a match, it returns the corresponding address for that object-key
+
+however, where does this prop-access function get this "list of internal keys"
+if the reader is spawning the function themselves, then they need to pass these keys in somehow
+but the reader doesn't necessarily know which keys these are
+maybe the reader passes in the original object?
+first: some terminology clarification
+
+        Alice:
+            val: obj[key]
+
+in this case, the reader `Alice` is accessing the property `key` on object `obj`
+(at times I may also refer to `obj` as the _readee_)
+which can be represented as:
+
+        Alice:
+            val: obj.propAccess(key)->    // note: sandboxed function call
+
+so the `propAccess()` function must compare the input `key` against all of the keys inside `obj`
+and this `propAccess` function must be self-contained, so it can be sandboxed
+so where does it get its list of keys?
+perhaps when Alice spawns `propAccess`, she passes in `obj` and then `propAccess` can retrieve all keys privately
+Alice doesn't need to know what keys are inside `obj`, or how `propAccess` is retrieving them
+all that functionality is hidden inside `propAccess`
+
+but then, if `propAccess` is given access to `obj`
+how do we know that `propAccess` isn't doing any side effects?
+how do we know it isn't leaking the input `key` to `obj`?
+
+### 
+
+maybe we don't need a reference to every object-key
+if for a given key `someKey`, the `someKey.equals()` function checks the address `12345` of the input object to see if it contains `true`
+we can just extract out that bit of code
+so the `propAccess()` function just checks the `12345` address of the input key
+and if it contains `true`, then we know that the input key must match `someKey`
+and we return the corresponding address
+
+however, the implementation of `someKey.equals()` is private, and might not be visible to the readee
+so the readee can't just figure out that it accesses the address `12345`
+
+
+notice that, while we do seem to need references to all object-keys
+the functions that we are invoking on each object-key are pure functional
+
+so perhaps we can embed references to other objects?
+inside the source code?
+kinda like a closure?
+
+but if you can embed references
+and the internal code of the `propAccess()` function is obfuscated
+how does the reader know that `propAccess` isn't doing any insertions?
+
+### Object-Key Property Access Revisited - how is the keyset accessing the input key?
+
+maybe we only need to embed the `equals()` function for each object-key
+    not the object-key itself
+and even though the implementation is private, it can be obfuscated and extracted out
+we may not know which address it accesses, but we can still copy it and call it safely
+
+but recall that equality is "double-sided" (see section "Double-Sided Equality")
+right now, the reader is passing the input key into the `equals()` function of every object-key
+so now the only missing part is, we have to pass each object-key into the `equals()` method of the input key
+how can this happen if the `propAccess` function doesn't even have references to the object-keys?
+
+maybe the reader passes the `equals()` method of the input key to the readee?
+but now the readee can use that method to impersonate the input key
+
+and recall that a main point of anonymous reads is to prevent leaking input keys
+
+we need to check `inputKey.equals(objectKey)`
+so if `inputKey.equals()` is checking for a `true` value at a secret address
+then we need `objectKey` so we can check its value at that secret address
+
+
+how does this work in real life
+in real life systems
+are there systems where you can create dictionaries where prop access doesn't reveal the key
+eg data banks where users can input a password and decrypt the data bank, without exposing the password
+
+while such things are trivial, the difference is real-world cases, the input is a string or a number
+whereas in our case, the input is an object, an actor
+imagine using a live-running server, as a password
+
+we can't just represent every server using an id of some sort, remember that we don't want a centralized id service
+and having public id's allows for impersonation
+// TODO: FIND REFERENCED SECTIONS
+
+so instead of using static ids to identify objects
+we instead use functions, the `equals()` function
+so in a sense, this is what we are using as our "password"
+
+### Tracking Keys - Keys with Built-in Tracking
+
+* tracking keys
+* we have to pass the input key into the `propAccess` function
+* what if the key itself tracked its own usage, and leaked it
+* for example, lets say that a readee creates a collection `usagesTracker`
+* and then the readee creates a key `badKey` that has a special hidden address `777777` that references this `usagesTracker`
+* in addition, the readee designs its `propAccess` function so that it takes the input key and tries to insert a `1` into the address `777777`
+* now the readee distributes `badKey` to the public,
+* and tells people to use it to store values inside the readee
+* and now the readee can track any time somebody uses `badKey` on it
+
+well maybe it can't be helped
+at least it isn't leaking private keys
+
+### Double-Sided Property Access (The Bilateral Protocol)
+
+going back to our problem from earlier
+    see section "Object-Key Property Access Revisited - how is the keyset accessing the input key?"
+right now, the reader is passing the input key into the `equals()` function of every object-key
+and we are only verifying that _______ before getting the address
+but what if one of the object-keys has an `equals()` function that always returns `true`
+
+we also can't just pass the `equals()` function of the input key to the readee
+because then the readee can use the function to impersonate the input key,
+    (TODO: FIND REFERENCED SECTION)
+which is basically equivalent to leaking the input key to the readee
+
+what if, instead of returning the address immediately
+it returns two addresses, the address of the object-key that matched, and the address of the corresponding value
+the reader wraps it in a function that has the `equals()` method of the input key embedded
+and then when the readee passes itself to the function
+it uses the address of the object-key to retrieve the object-key
+and then passes it to the `equals()` method of the input key
+and if it returns true, it will finally return the address of the corresponding value
+(actually on second thought this method might not work, but the concept makes sense i think)
+
+this way, we aren't directly using the `equals()` method of the input key, so it can't be used to impersonate the input key
+in the same way the readee creates a black box `propAccess` function that contains the `equals()` method of every object-key, but its obfuscated and doesn't reveal the identity of any individual object-key
+
+a better way to think about this is
+the readee provides a function that runs sandboxed in the reader, and accesses the reader's private info (in this case, the input key)
+the reader also provides a function that runs sandboxed in the readee, and accesses the readee's private info (in this case, the readee's keyset)
+
+it is a bit unfortunate that the reader has to provide a function to the readee now
+which loses one aspect of "anonymous reads"
+but at least there isn't information leak to either side
+
+this entire process is also starting to get more and more complicated (aka slower and less efficient)
+but perhaps caching and other optimizations can help
+it's merely a proof-of-concept, a proof that its possible
+
+
+### Static Bindings, Parametized Templates, and Dynamic Substitution
+
+(continued from section "Dynamic Spawning, Modifying Templates, and Metaprogramming")
+
+going back to generating templates
+the only reason we need this concept of dynamic templates and passing around templates
+is for sandboxing/copying
+because set_spawn and spawn can be done using static templates
+so we don't need fully-fledged tools for template modification
+we just need enough to make sandboxing/copying work
+
+it seems like the only "dynamic" part of templates right now is static binding / address embedding
+    necessary for the parent to pass in private data like `_scope`
+a parametized template, that makes it easy for a template to specify that certain values are provided by the parent directly
+
+though from the language standpoint, we are just generating a template and then spawning it
+we don't need to go into details of how it is being generated
+
+but this is still something we are adding to the language
+a temporary rule/mechanism
+that falls under the umbrella of "generating and creating templates"
+javascript has `eval()`, but its not a part of the language
+javascript doesn't need it
+we are almost giving our language an awareness of the interpreter
+by giving the ability to generate templates and execute them, within the language
+why doesn't javascript need it? why do we need it?
+
+i think it's because in javascript, the "templates" are static
+you define a function, and then during interpretation, you can call it but you can't modify the definition
+whereas in firefly, the implication with embedding and substitution is that you _can_ modify the template
+which, in a sense, seems a bit redundant
+considering cloning already provides a high-level way of modifying objects
+
+### Transforming Static References to Embedded Addresses
+
+(continued from prev section, "Static Bindings, Parametized Templates, and Dynamic Substitution")
+
+actually dynamic substitution isn't necessary
+and doesn't even need to be in the language syntax
+technically one could simply just hard-code an address in a parent and child
+
+        parent:
+            child:
+                console.log(this[777777])
+            child[777777] <: "hello"
+
+however, as a convenience, we can provide higher-level syntax sugars that _imply_ static binding
+eg scoping and other "tertiary forms" (see previous section ___________)
+and then when these higher level constructs get transformed into primitive operations
+we can generate these hard-coded addresses
+
+this distinction is important
+we are generating these hard-coded addresses _during the transformation_
+so the concept of static binding does not exist at the axiom level
+it's a _dynamic syntax sugar_ that generates a random address during its transformation to primitive operations
+the syntax sugar transformation is dynamic, but the template is static
+
+in fact, the terminology I used earlier, with "parametized templates", and "dynamic spawning" and such
+was confusing and misleading, and led me down the wrong path
+we are not passing around templates and then providing parameters whenever we spawn the template
+static bindings are bindings between **the template definition and the parent that is defining the template**
+
+as an example, imagine I create the template `Foo` within the scope of `FooParent`
+I can define a static binding between `Foo` and a value inside `FooParent`
+and all this does is generate an address, and embed that address into both `Foo` and `FooParent`
+    let's say this address is `777777`
+this allows `FooParent` to provide values to `Foo` during spawn time,
+    it allows `FooParent` to "initialize" `Foo`
+and this basically means that `Foo` (and all spawns of `Foo`) will always look for the value at address `777777`
+the address is already embedded, and can't be changed
+now, lets say somebody comes along and wants to spawn `Foo` as well
+and they also want to initialize `Foo`
+they can't embed a new address in `Foo`, the template is already created
+instead, they have to get the special address (in this case, `777777`) from `FooParent`
+
+it's important to also note that this syntax sugar is optional
+we could have manually hard-coded the address `777777` into `Foo` and `FooParent`
+and it would work just the same
+the syntax sugar is just to abstract away this process of generating arbitrary addresses and hardcoding them
+
+
+the addresses are embedded when the template is defined
+not when the template is spawned
+templates themselves are static, and the spawning mechanism is also static
+static bindings are just syntax sugar for embedded addresses
