@@ -5686,8 +5686,6 @@ sugars (tertiary forms, relatively simple to implement using secondary forms):
 * functions
 
 
-
-
 what is difference between primary secondary and tertiary?
 the primary forms are necessary, form the foundation for the language
 but they are too low level, so they mostly aren't exposed to the programmer
@@ -5696,7 +5694,7 @@ secondary forms are the core of the language, constructs used by the programmer 
 tertiary forms are forms that can be constructed via secondary forms
 
 
-
+### Static Binding = Passing Values to the Child Interpreter
 
 static binding
 isn't actually static
@@ -5707,31 +5705,41 @@ is values passed from the parent to the child _interpreter_
 not the child
 but the interpreter that is creating the child
 
+### Removing Insertions
 
+* something worth mentioning
+* i actually used to think that every insertion operation would also be stored at an address
+    * // TODO: FIND REFERENCED SECTION ??
+* just like every spawn/clone node is stored at an address:
 
-something worth mentioning
-i actually used to think that every insertion would also be stored at an address
-so every time you made an insertion
-it would look like
+        foo:
+            _a: someObj()
+
+* insertions would also look like that:
 
         foo:
             _a: someCollector <: someValue
 
-i did this so that you could override or remove insertions
-however, this seems unnecessarily complicated
-much simpler is to just make it so that actors can be receive or send any number of insertions
-completely separate from the address system
-if you want to allow callers to override/remove insertions
-just wrap it in another actor
+* i did this so that you could override or remove insertions
+  * just like you can override/remove spawn/clone operations by overriding the property where they are stored
+  * so for the earlier example, you could do `foo(_a: undefined)` to remove the clone operation `someObj()`
+
+* however, this seems unnecessarily complicated
+* much simpler is to just make it so that actors can be receive or send any number of insertions
+* completely separate from the address system
+* if you want to allow callers to override/remove insertions
+* just wrap it in another actor
 
         foo:
             _a:
                 someCollector <: someValue
 
 
+* note that all values have to be stored at an address
+* so this includes insertions, inserted items
+* but the insertion operation itself, is not something stored at an address
 
-all values have to be stored at an address
-so this includes insertions
+### 
 
 what are Collections
 they aren't an actual object
@@ -5823,22 +5831,22 @@ this pattern encourages state to be maintained in a shared ancestor, the lower c
 in firefly, parents would be able to access child state without issue
 could encourage bad design?
 
+### Implementing Initializers
 
-
-the way static binding/embedding works
-you reference `_some_name` in the code
-and then when the interpreter constructs an Actor
-they pass in a mapping `Actor(mapping)` where `mapping` looks something like
+* the way static binding/embedding works
+* you reference `_some_name` in the code
+* and then when the interpreter constructs an Actor
+* they pass in a mapping `Actor(mapping)` where `mapping` looks something like
 
         _some_name: 178374229
         _some_other_name: 381947392
 
-and it substitutes the references with those addresses
-embeds the addresses in the child template
+* and it substitutes the references with those addresses
+* embeds the addresses in the child template
 
-so for initializers, we can just create a standard
-and make `_initializer` a convention for this sort of pattern
-and you would use it like
+* so for initializers, we can just create a standard
+* and make `_initializer` a convention for this sort of pattern
+* and you would use it like
 
         fooDef:
             _static_props: _this.[_initializer].pick_one()
@@ -5851,22 +5859,18 @@ and you would use it like
             foo: new Actor(fooDef2)                        // spawn an actor from the definition
             foo.[_initializer] <: (name: "Joe", age: 13)   // insert initial values into the initializer
 
+* one neat thing about this is
+* everything is self contained
+* in functional, bound variables retain some knowledge of their environment
+* in a way, they are bound to their parent function
 
-
-one neat thing about this is
-everything is self contained
-in functional, bound variables retain some knowledge of their environment
-in a way, they are bound to their parent function
-
-whereas, in firefly
-the child may have some hard-coded embedded addresses
-but that is it
-everything else is provided via insertions
-so the child does not have any static bindings to the parent
-or any bindings to the environment
-it just has some embedded addresses, and uses those addresses to extract data from insertions
-
-
+* whereas, in firefly
+* the child may have some hard-coded embedded addresses
+* but that is it
+* everything else is provided via insertions
+* so the child does not have any static bindings to the parent
+* or any bindings to the environment
+* it just has some embedded addresses, and uses those addresses to extract data from insertions
 
 ### Anonymous Property Access - Language vs Implementation
 
@@ -6291,3 +6295,156 @@ the addresses are embedded when the template is defined
 not when the template is spawned
 templates themselves are static, and the spawning mechanism is also static
 static bindings are just syntax sugar for embedded addresses
+
+
+### Sets of Addresses II
+
+* earlier we said that it doesn't make sense to use address sets
+* because a set of addresses doesn't make sense without the context of the parent
+    * see section "Sets of Addresses"
+* so it doesnt make sense to pass it around by itself
+
+* but isn't that the case with regular addresses too?
+* yet we have no problem treating address as a primitive
+* but often, addresses don't make sense without the context
+* we just assume that the people passing around the address, are aware of the context
+
+* or maybe
+* instead of having public sets
+* you pass in a function to the collection
+* and it does the set_spawn for you
+
+
+* right now sets feel like the ugliest part
+* they feel so disconnected from the rest
+* spawning and addresses and prop access all seem to work quite well
+* but sets, with its special interface containing the three methods `set_spawn`, `make_ordered`, and `pick_one`
+* could technically all be implemented using spawning and addresses
+    * and a tiny bit of static binding
+* if we implement sets as linked lists
+* then `pick_one` and `make_ordered` are trivial
+* and `set_spawn` can be implemented with recursion
+* eg, store the template in the environment at some address, say `Environment[777777]: Footemplate`
+* and then inside `FooTemplate`, access itself at `Environment[777777]` and spawn itself
+* and then the last part would be to take some input linked-list and then at each step in the recursion,
+* iterate through the linked-list and spawn
+* note that the only caveat here is the reference to `Environment`, which is a static binding that is currently implemented via insertions and `pick_one`
+    * see section "Implementing Initializers"
+
+### Unordered-First Mindset
+
+* the only reason why I want the concept of sets
+* is because linked-lists are ordered
+* and I want the concept of un-ordered
+* so sets are more of a built-in object type, than an axiom
+* without them, the language is still Turing Complete (well aside from the static binding part, which is currently)
+
+* so it feels like our "base" language is ordered
+* and sets are just an un-ordered interface on top of it
+
+* but don't we want the opposite?
+* make the "base" language un-ordered
+* and add order on top of it?
+
+### Recursion and Property Access vs Set-Builder Notation
+
+* how does set theory work?
+* sets are all unordered
+* how are they able to model everything without using order?
+
+
+* well sets are defined using set-builder notation
+* uses predicates, instead of spawning/recursion
+  * instead of using iteration, you use a predicate (a fn that returns true/false) and find items that match
+* and uses set-membership, instead of trying to extract information using addresses and property access
+  * so instead of say, looking through the insertions, filtering for items that have the prop `isPrime`,
+    and then using `pick_one` to get the first one
+  * you say $\exists n \in Primes such that ...$
+* that way, the definitions are still un-ordered
+
+* set-builder notation still reference other sets though
+* so the concept of "references" is required
+* which in our case is currently implemented using insertions, prop access, and pick_one
+  * see section "Implementing Initializers"
+
+* also need at least one infinite ordered set (the axiom of infinity)
+* commonly provided using the set-theoretic definition of natural numbers
+* (maybe we kinda have the axiom of infinity too, with our infinite address space?)
+
+### Keysets, KeyChains and Object-Sets
+
+* keychains
+* computers often have a password management system called a "keychain"
+* where it stores your passwords or authentication keys for apps
+* and can log into them automatically for you
+* this is actually very similar to my idea of "keysets"
+* when you access an object, the items that you can access are determined by what keys you have
+* in a sense, your keychain
+* you have use own keychain to access the object
+  (or use the one provided by the object itself, the object's public keys)
+* and you can get all the corresponding values
+* a keychain is a basically just a set of addresses
+
+* so maybe "sets" are made up of addresses, not objects
+
+* and we can actually implement object-sets
+* you have an object that simply contains a keyset and a target object
+* and it has the same interface as the keyset
+* so you can also do `pick_one` on an object-set, and internally it will just call `pick_one` on the keyset 
+* and access that key on the target object and return the corresponding object
+
+* this is very similar to how we have addresses as a primitive
+* but object-keys are implemented, even though they are used the same way
+
+* in this case, keysets (or perhaps more aptly named: address-sets) are a primitive
+* and object-sets are implemented, but have the same interface
+
+### Set-Builder Notation and Query Languages
+
+lets think from a clean slate
+set builder notation
+how would we create a programming language for it?
+
+actually query languages like SQL are basically set builder notation languages
+
+however, for our case, we can't just reference the environment
+because in our decentralized network, people create their own isolated environments
+
+this whole system of scoping
+or parents passing in values to the child's initializer
+to "initialize" the child's environment
+seems like a completely different system from query languages or set-builder notation
+
+
+so perhaps we can implement some query-language mechanics for creating sets
+
+note that insertions and querying are two vastly different ways to create sets
+for insertions, actors from different, isolated environments **push** into a single set
+but for querying, the set itself **pulls** from multiple data sources
+
+so query-languages don't really have a sense of privacy
+and i feel like the whole functional-style actor model provides that
+it allows multiple independent and anonymous actors to create a set
+an analogy would be like posting to reddit
+reddit does not need to know who is posting, it just receives posts from whoever wants to send them
+
+### Query Model vs Actor Model - Feedback
+
+* one thing about query langs and set-builder notation
+* that sets it apart from functional / actor-model languages
+* is that they don't allow for recursion/feedback
+* whereas functional / actor-model languages do
+
+* in a sense though
+* feedback is inevitable in a decentralized network
+* since you have no control over how information is handled outside your environment
+* so you have no idea if the person giving you input data, is actually getting it from your output data
+* I talked about this a while ago, in the section "Comparison With Other Reactive or Actor Model Languages"
+
+### Query Mechanisms within Actor Model
+
+* so it sort of makes sense that we need this actor-model layer
+* that represents the decentralized nature of the system
+* this ecosystem of distributed, isolated environments
+* and then within each environment, we can use things like querying and set-builder notation
+
