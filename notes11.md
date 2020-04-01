@@ -2807,7 +2807,7 @@ It's control and responsibility
 Guarding against attacks like the "friendly fire attack"
 A new name I came up for when the caller uses a reference to an external arguments object
 
-### Set_spawn Restricted to Personal Insertions
+### Restricted set_spawn - set_spawn restricted to `_insertions`
 
 instead of the following:
 
@@ -2851,6 +2851,8 @@ insertion
 property access
 set_spawn
 
+### Infinite Behavior and Recursive Insertions
+
 hmm the only way i can think of to create infinite behavior using these operators
 is if scoping worked as well
 or even if the child can access parent at least
@@ -2868,6 +2870,7 @@ foo <: (index: 0)
 
 notice how, after the initial insertion, each insertion will
 cause another insertion
+in a sense, the insertions are recursive, like a loop
 
 however, this either requires scope to be available
 or, more simply, for the parent to insert itself into the child
@@ -2883,6 +2886,9 @@ in the section "Choice to Exist", we talked about how children can read from the
 but the concept of "environment" is from scope, which is implemented
 so it makes sense that the parent has to pass
 
+### Restricted set_spawn - how to achieve nested maps?
+
+(continued from prev section, "Restricted set_spawn - set_spawn restricted to `_insertions`")
 
 could you leverage this to mimic nested set_spawns?
 for example, could you replicate the following javascript behavior?
@@ -3482,6 +3488,7 @@ the interpreter can still re-order the items in whatever order is optimal, and t
 in a sense, we can still think of `(0: ..., 1: ..., 2: ..., etc)` as simply an unordered set of key-value pairs
 whether or not to treat the `0, 1, 2, etc` keys as ordered, is up to the person traversing/reading the object
 
+### Order Forces Agreement/Consistency Across Readers
 
 hmm but the problem is
 it also forces multiple readers to agree on the same order
@@ -3511,6 +3518,8 @@ Two types of unordered set
 
 Once you turn values into Key-value pairs, you introduce some order
 And multiple readers have to start agreeing
+
+### Representing Properties as Sets of Key-Value Pairs
 
 What if key-value pairs were an ordering on top of value sets
 As in, if you have a set of `(key: 5, value: "hi"), (key: 7, value: "bye")` then that corresponds to `(5: "hi", 7: "bye")`
@@ -3576,7 +3585,7 @@ Which feels ugly
 
 
 
-### Nondeterminism and Unordered Sets
+### Non-determinism and Unordered Sets
 
 I guess what makes these unordered sets different is
 **nondeterminism**
@@ -4144,7 +4153,7 @@ console.log(result ? `Success! ${result}` : `Error: ${errorObj.error}`);
 * but we talked previously about how
 * in order for the callee to do anything useful with the insertion
 * the insertion has to have properties itself, like `readRequest: (key: "foo", value: ())`
-    * see section "Public Sets vs Public Properties"
+    * see section "Representing Properties as Sets of Key-Value Pairs"
 * so circular??
 
 * not quite actually
@@ -5747,8 +5756,9 @@ they are an interface
 with the methods `set_spawn` and `pick_one` and `make_ordered`
 
 
-might be possible now to actually only allow for self insertions
-and then they are published on a special property
+might be possible now to actually only allow for restricted set_spawn
+aka you can only set_spawn on the `_insertions` special object
+and then insertions can be published on a special property/address
 if you want to publish them
 
 ### Cloning vs Copying, Set_Spawn vs Recursion
@@ -6337,7 +6347,7 @@ static bindings are just syntax sugar for embedded addresses
 * is because linked-lists are ordered
 * and I want the concept of un-ordered
 * so sets are more of a built-in object type, than an axiom
-* without them, the language is still Turing Complete (well aside from the static binding part, which is currently)
+* without them, the language is still Turing Complete (well aside from the static binding part, which is currently implemented via insertions and `pick_one`)
 
 * so it feels like our "base" language is ordered
 * and sets are just an un-ordered interface on top of it
@@ -6448,3 +6458,684 @@ reddit does not need to know who is posting, it just receives posts from whoever
 * this ecosystem of distributed, isolated environments
 * and then within each environment, we can use things like querying and set-builder notation
 
+
+### Encrypted Behavior
+
+Note that one of the assumptions I have been making a lot
+is that behavior can be encrypted
+this was first discussed in "Can Downloaded Code Contain Private Behavior?"
+but the concept of sandboxed code and object-key access relies on it
+    see section "Double-Sided Property Access (The Bilateral Protocol)"
+however I believe that it's possible to encrypt behavior effectively
+there are protocols such as the [garbled circuits protocol](https://en.wikipedia.org/wiki/Garbled_circuit)
+also, it's [impossible to figure out if two programs are equal](https://stackoverflow.com/questions/1132051/is-finding-the-equivalence-of-two-functions-undecidable), undecidable
+
+
+### `pick_one` vs $/exists$
+
+set builder notation doesn't have `pick_one`
+`pick_one` is rather ugly
+feels like a hack to insert into a collection, and then `pick_one`
+we are relying on the fact that only one person can insert into it
+but then why not just directly pass it in
+
+set-builder doesn't have `pick_one`
+instead it uses things like $\exists$
+for example, if we wanted to define `union`, which finds the union of a set of sets
+
+$$
+union: { n | /exists S in SetofSets s.t. n in S }
+$$
+
+in a sense, it's "backwards"
+we define things in terms of the inputs
+instead of `pick_one`, which is "forwards"
+we take inputs and operate on them
+
+### Using Set-Builder Notation instead of `pick_one`?
+
+how would we define objects in a "backwards" sense, like set-builder?
+
+
+maybe something like
+
+    student:
+        grade | gradeMap[test.score]
+
+often when we want to define a new variable we can use /exists
+
+how to do prop access
+well maybe every property is represented using a set (address, value)
+we represent the set of all addresses using A
+so if we were trying to retrieve the property "foo"
+like `bar: obj.foo`
+and then we can do
+
+$$
+\{ bar | /exists prop in Obj, /exists addr /in prop, addr /in A \& addr = "foo" \& bar /in prop \& bar /notin A \}
+$$
+
+however note that due to the way set-builder notation works
+if there are multiple items that satisfy the condition
+then `bar` would represent multiple items
+so we would still need `pick_one`
+
+
+
+wiki https://en.wikipedia.org/wiki/Set-builder_notation#Parallels_in_programming_languages
+functional has set-builder notation
+list comprehension
+
+
+### 
+
+distributed collectors
+right now the parent can control what messages a collector accepts
+almost like a social network moderating the posts
+which seems natural because the social network platform is the one responsible for hosting the posts, so they can control what they host
+but what about a decentralized distributed collector like bitcoin
+where nobody is in control, anybody can post, and the posts are hosted by everybody
+
+well actually this is more about how the collection is implemented
+but in terms of the language, there is nothing wrong with the idea of a "distributed collection"
+whether a collection is distributed or centralized makes no difference from the language standpoint
+
+### An Address for Every Value - Referenced Objects
+
+starting to work on implementation
+putting every value on an address, as we mentioned before
+    // TODO: FIND REFERENCED SECTION
+so every address access, the accessed value is stored on a separate address
+insertions don't have an address, as mentioned earlier
+    see section "Removing Insertions"
+
+but sometimes values are passed in
+through insertions
+and we are just storing them on an address so that other people can access them via our object
+but this is different from spawned objects, which we create
+
+are these references, proxies or aliases?
+    * proxy: all property access on the reference, goes _through_ the reference before hitting the source object
+    * alias: property access goes directly to the source object
+doesn't matter since reads are anonymous
+even if they were proxies, they wouldn't be able to track what properties were being read, or try any man in the middle attacks
+
+note that this is different from just creating a "mirror", an object that _looks_ like the original object by copying properties over
+because that would require the mirror object to know all the private keys of the target object
+so no security issues
+
+### Address Objects
+
+exploring how to represent the axioms and primary constructs:
+
+```js
+const template ={
+    'addr_255': { type: 'access', source: 'addr_101', address: 'addr_751' }, // equivalent to `this[addr_255] = this[addr_101].[addr_751]`
+    'addr_231': { type: 'spawn', source: 'addr_255' },                       // equivalent to `this[addr_231] = spawn(this[addr_255])
+    insertions: [
+        { source: 'addr_509', target: 'addr_999' },                          // equivalent to `this[addr_999] <: this[addr_509]`
+    ],
+}
+```
+
+all we need now is address sets
+
+however something i noticed is
+it's a big weird to pass around address sets
+because if you notice, we are actually never passing around addresses
+the value stored at an address is always an object, never an address
+the result of an `access` is always a value
+
+one key advantage of this is, we'll never accidentally do try to access an address on an address
+eg, we would never run into something like `addr_111: addr_222, this[addr_111].[addr_333]`
+
+in fact, we can re-formulate all our secondary-forms to never pass around addresses as values
+for example, cloning already follows this
+
+if you want to allow other actors to initialize the template
+instead of passing them the address of the initializer
+you can do so by providing a pure function `initializeFn()` that takes in an object (spawned from the template),
+a set of values, and then inserts that set of values into the correct address for the object
+
+what about object-key access?
+well right now we compare keySet.findMatch(inputKey) and inputKey.findMatch(keySet) and both will return the address of the match and then we see if the returned addresses are the same
+
+        leftAddrEncrypted: spawn{keySet.findMatchTemplate}(inputKey)      // this happens securely on the inputKey side
+        rightAddr: spawn{inputKey.findMatchTemplate}(keySet)              // this happens securely on the keySet side
+        if (decrypt(leftAddrEncrypted) = rightAddr) return obj[rightAddr] // this happens securely on the keySet side
+
+instead of passing around the address of the matching value
+we instead create a unique object corresponding to each key, and spawn it within the equalsTemplate
+        if (equalsKey1(inputKey)) return (addr_1: true)
+        else if (equalsKey2(inputKey)) return (addr_2: true)
+        else if (equalsKey3(inputKey)) return (addr_3: true)
+
+and then do
+
+        left: spawn{keySet.equalsTemplate}(inputKey)
+        right: keySet.equals(inputKey.equalsTemplate)
+        for (key in keyset) {
+            if (left = right & left[the special addr eg addr_1]) return this[key]
+        }
+
+
+in fact we can generalize this transformation
+instead of passing around addresses
+we generate an addrObject for every address
+and pass that around
+and the original object can use the addrObject and get the corresponding value
+but isn't that just the same as passing around addresses?
+well while it behaves exactly the same, it shows that we don't need to pass around addresses
+
+but wait, earlier when we created address objects like `addr_1: true`
+that depends on the spawner providing the value `true`
+what if they don't?
+
+instead, we create a "mirror" function
+that just outputs all of its inputs
+note that it is completely self-contained, aka it can be embedded into templates
+and we store that at the secret address, `(addr_1: mirror)`
+
+now the original object can get the value at the addr_1
+then pass it `true`, and if it gets it back, then it passes back `value_1`
+
+actually if we implement `true` how functional langs implement it
+
+    function True(branchA, branchB) {
+        return branchA;
+    }
+
+(see section "Pure Functional Data Structures" and [this article](https://www.linkedin.com/pulse/function-data-structures-javascript-basics-kevin-greene/))
+then is also fully self-contained, can be embedded
+so no need for the mirror function
+
+
+
+can this addrObject method work for hashmaps
+where items are dynamically added?
+we can't statically embed addresses for each value, when the values are dynamic
+do we have to generate addresses on the fly when a new key-value pair is added to the hashmap?
+I guess this falls under the broader category of computed properties
+
+probably works though
+we don't need to generate addresses on the fly and then pass them around
+we just need to make sure the `propAccess` function supports these inserted properties
+
+
+
+passing around address sets has a similar problem as passing around addresses
+eg, we might accidentally do property access on an address set
+
+so we might have to re-think address sets...
+
+
+### Public Sets using Linked Lists
+
+we talked earlier about how we need public sets
+we can't just restrict set-spawns to `_insertions`
+    see section "Restricted set_spawn - set_spawn restricted to `_insertions`"
+
+hmmm
+what if all sets were just linked lists?
+what would that look like?
+
+lets just try implementing it using linked-lists, templates, and recursion
+the functional way
+and perhaps that will give us an idea of how it might work in our language
+
+        set_spawn: template, list >>
+            spawn{template}(list.value)
+            set_spawn(template, list.next)
+
+clearly, if public sets were linked-lists, it makes things much easier
+so it seems like the core thing we are trying to achieve
+is for an actor to be able to take a public set, and spawn a template for each item in the list
+
+
+hmm do intializers use public sets?
+since the actor needs to do `_initializer.pick_one()` to get the initial values
+actually no, it can be done with restricted set_spawn
+`_initializer` can be implemented like:
+
+        _initializer:
+            [7777]: _insertions.pick_one()
+        someValue: _initailizer[7777].someValue
+
+(note that `7777` is a static address generated by interpreter)
+
+### The collapse() Function
+
+if we make pick_one necessary for lots of cases
+it means that non-determinism will become prevalent
+because `pick_one` is technically non-deterministic
+
+really, in many cases all we need is a reducer function
+some way to turn a set of items into a single item
+
+`one_or_none` function
+if the set only has 1 item, it returns it
+otherwise returns undefined
+
+this function has 4 properties that are desirable
+1. reduces it to one item (unlike `map()` or `set_spawn`)
+2. deterministic (unlike `pick_one()` or `make_ordered()`)
+3. unordered (doesn't depend on the order of the items)
+4. doesn't depend on object type (unlike sum, which expects items to be numbers)
+
+we'll call it collapse() from now on
+
+
+what about `make_ordered()[0]`?
+still nondeterministic
+
+`make_ordered().collapse()` is prob better
+
+### 
+
+(continued from "Address Objects")
+
+the only reason to separate every public sets, into an address sets + the source object
+is if we would pass around address sets separately,
+and use one address set on different objects
+but notice that since addresses are never passed around, and are generated in the interpreter
+the same can be said for address sets
+every address is specific to each object?
+
+### Multiplicative Behavior
+
+thinking about restricting set_spawn to private insertions, aka the `_insertions` object
+    discussed previously in section "Restricted set_spawn - set_spawn restricted to `_insertions`"
+these set operations are very special, so its nice to have them localized to the object internals
+and then public sets would be implemented using protocols
+
+it would also follow this pattern of having a low-level axiom and a corresponding high-level syntax sugar
+eg how scoping works:
+    * low level uses static binding, high level uses scope which is implemented using static bindings
+and also prop access
+    * low level uses addresses, high level uses object-keys which is implemented using addresses
+
+however as we mentioned before, only allowing set_spawn on private insertions
+    // TODO: FIND REFERENCED SECTION
+doesn't allow for things like, double-nested loops, product spaces, multiplicative behavior
+for example, if we were trying to mimic something like
+
+```js
+    for (r in rows)
+        for (c in cols)
+            console.log(`coordinate: ${r},${c}`);
+```
+
+attempts:
+
+        foo([1,2,3,4])
+        foo: rows >>
+            _insertions
+            for (col in insertions):
+                // how do we access each row here?
+        
+        // we can try to insert col into rows, and make `rows` a special object that handles both rows and cols
+        foo: rows >>
+            _insertions
+            for (col in insertions):
+                rows <: col
+        rows:
+            _insertions
+            // same issue, now _insertions contains both rows and cols, but we want to iterate across them separately
+
+
+in fact, if set_spawn is only allowed on private insertions
+that means that every insertion can only spawn a static number of items
+and spawning a static N items, is like merging those N templates and just spawning the merged template
+which effectively means that every insertion can only spawn one item
+so it's clear why multiplicative behavior is impossible
+(assuming we don't use feedback, aka inserting into oneself)
+
+### Recursion/Iteration and Multiplicative Behavior
+
+how does recursion enable multiplicative behavior
+well if you have a function that takes two iterators as inputs
+it can iterate the first one until reaches the end
+and then reset the first one while iterating the second
+
+```js
+    function recurse(row_iter, col_iter) {
+        if (row_iter.next()) {
+            console.log(row_iter.value + ',' + col_iter.value);
+        } else {
+            row_iter.reset();
+            col_iter.next();
+            console.log(row_iter.value + ',' + col_iter.value);
+        }
+    }
+```
+
+essentially, you are traversing a grid
+because you can iterate each iterator independently
+
+for example, the ackermann function
+
+```js
+function ack(m, n) {
+    if (m == 0)
+        return n+1
+    else if (n == 0)
+        return ack(m-1, 1)
+    else
+        return ack(m-1, ack(m, n-1))
+}
+```
+
+overall, the way recursion handles mapping across a "multi-dimensional" sample space
+it's a rather "ordered" approach, basically breaking down the grid/space into a linear traversal
+
+we can enable multiplicative behavior on set_spawn
+if mimic set-builder notation like $/exists m /in S, /exists n /in S, m+n = 0$
+so in syntax we would do something like
+
+    for (m in _insertions, n in _insertions):
+        ...
+
+this is similar to the stuff we talked about in "Monads and Sample Spaces and Infinites.one"
+
+it's an unordered approach to mapping across cartesian product spaces
+
+now why do we need this, if we can already achieve multiplicative behavior using linked lists and recursion?
+because this provides a way of doing it in an un-ordered way
+
+this way, all behavior pertaining to parsing _insertions and applying set operations, is now localized within the actor
+on the outside, outsiders can only do two things: read properties and insert data
+
+so now how do we leverage this to emulate public sets?
+
+is it possible to implement exponential behavior? eg power set?
+what about something as complex as the ackermann function?
+
+### Using Recursive Insertions to Emulate Functional Recursion/Iteration
+
+something i realized while looking at the ackermann function
+is that the reason recursion is so powerful
+is that it can dynamically change its "path" on each iteration
+eg, at every iteration, it can check its arguments and see where to go next
+
+whereas, for the notation I introduced earlier, `for (m in _insertions, n in _insertions):`
+i am establishing the sample space before doing the set_spawn
+whereas with recursion, as you are spawning each child, you can dynamically construct the path/sample-space as you go
+
+we can actually do something similar with self-insertions, or recursive insertions
+an idea I actually explored earlier in section "Infinite Behavior and Recursive Insertions"
+
+
+        ackermann:
+            for ([m, n] in _insertions):
+                if (m = 0):
+                    => n+1
+                else if (n = 0):
+                    this <: (m-1, 1)
+                    => ____ // get result of the above statement
+                else:
+                    this <: (m-1, n+1)
+                    => ____ // get result of the above statement
+
+well we still need a way to get the result of each insertion
+so we pass in an address (or rather, an addrObject)
+and then store the result and retrieve it from that address
+since the result is inserted, it has to be retrieved using collapse()
+
+still ugly
+this pattern of storing values and then retrieving them using collapse()
+seems very common
+basically whenever we are trying to communicate one-to-one
+so we know only one person is making the insertion
+
+### Removing Order
+
+what does this self-insertion style recursion achieve over regular recursion?
+it's unordered
+while technically, during execution, the insertions and spawnings happen in a certain order
+but after everything is stabilized, if you just looked at `_insertions` you would not be able to tell what order everything happened
+
+in fact, that seems to be the main purpose of sets and insertions
+its a way of storing unordered information
+which means it can be used to _remove_ order from a system
+eg if we took a linked-list
+and iterated through each item and inserted each item into a collection
+that collection has now lost the ordering information that was in the linked-list
+
+this is useful because it allows for more optimization
+if order is unnecessary, we shouldn't have to specify it
+
+is this possible in a functional language?
+it seems like essentially what we are doing
+is taking any unordered list of information
+and then wrapping it in an `Unordered` interface
+so any callers/readers have to treat it as unordered
+and therefore, the interpreter/compiler can make optimizations because it doesn't have to maintain the original order
+
+for example, if we had a huge list of store items
+and we wanted to display 10 items to every customer
+if the items were stored in a list, then we could write `list.slice(10)`
+
+
+nondeterminism
+
+
+we talked about all this before
+see section "Order Forces Agreement/Consistency Across Readers" and "Nondeterminism and Unordered Sets"
+
+
+well but i think nondeterminism is rarely used
+even with databases, where order doesn't matter
+usually when people retrieve them, they use an order
+eg if you were to display store items
+you would want to display them in a certain order
+
+### Sets are an Interface?
+
+so i think the best way to think of it is
+sets are just lists with certain methods/properties removed
+    eg, no array access, no iteration
+
+if we go back to what we had earlier
+when we explored what it would look like if sets were just linked lists
+    see section "Public Sets using Linked Lists"
+then it seems like the only method that sets need is `set_spawn`
+
+then a public set would just be
+exposing those methods to the public
+
+but that's where the problem is
+what does it mean to expose `set_spawn` to the public?
+it's different from exposing a linked-list to the public
+it would instead be like if every linked-list had a "forEach" function
+and you exposed that
+but that means that list/set itself is responsible for doing all the spawning
+which we don't want right?
+
+so it seems like this is actually the crux of the issue
+what's been bugging me
+if the caller is responsible for spawning, then how would that work if the Set isn't ordered and has no way of iterating through them?
+if the Set itself is responsible for spawning, then how does the caller securely provide arguments to each spawn?
+
+well since the caller provides the template, they know what address the initializer is at
+so after the Set spawns the template for each item, it gives the spawned objects back
+and the caller can pass values into the initializer of each object
+in addition, for extra security, the caller needs to make sure that the objects returned are actually spawned from the original template
+so the original template can have a hidden property that the caller can check on the returned objects
+
+also recall that for a set_spawn functions similarly to forEach, eg `forEach(item => fn(item))`
+in that every spawned object is given an item from the Set
+to do this, the public Set and the caller has to agree upon some address
+so during the set_spawn, the Set puts a set item onto that address in the spawned object
+and the caller knows to define the template to pull from that address
+
+last but not least, how is the Set spawning the template for each item?
+if there are M callers calling a set of size N
+then there are M*N total spawned objects
+quadratic
+can we leverage self-insertions?
+
+        this <: callerListHead, itemListHead
+        for ([caller, item] in _insertions)
+            spawn{caller.template}(item)
+            if (item.next() = undefined)
+                this <: [caller.next(), itemListHead] // reached end of item list, move to next caller
+            else
+                this <: [caller, item.next()]
+
+notice how in order to mimic recursion
+the callers and items have to be ordered
+
+
+
+another thing weird
+is that the idea of public sets
+is taking this method set_spawn and defining it as a public method
+but we aren't actually defining it
+because it seems like it's impossible to define
+so i guess it's more as if we have a `_set_spawn` private method
+and we are just doing `public_set_spawn: _set_spawn`
+well but what is a "method" in this case?
+remember functions don't exist in firefly (they are implemented using cloning)
+is `_set_spawn` a template?
+
+
+### Localized Orderings
+
+something i've been thinking about
+there are many cases where order seems necessary to define a function
+reductions are a big example
+eg, to sum a set of numbers
+
+        setsum: nums >>
+            => nums.reduce((x, acc, => x+acc), 0)
+
+however, notice that the "order" is localized
+from an outsider's perspective, they have no idea how setsum is implemented, and what order the set was traversed
+
+maybe this is what removing order is all about
+unordered sets isn't really about nondeterminism
+its not really a mechanism or a specific data type
+its a paradigm
+
+we can define objects such that from the outside, there is no visible order
+even if there is order on the inside
+that ordering can be "removed" before exposing data to the public
+this allows the internal implementation to be changed freely
+without worrying about preserving some arbitrary ordering of items
+
+the interface is unordered, even if the implementation is ordered
+
+
+and public sets are just an example:
+
+        [..._insertions].
+
+
+
+contrast this with functional languages, where lists _must_ be ordered
+since they are implemented using linked-lists (see "PureFunctionalDataStructures.js")
+
+though i guess many languages do have unordered sets
+like javascript and Java
+it's really just a paradigm that Firefly is designed to encourage
+
+
+if you don't need order, don't use it
+if you need it, localize it
+
+
+### Non-determinism and Unstable Sets
+
+localizing it guarantees that readers can't expect the order to be the same every time
+for example, take the implementation of public sets shown earlier
+the input set `_insertions` is unordered, and the output set of spawned objects is also unordered
+internally, the function orders the set, performs some operations, and then creates an unordered set
+
+so note that there is an ordering that is created within the function
+but multiple calls to this function can result in multiple different orderings
+since `make_ordered` is non-deterministic, and **unstable**
+
+to demonstrate this further, take the example:
+
+        foo: nums >>
+            => [...nums].reduce((x, acc, => x-acc), 0)
+        
+        someNums: Set(1,2,3)
+        print(foo(someNums))
+        print(foo(someNums))
+
+lets say that in the first call to `foo`, `[...nums]` results in `[2,1,3]`
+then the first output is $3-(1-(2-0))$ or $4$
+lets say that in the second call to `foo`, `[...nums]` results in `[1,3,2]`
+then the second output is $2-(3-(1-0))$ or $0$
+
+so we can see that the output can change every time
+
+contrast this with a functional language, where the input is a list, eg `[1,2,3]`
+the output will be the same every time
+
+contrast this with the javascript [Map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map) object
+where iteration across the Map will always happen in the order that items were originally inserted
+from the outside, there is no indication that the Map has some inherent order
+all the reader sees is a bunch of keys and values
+however, if the reader iterates across it once, it can memorize that order
+and it knows that every subsequent iteration will follow the same order!
+
+this means that Javascript cannot make any optimizations that change the internal ordering of items
+even though the interface is unordered, the javascript `Map` object is actually ordered!
+
+so this shows why it's important that we specify that `make_ordered` is unstable
+in a sense, because `make_ordered` is an axiom, and one of our first order constructs
+it means that **non-determinism is an inherent part of our language**
+
+
+### My Motivation behind Un-ordered Sets and Non-determinism
+
+* I'm not sure if I mentioned this before
+* but one of the main reason why I have been pushing for un-ordered sets in this language
+* is that often when writing javascript/java code
+* there will be times where order is un-necessary, but I am forced to specify one
+* a simple case would be like, if i have to increment `foo` and `bar`
+* it doesn't matter which order i increment them,
+* but the way imperative code works is you have to write something like
+
+        foo++
+        bar++
+
+* and I am kinda perfectionist
+* so often times, if I'm forced to specify an order
+* I want to specify the "best" order
+* and i'll waste time trying to figure out what order I should put them in
+* even though it doesn't really matter
+
+* because in a sense, the way the language is designed
+* is that it _does_ matter
+
+* this is why declarative code is so nice
+* you only specify what you need to specify
+* you aren't forced to specify some arbitrary order
+
+
+### Sets are an Interface II
+
+(continued from section "Sets are an Interface" and "Non-determinism and Unstable Sets")
+
+actually maybe functional languages can have this concept of un-ordered sets
+they just need an interface `Set` that only exposes the method `map` and `make_ordered`
+`map` returns another `Set`
+and `make_ordered` returns a list but is not guaranteed to be the same order every time
+
+if the interface is designed like this
+then it's actually impossible to tell what the internal ordering is
+even if the reader iterates across it once and memorizes the order
+the way the `make_ordered` method is defined, it does not guarantee the same order every time
+so the internal implementation is allowed to choose the order however it wants
+
+so it seems like order vs unordered
+is getting into type systems and category theory
+
+though I guess to specify an "unstable" and non-deterministic `make_ordered()` function
+you would need to have some inherent notion of randomness and non-determinism
+which lambda calculus doesn't have
+so perhaps that's what makes Firefly un-ordered sets special?
+that non-determinism is part of our axioms?

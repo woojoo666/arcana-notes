@@ -2212,6 +2212,7 @@ but will this work for all filter matchers?
 Maybe we should stick to static property names after all
 
 
+(revisit 3/29/2020: a lot of the stuff below is stuff that I covered before, see section "Pure Functional Data Structures". In fact a lot of it is stuff that I learned from [this article](https://www.linkedin.com/pulse/function-data-structures-javascript-basics-kevin-greene/), I guess I forgot it and then re-discovered it)
 
 conditionals still seem special
 functional needs it

@@ -6,6 +6,7 @@
  * 
  * Much of this is a direct copy from:
  * https://www.linkedin.com/pulse/function-data-structures-javascript-basics-kevin-greene/
+ * backup: https://github.com/kevinbgreene/functional-data-js/blob/master/PART_ONE.md
  * 
  * The graph traversal example is from:
  * https://softwareengineering.stackexchange.com/questions/140660/data-structures-in-functional-programming
