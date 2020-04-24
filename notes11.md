@@ -6564,12 +6564,12 @@ note that this is different from just creating a "mirror", an object that _looks
 because that would require the mirror object to know all the private keys of the target object
 so no security issues
 
-### Address Objects
+### Defining the Template Format
 
 exploring how to represent the axioms and primary constructs:
 
 ```js
-const template ={
+const template = {
     'addr_255': { type: 'access', source: 'addr_101', address: 'addr_751' }, // equivalent to `this[addr_255] = this[addr_101].[addr_751]`
     'addr_231': { type: 'spawn', source: 'addr_255' },                       // equivalent to `this[addr_231] = spawn(this[addr_255])
     insertions: [
@@ -6578,8 +6578,14 @@ const template ={
 }
 ```
 
-all we need now is address sets
+* we have a way of representing most of the main operations: insertion, access, and spawn
+* all we need now is address sets
 
+### Address Objects
+
+(continued from prev section, "Defining the Template Format")
+
+looking at our current template format
 however something i noticed is
 it's a bit weird to pass around address sets
 because if you notice, we are actually never passing around addresses
@@ -7978,3 +7984,101 @@ have a way to convert an async function to a sync function
 right now, it's trivial to turn a sync function to an async one
 use `setTimeout`
 so we naturally should have the opposite
+
+### Defining the Template Format II
+
+* for our revised template model
+* for every actor/template, we need to specify an address for `next` and `val`
+* these addresses will be used for the actor's linked-list of insertions
+* and will likewise be used by others who want to iterate through those insertions
+
+* basically the same as static binding, where the transformation step will generate an address and give it to parent and child
+  * // TODO: FIND REFERENCED SECTION
+* except in this case, these address bindings are special, and tell the actor how to structure its internal insertions list
+
+```js
+const template = {
+    'addr_255': { type: 'access', source: 'addr_101', address: 'addr_751' }, // equivalent to `this[addr_255] = this[addr_101].[addr_751]`
+    'addr_231': { type: 'spawn', source: 'addr_255' },                       // equivalent to `this[addr_231] = spawn(this[addr_255])
+    insertions: [
+        { source: 'addr_509', target: 'addr_999' },                          // equivalent to `this[addr_999] <: this[addr_509]`
+    ],
+    'addr_131': { type: 'insertions_next'},  // the address for retrieving the next node in the insertions iterator
+    'addr_132': { type: 'insertions_value'}, // the address for retrieving the value at the current node in the insertions iterator
+}
+```
+
+### Undefined as a Primitive
+
+(continued from section "undefined as a type or a primitive?")
+
+* should `undefined` be a primitive
+* or can we make it an actor?
+* if it's a primitive, then we have two primitives: actors and undefined
+* so ideally it would be an actor so we would only have one primitive across the entire language
+
+* how do other languages handle it?
+* well pure functional languages only have one datatype
+* functions
+* every function returns another function, that's it
+
+* how do other actor languages handle it?
+* it seems like smalltalk has only one primitive: actors
+* while the actors communicate via messages, the messages aren't really a datatype on their own
+* they are more just a format for communication
+* kind of like how functional langs need a way of passing arguments to other functions
+
+* why doesn't smalltalk need `undefined`?
+* well smalltalk doesn't have a primitive concept of property access / reads like Firefly does
+* it's more like functional, where you define a response for every message
+* so every response is defined
+
+* Firefly has reads though
+* and addresses that aren't defined, have to return undefined right?
+
+
+* what if property access was functional
+  * previously explored in sections "Dynamic Properties - Finite Objects with Infinite Properties?" and "Property Muxers"
+* then an actor could define a default value to return
+
+* we could easily define this at higher levels
+* would be similar to how we define object-key access
+  * see section "Functional Property Access - Implementing Property Access using Sandboxing and Equality" and
+    "Double-Sided Property Access (The Bilateral Protocol)"
+* we could have a special address for storing the "default value", eg address `456`
+* and every time an actor tries to access a property on some object, and it returns undefined,
+* then they check if the object has default value defined, and use that instead
+
+* however, what about low-level reads
+* can we have a default value built into the property access operation itself?
+
+* remember, address access is a core part of the lang
+* we need it to define how actors and functions work
+* even the logic for a default value would involve a conditional
+  * eg `if (key exist) return value else return default`
+* circular
+* we have to define property access before defining actors/functions
+* so we can't use functions to define property access
+
+* in addition, reads are anonymous
+* the actor cannot know what address is being accessed
+* and they can't modify their behavior based on what address is being accessed
+
+* returning a default value
+* the actor would have to know that the input key is not in the key space
+* which would break anonymity
+
+* thus, **`undefined` has to be a primitive**
+
+### Operating on Undefined
+
+(continued from prev section "Undefined as a Primitive")
+
+* now that we know that `undefined` is a primitive
+* since Firefly is dynamically typed, every primitive must be compatible with every operation
+* thus, we have to define how it interacts with the core operators: insertion, spawn, and property access
+* though it's actually quite simple
+
+* any insertions to `undefined` have no effect
+* accessing a property on `undefined` returns `undefined`
+* spawning `undefined` returns `undefined`
