@@ -8082,3 +8082,55 @@ const template = {
 * any insertions to `undefined` have no effect
 * accessing a property on `undefined` returns `undefined`
 * spawning `undefined` returns `undefined`
+
+------------------------------------------------------------------------
+
+### fdsafdas
+
+access is now static
+at the core level
+
+a static address
+
+makes things a bit easier in the interpreter
+since every binding only needs to monitor one source node
+
+no need to unregister listeners anymore, except when de-spawning fireflies
+
+
+### insertions is now either outbox or inbox
+
+less confusing
+
+eg we'll now use terms like "inbox iteration" and "inbox iterator"
+    instead of _insertions iterator, like we used before
+
+
+###  
+
+firefly item type
+
+feels a little ugly because
+you can pass around this item type
+so we have to define how operators work on this type as well
+
+smalltalk keeps inbox processing internal
+but we have to make it external
+because we spawn slave actors to do the processing for us
+recursion
+
+required because
+* actors can _proactively_ spawn other actors
+* (compared to smalltalk, where behavior is spawned automatically from insertions)
+* so the way we operate on inbox items is to proactively spawn from them
+* instead of like in smalltalk, where behavior is spawned automatically
+
+proactive spawning is important
+because it allows an actor full control over the spawned child
+full control over the environment
+even if the actor has no idea what the template does, it can guarantee that the spawned child can't leak data to others
+sandboxing
+this is impossible in smalltalk, since each template is owned by a single actor and you spawn that behavior by sending data to the template owner
+so you either have to trust that the template owner won't leak the data
+or the template has to be open source so you can see that it doesn't leak the data
+but in my model, the template can be a black box, and the spawner can still sandbox the result behavior
