@@ -8134,3 +8134,35 @@ this is impossible in smalltalk, since each template is owned by a single actor 
 so you either have to trust that the template owner won't leak the data
 or the template has to be open source so you can see that it doesn't leak the data
 but in my model, the template can be a black box, and the spawner can still sandbox the result behavior
+
+
+also if we just forced it, and allowed a reduction type definition within each actor
+similarly would require two reserved words, `prev` and `item`, that the body of each reduction iteration would refer to
+
+
+also, hard/impossible to send out an insertion only once in an actor
+we could make it so it only sends one out for the first inbox item
+but what if we want to send out the largest inbox item
+eg
+
+        foo: prev, item >>
+            largestItem: Math.max(prev.largestItem, item)
+            target <: this.largestItem
+
+this would insert for every iteration
+
+we would need a special syntax for only inserting once?
+
+
+###
+
+
+bindings are actually all static too
+at least, the ones for spawn and access
+they read from some address in the actor, either do a spawn or a prop access, and then put the result in another address
+but those addresses are static
+so the internal behavior of each actor is actually just a static network of bindings
+
+well aside from the inbox linked-list / iterator
+which is dynamic
+

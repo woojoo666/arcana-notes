@@ -77,12 +77,17 @@ class SpawnBinding extends Binding {
     }
     evaluate () {
         // TODO: do we need to check if the spec changed? or is that already handled during Binding.update()?
+        // TODO: we need to destruct the prev child if spec changed
         const template = this.parent.get(this.source);
         return template ? new Firefly(template) : UNDEFINED;
     }
+    destruct () {
+        this.value.farewell();
+        Binding.prototype.destruct.call(this);
+    }
 }
 
-class OutboxItem extends Binding {
+class InsertionBinding extends Binding {
     constructor (spec, parent) {
         super(spec, parent);
         this.source = spec.source;
@@ -94,12 +99,12 @@ class OutboxItem extends Binding {
     }
 }
 
-// every outbox item has an id because collectors can contain duplicates,
+// every insertion has an id because collectors can contain duplicates,
 // so this is an easy way to tell duplicates apart
-OutboxItem.currentId = 0;
-OutboxItem.generateId = function () {
-    OutboxItem.currentId++;
-    return OutboxItem.currentId;
+InsertionBinding.currentId = 0;
+InsertionBinding.generateId = function () {
+    InsertionBinding.currentId++;
+    return InsertionBinding.currentId;
 }
 
 function createTemplate(nodes) {
@@ -113,25 +118,47 @@ function createTemplate(nodes) {
 class Actor {
     constructor () {
         this.properties = {};
+        this.bindings = [];
     }
     get (address) {
         return this.properties[address] ? this.properties[address].value : UNDEFINED;
     }
-    despawn () {
-
+    farewell () { // destructor
+        for (const binding of this.bindings) {
+            binding.destruct();
+        }
+    }
+    setNext () {
+        // throw error
     }
 }
 
 class InboxItem extends Actor {
-    constructor (actor, inbox_next, inbox_value) {
+    constructor (insertionBinding, inbox_next, inbox_value) {
         this.inbox_next = inbox_next;
         this.inbox_value = inbox_value;
-        this.properties = {
-            [inbox_value]: actor,
-        };
+        this.insertionBinding = insertionBinding;
+    }
+    initializeProperties () {
+        this.properties[this.inbox_value] = this.insertionBinding;
+        this.properties[this.inbox_next] = new NextItemBinding();
+        // TODO: subscribe to updates
+    }
+    resolveReferences () {
+
     }
     setNext (inboxItem) {
-        this.properties[this.inbox_next] = inboxItem;
+        this.properties[this.inbox_next].set(inboxItem);
+    }
+}
+
+class NextItemBinding extends Binding {
+    evaluate () {
+        return this.item;
+    }
+    set (item) {
+        this.item = item; // TODO: undefined?
+        this.update(); // notify subscribers
     }
 }
 
@@ -155,34 +182,31 @@ class Firefly extends Actor {
                 default: throw Error(`unknown node type "${binding.type}"`);
             }
         }
+        this.properties[this.inbox_next] = new NextItemBinding();
     }
     resolveReferences () {
         // resolve references to other addresses and create reactive bindings
         // eg 'addr_231': { type: 'spawn', source: 'addr_255' } will take the SpawnNode at address addr_231,
         // and bind it to the value at addr_255, spawning from that value
-
+        
     }
     setNext (inboxItem) {
-        this.properties[this.inbox_next] = inboxItem;
+        this.properties[this.inbox_next].set(inboxItem);
+        // notify subscribers ?
     }
-    processInbox () {
-        const head = this;
-        const currentItem = head;
-        for (const actor of this.inbox) {
-            const inboxItem = new InboxItem(actor, this.inbox_next, this.inbox_value);
-            currentItem.setNext(inboxItem);
-            currentItem = inboxItem;
-        }
-    }
-    addItem (item) {
+    addItem (insertionBinding) {
+        const item = new InboxItem(insertionBinding);
         this.inbox.add(item);
-        item.subscribe({ update: () => this.processInbox() });
-        this.processInbox();
+        this.inboxTail.setNext(item);
+        this.inboxTail = item;
     }
-    removeItem (item) {
+    removeItem (insertionBinding) {
+        const item = [...this.inbox].filter(it => it.insertionBinding == insertionBinding)[0];
         // no need to unsubscribe since the item is about to be destructed anyways
-        this.inbox.remove(item);
-        this.processInbox();
+        if (this.inbox.remove(item)) {
+            this.item.prevItem.setNext(item.nextItem);
+        }
+        item.farewell();
     }
 }
 
