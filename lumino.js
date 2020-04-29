@@ -21,10 +21,11 @@ class Undefined_Class extends Actor {
 const UNDEFINED = new Undefined_Class();
 
 class Binding {
-    constructor (spec, parent) {
+    constructor (spec, parent, subject) {
         this.spec = spec;
         this.parent = parent;
         this.listeners = new Set();
+        subject.subscribe(this.update);
     }
     resolveReferences () {
 		throw Error(`Unimplemented ${this.constructor.name}.resolveReferences() function`);
@@ -45,12 +46,12 @@ class Binding {
 		this.value = this.evaluate();
 		if (this.value != oldValue) {	
 			for (const listener of this.listeners) {
-				listener.update();
+				listener();
 			}
 		}
 	}
     destruct () {
-
+        subject.unsubscribe(this.update);
     }
 }
 
@@ -87,24 +88,36 @@ class SpawnBinding extends Binding {
     }
 }
 
+// A bit of a hack, subscribes to itself for changes, so that if the target changes it can rebind itself
 class InsertionBinding extends Binding {
     constructor (spec, parent) {
         super(spec, parent);
-        this.source = spec.source;
+        this.sourceBinding = parent.properties[spec.source]; // TODO: is this safe?
         this.target = spec.target;
         this.id = OutboxItem.generateId();
+
+        // manually add an eventlistener on update so I can re-bind the target
+        this.addListener(this.onTargetChanged.bind(this));
     }
     evaluate () {
-        return this.parent[this.source] || UNDEFINED;
+        return this.parent.get(this.target);
+        // should I be creating a InboxItem Actor here?
     }
+	// re-evaluate and re-bind target
+	onTargetChanged () {
+        console.log(`Re-binding target for InsertionBinding with id ${this.id}`); // for debugging
+        this.oldTargetValue.removeItem(this.sourceBinding);
+        this.target.addItem(this.sourceBinding);
+
+		this.oldTargetValue = this.parent.get(this.target);
+	}
 }
 
 // every insertion has an id because collectors can contain duplicates,
 // so this is an easy way to tell duplicates apart
 InsertionBinding.currentId = 0;
 InsertionBinding.generateId = function () {
-    InsertionBinding.currentId++;
-    return InsertionBinding.currentId;
+    return InsertionBinding.currentId++;
 }
 
 function createTemplate(nodes) {
@@ -118,13 +131,13 @@ function createTemplate(nodes) {
 class Actor {
     constructor () {
         this.properties = {};
-        this.bindings = [];
+        this.bindings = new Set();
     }
     get (address) {
         return this.properties[address] ? this.properties[address].value : UNDEFINED;
     }
     farewell () { // destructor
-        for (const binding of this.bindings) {
+        for (const binding of this.bindings.values()) {
             binding.destruct();
         }
     }
@@ -152,23 +165,24 @@ class InboxItem extends Actor {
     }
 }
 
+// this is really just to add a pub-sub mechanism to the next item pointer for each inbox item
 class NextItemBinding extends Binding {
     evaluate () {
-        return this.item;
+        return this.nextItem;
     }
-    set (item) {
-        this.item = item; // TODO: undefined?
+    set (nextItem) {
+        this.nextItem = nextItem || UNDEFINED;
         this.update(); // notify subscribers
     }
 }
 
 // the main actor class
 class Firefly extends Actor {
-    constructor (template) {
+    constructor (template, insertionBinding) {
         super();
         this.template = template;
         this.inbox = new Set();
-        this.initializeProperties();
+        this.initializeProperties(insertionBinding);
     }
     initializeProperties () {
         // create static nodes for each property
@@ -178,7 +192,11 @@ class Firefly extends Actor {
                 case 'access': this.properties[address] = new AccessBinding(binding, this); break;
                 case 'spawn': this.properties[address] = new SpawnBinding(binding, this); break;
                 case 'inbox_next': this.inbox_next = address; break;
-                case 'inbox_val': this.inbox_value = address; break;
+                case 'inbox_val': this.inbox_value = address; 
+                    if (insertionBinding) {
+                        this.properties[this.inbox_value] = insertionBinding;
+                    }
+                    break;
                 default: throw Error(`unknown node type "${binding.type}"`);
             }
         }
@@ -190,9 +208,14 @@ class Firefly extends Actor {
         // and bind it to the value at addr_255, spawning from that value
         
     }
+    deliverOutbox () {
+        for (const bindingSpec of this.template.outbox) {
+            const binding = new InsertionBinding(bindingSpec, this);
+            this.bindings.add(binding);
+        }
+    }
     setNext (inboxItem) {
         this.properties[this.inbox_next].set(inboxItem);
-        // notify subscribers ?
     }
     addItem (insertionBinding) {
         const item = new InboxItem(insertionBinding);

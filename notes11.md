@@ -6554,6 +6554,8 @@ through insertions
 and we are just storing them on an address so that other people can access them via our object
 but this is different from spawned objects, which we create
 
+they are almost like "virtual objects" (kinda like how in physics and light refraction, the "virtual image" of a lens is where the object looks like it is)
+
 are these references, proxies or aliases?
     * proxy: all property access on the reference, goes _through_ the reference before hitting the source object
     * alias: property access goes directly to the source object
@@ -8106,34 +8108,35 @@ eg we'll now use terms like "inbox iteration" and "inbox iterator"
     instead of _insertions iterator, like we used before
 
 
-###  
+###  Handling Insertions Using a Reduction III
 
-firefly item type
+lumino inbox item actor (see `InboxItem` in `lumino.js`)
 
-feels a little ugly because
-you can pass around this item type
-so we have to define how operators work on this type as well
+* feels a little ugly because
+* it's an actor that can be passed around just like regular actors and UNDEFINED
+* so we have to define how operators work on this type as well
 
-smalltalk keeps inbox processing internal
-but we have to make it external
-because we spawn slave actors to do the processing for us
-recursion
+* smalltalk keeps inbox processing internal
+* but we make it external
+* because we spawn slave actors to do the processing for us
+* using recursion
 
-required because
+however this is unavoidable because
 * actors can _proactively_ spawn other actors
 * (compared to smalltalk, where behavior is spawned automatically from insertions)
 * so the way we operate on inbox items is to proactively spawn from them
 * instead of like in smalltalk, where behavior is spawned automatically
 
-proactive spawning is important
-because it allows an actor full control over the spawned child
-full control over the environment
-even if the actor has no idea what the template does, it can guarantee that the spawned child can't leak data to others
-sandboxing
-this is impossible in smalltalk, since each template is owned by a single actor and you spawn that behavior by sending data to the template owner
-so you either have to trust that the template owner won't leak the data
-or the template has to be open source so you can see that it doesn't leak the data
-but in my model, the template can be a black box, and the spawner can still sandbox the result behavior
+* proactive spawning is important
+* because it allows an actor full control over the spawned child
+* full control over the environment
+* even if the actor has no idea what the template does, it can guarantee that the spawned child can't leak data to others
+* sandboxing
+* this is impossible in smalltalk, since each template is owned by a single actor
+  and you spawn that behavior by sending data to the template owner
+* so you either have to trust that the template owner won't leak the data
+* or the template has to be open source so you can see that it doesn't leak the data
+* but in my model, the template can be a black box, and the spawner can still sandbox the result behavior
 
 
 also if we just forced it, and allowed a reduction type definition within each actor
@@ -8154,15 +8157,71 @@ this would insert for every iteration
 we would need a special syntax for only inserting once?
 
 
-###
+### Lumino Exploration - Access and Spawn bindings are Static
+
+(in this section I reference the pub-sub mechanisms that I use in the `lumino.js` interpreter.
+These "bindings" are objects I use to store values and propagate changes throughout the network)
 
 
-bindings are actually all static too
-at least, the ones for spawn and access
-they read from some address in the actor, either do a spawn or a prop access, and then put the result in another address
-but those addresses are static
-so the internal behavior of each actor is actually just a static network of bindings
+* bindings are actually all static too
+* at least, the ones for spawn and access
+* they read from some address in the actor, either do a spawn or a prop access, and then put the result in another address
+* but those addresses are static
+* so the internal behavior of each actor is actually just a static network of bindings
 
-well aside from the inbox linked-list / iterator
-which is dynamic
+* well aside from the inbox linked-list / iterator
+* which is dynamic
 
+### Lumino Exploration - insertion binding
+
+currently we have two binding classes and one actor class just for handling insertions
+
+all this really is just to handle dynamic bindings that point to external actors
+
+i considered re-using spawn bindings and storing next-item actors onto an address
+and if i need to re-bind, change the address in the template, and then re-spawn
+but that would also trigger any listeners attached to the inbox_value
+
+
+one type of binding is for the insertion, whether or not the insertion exists
+and the other type is for the insertion value
+so if the insertion moves or gets destructed, the first binding gets triggered
+if the insertion value changes, the second binding gets triggered
+
+actually we may need to split insertion binding into two parts
+1. binding to the target
+2. binding to the source
+because we need to listen to when the target changes (so we can remove our insertion from old target, and add insertion to new target)
+and also when the source changes (tell the current target that the source value changed)
+
+so actually we may need three types of bindings just for handling insertion:
+1. one is for the target actor
+2. one is for the source value
+3. one is for existence
+
+another thing to notice
+spawn and access bindings are completely internal
+insertion bindings and next-item bindings are the only bindings that go between actors
+
+
+### Handling Insertions Using a Reduction IV
+
+even with reduction
+you are technically creating a new actor for every insertion
+since in a reactive language like mine
+you would have to keep every step in the reduction "alive"
+in case, say, the first insertion changes
+that change has to ripple through the entire reduction
+
+### Lumino Exploration - insertion binding II
+
+actually i think i'm thinking about insertion bindings wrong
+it's true that we need to listen to when the target and source change
+but actually, there are already bindings there that notify us of those changes
+the target address should already contain a `Binding` object
+and the source address too
+so we first figure out what actor the target points to, and then insert to it the value at the source
+in other words, we evaluate the `Binding` at the target address, get the actor, and then take the `Binding` at the source address and insert it into the actor
+then we subscribe to the target address, so that if the target ever changes,
+    we remove our insertion from the previous target and send it to the new target
+since we are sending the source `Binding` to the target, the target can directly subscribe to when the source value changes
