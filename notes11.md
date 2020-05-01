@@ -5636,7 +5636,7 @@ hmmm
 * perhaps if I had looked back at my notes
 * I would have reaized this sooner
 
-###
+### 
 
 recall that earlier, I suspected that dynamic property access could compromise anonymity and security
     see sections "Property Muxers", "Preventing Dynamic Access and Proxies using Encryption", "Ordering Sets 2"
@@ -6042,7 +6042,7 @@ and assume that the template source is private, you can only copy the template, 
 (in other words, the source code is always obfuscated)
 
 
-###
+### 
 
 another argument for making source code a primitive datatype
 source code is a naturally recursive structure

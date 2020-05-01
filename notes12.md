@@ -1076,3 +1076,387 @@ in other words, we evaluate the `Binding` at the target address, get the actor, 
 then we subscribe to the target address, so that if the target ever changes,
     we remove our insertion from the previous target and send it to the new target
 since we are sending the source `Binding` to the target, the target can directly subscribe to when the source value changes
+
+### Lumino Exploration - insertion binding III
+
+* something I noticed
+* right now at every address we store a `Binding` object
+* but then we also have `Binding` objects subscribe to changes in other `Binding` objects
+* as if we are binding bindings together
+* weird naming!!
+
+* in our old interpreter (see `interpreter.js`), we simply called these pub-sub objects `Node` objects
+* but I kinda wanted to avoid that naming because the difference between an `Actor` and a `Node` can get confusing
+* but at the same time, this `Binding` naming is just as bad...
+
+* so I think we should just go back to calling them `Node`s
+
+
+* however, it did make me notice something
+* recall that in Firefly, every address stores either a value or a "virtual object"
+    * see section "An Address for Every Value - Referenced Objects"
+* and looking at the current implementation of lumino, it seems like every address stores a Node object
+* so conversly, should every Node be stored at an address?
+* eg insertions require a pub-sub mechanism, should they also be stored at addresses?
+
+* actually insertions already have a Node that can be stored, the Inbox Item actor
+* but actually, remember that Nodes and actors are different
+* nodes are merely carriers for actors
+* they just handle the pub-sub mechanism
+* eg the spawn node subscribes to the value at the source address, and spawns the current value there,
+  and returns the resulting actor
+
+* so likewise, we just need a node that subscribes to the insertion target,
+  spawns an inbox item actor from the insertion source, and gives it to the target
+
+* this is pretty much what we had before, but now, instead of the Inbox Item actor being created by the target,
+  we now create it in the insertion Node
+
+* we still need one more
+* nextitem node
+* actually maybe this one is responsible for creating the inbox item actor
+
+* actually instead of calling it InboxItem actor and NextItem node
+* i think i'll call it OrderingActor and OrderingNode
+* its a little more abstract, and feels less hacky
+
+* actually we can make the base actor class support OrderingNodes and InsertionBindings
+* and that way we don't need OrderingActors anymore
+* we can just use regular actors for inbox items
+
+
+* I need to formalize how these node bindings work a little more
+* every node:
+  * watches another node (the "subject")
+  * computes a watch function on the subject node
+  * if the watch function return value changes, triggers some behavior
+  * then notifies all subscribers
+
+* unlike the previous interpreter implementation,
+* not every node has an output "value"
+* some nodes just execute behavior when the subject changes,
+* eg insertion nodes, which re-bind the target  
+
+
+### Handling Undefined
+
+* how to handle undefined
+* like, somebody using the inbox iterator
+* how would they know they reached the end
+* they would need to be able to check if the next item is undefined
+
+* but how do we check for undefined?
+* and how would we specify something like `if (x is undefined) do y`
+* do we have a special property in `undefined` that has a conditional
+* eg
+
+        undefined:
+            ifUndefined: fn >>
+                fn()
+
+        x.ifUndefined(doSomething)   // will execute doSomething if x is undefined
+
+* but notice how special this makes `undefined`
+* just declaring an empty object, eg `x: ()`, is not the same as undefined
+* even though from the outside, it may look the same (doesn't have properties, doesn't respond to insertions)
+
+* this is different from how functional languages work
+* where anything would be able to "act" like undefined
+* there is no referential equality
+* eg anything could act like the boolean `true`
+    * aka in pure functional notation, `True: (trueBranch, falseBranch) => trueBranch())`
+* if they simply acted the same way
+
+
+* recall how functional languages handle linked-lists
+* (see `PureFunctionalDataStructures.js` for a refresher)  
+* the linked-list data structure is actually a function
+* and you have to _call_ the function with two behaviors,
+    * one behavior for if the list has more items, and one for if the list is empty
+
+* in a sense, you pass control to the linked-list
+* because only the linked-list knows whether or not they are empty or not
+
+* whereas in my model, since you can read from the linked-list directly
+* you have control
+* and thus, it's your responsibility to figure out whether you have reached the end of the list
+* likewise, it's your responsibility to figure out if a value is undefined or not
+
+### Anonymous Reads and Data Persistence Networks
+
+* previously I mentioned that anonymous reads are important
+* so that readers don't "leak" their private keys to the object being read
+* see section "Private Keys and Anonymous Reads, Property Bundles"
+
+* but there's actually another reason why I believe anonymous reads are important
+* that I realize I haven't mentioned yet
+* I believe that nobody can and should be able to "control" the sharing of information
+* eg like what snapchat tries to do, making a picture/video only available once
+
+* anybody can simulate anonymous reads using a decentralized P2P network
+* so even if you tried to only allow one person to read some data
+* that person can share it to the p2p network, and now everybody has access
+* with snapchat, somebody could just record their screen, and now they have a downloaded copy that they can share with whoever they wish
+* so trying to control the sharing of information is futile
+* so anonymous reads is natural, inevitable
+
+* I call this model a **data persistence network**
+* since all data in this network is persistent and available (as long as you have the private key)
+
+
+* so how does this connect to handling undefined, "passing control", and pure functional languages?
+* what if we modeled this p2p network in a pure functional language
+* what would `undefined` be like?
+* hmm
+
+### Impersonating Undefined, Conditional Branching for Undefined/Defined
+
+* technically something could act like undefined
+* if they defined that same special property right?
+* the `ifUndefined` property
+
+
+* is a special property enough though?
+* sure, you could make it so `undefined` has a special `ifUndefined` function stored in a special property
+* and then you give it two args, `x(doIfDefined, doIfUndefined)`
+* but this needs to work for defined objects too
+* but say somebody just passed you an empty object, `x: ()`
+* now what can you do?
+* you need to make this empty object execute the `doIfDefined` template
+* but how can you make this empty object "execute" behavior?
+
+* actually we can leverage the fact that `undefined` is a default value
+* we check some arbitrary address, eg `addr_777`
+* and we make sure that the `undefined` primitive doesn't have anything
+* so it will always return `undefined` at that address
+* and now we are sure we have `undefined`, and we retrieve the `ifUndefined` function from it
+
+* in a sense, we are making things _explicitly undefined_
+* empty objects actually aren't the same as `undefined`
+* in order to be considered `undefined`, it has to follow the same rules
+* eg have the `ifUndefined` property, and also have nothing at address `addr_777`
+
+
+* wait this isn't enough
+* what if bad actor overrides the value at that arbitrary address, `addr_777`
+* and puts empty object
+* ultimately we are back to square one
+
+
+
+* functional actually has same problem
+* if you have some variable `x` of unknown type
+* it's easy to execute behavior based on equality
+* eg if you are checking if `x is true`, you simply implement the functionality in `true`
+    * and then do `true(x)`
+* but how would you execute behavior based on inequality?
+* you pass control over to `x` and you have no idea what it will do
+
+### Checking for End of List
+
+* note that for linked-list though
+    * which is where this discussion started, see section "Handling Undefined"
+* we don't need to execute behavior at the end
+* we need to _not_ execute behavior at the end
+* and that is easier
+* since we define secret `addr_next` and `addr_val` addresses used in the linked list
+* bad actors can't impersonate and set those addresses (since they don't know them)
+* thus, for every inbox item, we create a secret address `addr_execute` where store a function
+  that just executes whatever template is given to it
+* and during iteration, we pass our recursive template to `addr_execute` to iterate to the next inbox item
+* and for the last inbox item, `addr_execute` will be undefined, so nothing will happen
+
+### Combining Equality Check and Undefined Check
+
+* actually we can combine equality with ifUndefined
+* to kinda get what we want
+* if we have some object `x`
+* we create a hidden property at `addr_777`
+* that executes whatever function is given to it, an "executor"
+    * `addr_777: x => x()`
+* so if we ever are given an unknown `input` object and we want to check it against `x`
+* aka we want to do `if (input = x) trueBranch else falseBranch`
+* then we get the value at `addr_777`, and then
+1. we assume it is an "executor", so we call it with `trueBranch`
+    * if `input` happened to be `x`, then `trueBranch` will be executed
+    * if `input` was not `x`, then nothing will happen
+2. we assume it is `undefined`, and we retrieve the `ifUndefined` property and call it with `falseBranch`
+    * if `input` happened to be `x`, then the `ifUndefined` property wouldn't exist, so nothing happens
+    * if `input` was not `x`, then `addr_777` is undefined, and `falseBranch` will get executed
+* so notice how, by doing both (1) and (2) at the same time, we are guaranteed that either `trueBranch`
+  will get executed or `falseBranch`
+
+
+* this only works if we know the hidden property though
+* but what about a generalized case
+* where we want to check if the input `inputA` is equal to another input `inputB`
+* we don't know how `inputA` or `inputB` implement isEquals()
+* we don't know what hidden properties they use
+* but we to trust that `inputA.isEquals(inputB)` returns a boolean (??)
+
+### Impersonating Booleans
+
+* the problem is booleans are public definitions
+* anybody can impersonate a boolean
+* so back to square one
+* we can't trust whatever is returned from `isEquals()`
+* `x` has full control over what is returned from `x.isEquals()`
+* it could be a boolean, an empty object, undefined, or something else entirely
+
+* also, even if they spawned the behavior you want
+* what if they spanwed it multiple times?
+
+* what if we leveraged insertion
+* so you give `x` some behavior `ifDefined`
+* and when `ifDefined` is spawned, it inserts into your private collector `mCollector`
+* and `mCollector` takes the first insertion and spawns it
+* you also give `mCollector` your function `ifUndefined`
+* and if `mCollector` has no insertions, aka if the first insertion is `undefined`, it calls `ifUndefined`
+
+* however, what if `x` doesn't allow outgoing insertions
+* sandboxes the spawn
+* well that's pretty much the same as `x` behaving like `undefined`
+* though `x` could choose to allow certain outgoing insertions, and not allow others
+* which is weird, we don't want that
+
+* instead, we make `x` return a template
+* that _we_ can sandbox
+* and only send in the collector
+* we know the return result should be a boolean ish
+
+
+* functional seems to have all the same problems
+* can functional handle complete isolation in a trustless environment?
+* if you have a third party api like `fn()`
+* and it tells you that it returns a boolean
+* you can't trust it
+* and it might not actually act like a boolean
+* though it is a bit more safe since you don't have to worry about side effects
+* you can call it without worrying about leaking info
+
+### Normalizing Inputs and Type Coercion
+
+* what i am basically trying to achieve
+
+```js
+if (input)
+    trueBranch()
+else
+    falseBranch()
+```
+
+* this works in javascript because type coercion
+* doesn't matter what `input` is, either `trueBranch` will be called once or `falseBranch` will be called once
+
+
+* looking for some way to normalize the input
+* coercion
+
+
+* what do i want
+* some function `coerce()` that lets me treat some generic fn `fn()` as a boolean
+* so `coerce(fn)(trueBranch, falseBranch)`
+* should guarantee that either trueBranch is called once or falseBranch is called once
+* depending on fn
+
+
+* well i guess number of times trueBranch and falseBranch are called don't really matter in functional
+* since no side effects
+* but the problem is that you can't guarantee that the output of `coerce(fn)(trueBranch, falseBranch)` is
+* either the output of `trueBranch` or the output of `falseBranch`
+
+
+* you can't even check the output of `coerce(fn)(trueBranch, falseBranch)`
+* and try to do something like
+
+        result: coerce(fn)(trueBranch, falseBranch)
+        if (result != true || result != false)
+            return false
+
+* because again, `result` can be anything
+* so checking `(result != true || result != false)` runs into the same problem
+
+### Normalizing Inputs and Type Coercion - Memory as a Static Type
+
+* in functional, the only way to gain information about something
+* is to call it
+* eg, for a boolean, to run conditional logic based on the boolean
+* you have to call the boolean as a function
+* thus, if you want to "coerce" an input into a boolean value
+* you have to call the input (and give it the boolean values you want to coerce it into, True and False)
+* but that gives the input the power to return whatever it wants
+* and then you're back to square one
+
+
+* the reason why it works in imperative languages
+* is because the memory model acts as a "static type"
+* even in dynamically typed languages
+* if some API returns some unknown value
+* you can still check if it is undefined
+* because you can check its byte value in memory
+* byte value is basically a "type", a shared protocol for communicating/understanding data
+
+* in pure functional or lambda calculus, there are no shared protocols
+* you have to construct them
+
+* in Firefly, luckily, we do have a shared protocol
+* the address system
+
+### Coercing Defined/Undefined to a Boolean
+
+* so how do we do type coercion in Firefly?
+* how do we create some function `coerce()` that is guaranteed to either return `true` or `false`
+* when anybody can impersonate booleans?
+    * since they are public definitions, as mentioned earlier
+
+* well we can define `true` to have a hidden executor
+* and use the method explored earlier?? for equality?, eg just check `if (input == true)`
+  * see section "Combining Equality Check and Undefined Check"
+* but what about impersonation
+
+* but this doesn't cover checking for defined
+* implementing `if (input) doIfDefined else doIfUndefined`
+
+
+* actually, we can "create our own booleans"
+* instead of defining `undefined` to have a hidden executor
+* we use a hidden "mirror", identity function
+
+        undefined:
+            ifUndefined: x => x
+
+* then, any time we want to check if defined/undefined
+* we create an object with a hidden executor, stored at an address that we randomly generate
+
+        testObject:
+            addr_248: x => x()
+
+* then, we give this testObject to `input.ifUndefined`
+* if `input` is undefined, we will get the testObject back
+* so if we check `addr_248`, it will return an executor
+* otherwise, if we don't get testObject back, then when we check `addr_248`, we will get `undefined`
+
+* since `addr_248` was randomly generated
+* very unlikely to be defined
+* so we can assume that the return value is `undefined`
+
+
+* (note that we explored "mirror" objects in the section "Address Objects")
+
+### Iteration across Superposition Values
+
+(continued from section "Superposition Values")
+
+* was exploring superposition values again
+* and had an idea
+
+* instead of returning a random order and iterating along that order
+* we return a superposition of _all_ orders
+* and iterate across _all_ orders
+* and this way, guaranteed order doesn't matter
+* since all orders are being executed at the same time
+
+* we can collapse too
+* in case we do something that inserts
+* and now, instead of inserting once, it inserted an exponential amount of times
+* but we can design it so it gets collapsed?

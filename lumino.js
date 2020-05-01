@@ -166,7 +166,7 @@ class InboxItem extends Actor {
 }
 
 // this is really just to add a pub-sub mechanism to the next item pointer for each inbox item
-class NextItemBinding extends Binding {
+class OrderingBinding extends Binding {
     evaluate () {
         return this.nextItem;
     }
@@ -200,7 +200,7 @@ class Firefly extends Actor {
                 default: throw Error(`unknown node type "${binding.type}"`);
             }
         }
-        this.properties[this.inbox_next] = new NextItemBinding();
+        this.properties[this.inbox_next] = new OrderingBinding();
     }
     resolveReferences () {
         // resolve references to other addresses and create reactive bindings
