@@ -3,14 +3,14 @@
  * 
  * Two base classes:
  *   * Actor: defines the core methods of each actor
- *   * Binding: defines the pub-sub framework
+ *   * Node: stores values, makes up the pub-sub framework
  */
 
-// for debugging. All actors and bindings given a unique id.
+// for debugging. All actors and nodes given a unique id.
 let idCounter = 0;
 let generateId = () => idCounter++;
 
-class Binding {
+class Node {
     constructor (spec, parent, subjectAddr) {
         this.spec = spec;
         this.parent = parent;
@@ -18,13 +18,13 @@ class Binding {
         this.subjectAddr = subjectAddr;
         this.id = generateId();
 
-        parent.bindings.add(this); // register binding to parent, so when the parent destructs, the binding will destruct as well
+        parent.nodes.add(this); // register node to parent, so when the parent destructs, the node will destruct as well
     }
     resolveReferences () {
         if (!this.subjectAddr)
             return;
 
-        this.subject = this.parent.getBinding(this.subjectAddr);
+        this.subject = this.parent.getNode(this.subjectAddr);
         this.subject.subscribe(this);
     }
 	subscribe (listener) {
@@ -55,7 +55,7 @@ class Binding {
     }
 }
 
-class AccessBinding extends Binding {
+class AccessNode extends Node {
     constructor (spec, parent) {
         super(spec, parent, spec.source);
         this.sourceAddr = spec.source;
@@ -63,11 +63,11 @@ class AccessBinding extends Binding {
         this.value = UNDEFINED;
     }
 	onChange (oldSource, newSource) {
-        return newSource.get(this.accessAddr);
+        return newSource.getValue(this.accessAddr);
     }
 }
 
-class SpawnBinding extends Binding {
+class SpawnNode extends Node {
     constructor (spec, parent) {
         super(spec, parent, spec.source);
         this.sourceAddr = spec.source;
@@ -83,9 +83,9 @@ class SpawnBinding extends Binding {
     }
 }
 
-// note: this works a bit differently from most bindings
+// note: this works a bit differently from most nodes
 // nobody listens to it, has no "value", all it does is bind to the target, and rebind to the target if target changes
-class InsertionBinding extends Binding {
+class InsertionNode extends Node {
     constructor (spec, parent) {
         super(spec, parent, spec.target);
 
@@ -94,27 +94,27 @@ class InsertionBinding extends Binding {
     }
     resolveReferences() {
         super.resolveReferences();
-        this.sourceValue = this.parent.getBinding(this.sourceAddr);
+        this.sourceNode = this.parent.getNode(this.sourceAddr);
         // note: we never addItem() to the initial target since the initial target is guaranteed to be UNDEFINED
     }
     onChange (oldTarget, newTarget) {
-        oldTarget.removeItem(this.sourceValue);
-        newTarget.addItem(this.sourceValue);
+        oldTarget.removeItem(this.sourceNode);
+        newTarget.addItem(this.sourceNode);
 
         this.subject = newTarget;
     }
     destruct () {
         const target = this.subject;
-        target.removeItem(this.sourceValue);
+        target.removeItem(this.sourceNode);
         super.destruct();
     }
 }
 
 // this is really just to add a pub-sub mechanism to the next item pointer for each inbox item
-// Unlike other bindings, OrderingBinding doesn't subscribe to a subject since values are manually set.
-class OrderingBinding extends Binding {
+// Unlike other nodes, OrderingNode doesn't subscribe to a subject since values are manually set.
+class OrderingNode extends Node {
     constructor (parent) {
-        super(null, parent, null); // Parent is passed in so that the OrderingBinding gets destructed when InboxItem gets destroyed
+        super(null, parent, null); // Parent is passed in so that the OrderingNode gets destructed when InboxItem gets destroyed
         this.value = UNDEFINED;
     }
     onChange (oldNextItem, newNextItem) {
@@ -127,10 +127,10 @@ class OrderingBinding extends Binding {
 
 // Null bindings are when a node in the lumino network tries to reference a node that was never defined in the spec.
 // This should rarely happen, since a null binding will always return UNDEFINED, so it's not very useful.
-const NULL_BINDING = new Binding(null, {bindings: new Set()}, null);
+const NULL_BINDING = new Node(null, {nodes: new Set()}, null);
 
 
-// Bindings will reference other bindings in the network, so we create the network in two stages:
+// We create the network in two stages:
 //   1. initialize properties, aka create nodes
 //   2. resolve references, aka bind nodes to each other
 // Initially, all values are UNDEFINED, and no bindings are triggered.
@@ -138,18 +138,18 @@ const NULL_BINDING = new Binding(null, {bindings: new Set()}, null);
 class Actor {
     constructor () {
         this.properties = {};
-        this.bindings = new Set();
+        this.nodes = new Set();
         this.id = generateId();
     }
-    getBinding (address) {
-        const binding = this.properties[address];
-        if (!binding) {
-            console.warn(`Warning: null binding access in Actor ${this.id}`);
+    getNode (address) {
+        const node = this.properties[address];
+        if (!node) {
+            console.warn(`Warning: null node access in Actor ${this.id}`);
             return NULL_BINDING;
         }
-        return binding;
+        return node;
     }
-    get (address) {
+    getValue (address) {
         return this.properties[address] ? this.properties[address].value : UNDEFINED;
     }
     // create static nodes for each property
@@ -161,18 +161,18 @@ class Actor {
     // eg 'addr_231': { type: 'spawn', source: 'addr_255' } will take the SpawnNode at address addr_231,
     // and bind it to the value at addr_255, spawning from that value
     resolveReferences () {
-        for (const binding of this.bindings.values()) {
-            binding.resolveReferences();
+        for (const node of this.nodes.values()) {
+            node.resolveReferences();
         }
     }
     farewell () { // destructor
-        for (const binding of this.bindings.values()) {
-            binding.destruct();
+        for (const node of this.nodes.values()) {
+            node.destruct();
         }
     }
 }
 
-class Undefined_Class extends Actor {
+class UndefinedActor extends Actor {
     isUndefined = true
     initializeProperties() {}
     resolveReferences() {}
@@ -182,12 +182,12 @@ class Undefined_Class extends Actor {
     farewell() {}
 }
 
-const UNDEFINED = new Undefined_Class();
+const UNDEFINED = new UndefinedActor();
 
 class InboxItem extends Actor {
-    constructor (valueBinding, inbox_next, inbox_value) {
+    constructor (valueNode, inbox_next, inbox_value) {
         super();
-        this.valueBinding = valueBinding;
+        this.valueNode = valueNode;
         this.inbox_next = inbox_next;
         this.inbox_value = inbox_value;
 
@@ -196,21 +196,22 @@ class InboxItem extends Actor {
     }
     initializeProperties () {
         this.properties = {
-            [this.inbox_value]: this.valueBinding,
-            [this.inbox_next]: new OrderingBinding(this),
+            [this.inbox_value]: this.valueNode,
+            [this.inbox_next]: new OrderingNode(this),
         };
     }
     setNext (inboxItem) {
-        this.getBinding(this.inbox_next).setNext(inboxItem);
+        this.getNode(this.inbox_next).setNext(inboxItem);
     }
 }
 
 // the main actor class
+// TODO: separate linked-list into a separate class?
 class Firefly extends Actor {
     constructor (template) {
         super();
         this.template = template;
-        this.inbox = new Map(); // a map of <value, inboxitem>. Note: every incoming value has to be wrapped in an InboxItem
+        this.inbox = new Map(); // a map of <node, inboxitem>. Note: every incoming node has to be wrapped in an InboxItem
 
         // initialize circular linked list
         const inboxDummyItem = this;  // use self as a dummy first item
@@ -225,38 +226,38 @@ class Firefly extends Actor {
     initializeProperties () {
         // create static nodes for each property
         // eg 'addr_231': { type: 'spawn', source: 'addr_255' } will create a SpawnNode at address addr_231
-        for (const [address, binding] of Object.entries(this.template.properties)) {
-            switch (binding.type) {
-                case 'access': this.properties[address] = new AccessBinding(binding, this); break;
-                case 'spawn': this.properties[address] = new SpawnBinding(binding, this); break;
+        for (const [address, node] of Object.entries(this.template.properties)) {
+            switch (node.type) {
+                case 'access': this.properties[address] = new AccessNode(node, this); break;
+                case 'spawn': this.properties[address] = new SpawnNode(node, this); break;
                 case 'inbox_next': this.inbox_next = address; break;
                 case 'inbox_value': this.inbox_value = address; break;
-                default: throw Error(`unknown node type "${binding.type}"`);
+                default: throw Error(`unknown node type "${node.type}"`);
             }
         }
-        this.properties[this.inbox_next] = new OrderingBinding(this);
+        this.properties[this.inbox_next] = new OrderingNode(this);
         
-        for (const bindingSpec of this.template.outbox) {
-            new InsertionBinding(bindingSpec, this);
+        for (const nodeSpec of this.template.outbox) {
+            new InsertionNode(nodeSpec, this);
         }
     }
     setNext (inboxItem) {
-        this.getBinding(this.inbox_next).setNext(inboxItem);
+        this.getNode(this.inbox_next).setNext(inboxItem);
     }
     getTail () {
         return this.dummyHead.prev;
     }
-    addItem (valueBinding) {
-        const newTail = new InboxItem(valueBinding, this.inbox_next, this.inbox_value);
+    addItem (valueNode) {
+        const newTail = new InboxItem(valueNode, this.inbox_next, this.inbox_value);
         const prevTail = this.getTail();
 
-        this.inbox.set(valueBinding, newTail); // add item to inbox
+        this.inbox.set(valueNode, newTail); // add item to inbox
         prevTail.setNext(newTail);      // setNext() is used to set the item's inbox_next property
         prevTail.next = newTail;        // .next and .prev are for linked-list housekeeping
         newTail.prev = prevTail;
     }
-    removeItem (valueBinding) {
-        const item = this.inbox.get(valueBinding);
+    removeItem (valueNode) {
+        const item = this.inbox.getValue(valueNode);
         if (this.inbox.delete(item)) {
             item.prev.setNext(item.next);
             item.prev.next = item.next;

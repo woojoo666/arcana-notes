@@ -36,11 +36,11 @@ test('basic tests', () => {
     const adam = new Firefly(adamTemplate);
     adam.addItem(dummyValueNode);
 
-    const eve = adam.get('addr_11');
+    const eve = adam.getValue('addr_11');
 
 	expect(eve).not.toBe(UNDEFINED);
     expect(eve.inbox_next).toBe('addr_eve_next');
-    expect(eve.get(eve.inbox_next).get(eve.inbox_value)).toBe(eve);
+    expect(eve.getValue(eve.inbox_next).getValue(eve.inbox_value)).toBe(eve);
 });
 
 // todo: test destructors
