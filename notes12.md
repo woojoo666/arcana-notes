@@ -936,18 +936,19 @@ const template = {
 * accessing a property on `undefined` returns `undefined`
 * spawning `undefined` returns `undefined`
 
-### fdsafdas
+### access bindings are static
 
-access is now static
-at the core level
+* access is now static
+* at the core level (lumino)
 
-a static address
+* a static address
+* instead of a dynamic object-key
 
-makes things a bit easier in the interpreter
-since every binding only needs to monitor one source node
+* makes things a bit easier in the interpreter
+* since every binding (access, spawn, insertion) only needs to monitor one source node
 
-no need to unregister listeners anymore, except when de-spawning fireflies
-
+* no need to re-assign listeners anymore, like we had to in the `MemberAccessNode` in the old interpreter
+  * see `MemberAccessNode.updateTarget()` in `interpreter/interpreter.js` at commit 4e3461941c03041ca492ade12cd7bd4df16c1ac2
 
 ### insertions is now either outbox or inbox
 
@@ -1816,3 +1817,47 @@ interestingly for the bindings:
     * since it has to do so manually, doesn't use subscriber system
 * the ordering binding represents an "enter node", it has to manually receive a value and integrate it into the network
     * since it has to do so manually, it doesn't have a subject
+
+### Lumino Exploration - Null Bindings
+
+* while writing lumino, I had to add the concept of a "null binding" or "null node"
+* recall that every actor is made up of a reactive network of nodes,
+  that store values and propagate updates to other nodes
+* a "null node" is when a node references an address that wasn't defined in the spec
+* eg
+
+```js
+const template = {
+    properties: {
+        'addr_10': { type: 'inbox_next' },
+        'addr_11': { type: 'inbox_value' },
+        'addr_12': { type: 'spawn', source: 'addr_777' },
+    },
+    outbox: [],
+}
+```
+
+* notice that the `spawn` node references `addr_777`, which will _never be defined_
+* so the `spawn` node is permanently undefined
+
+* Note that null bindings are very different from UNDEFINED values.
+* "undefined" is a value, it is dynamic and temporary
+* a property value could be UNDEFINED one moment and then defined the next moment.
+* On the other hand, a null binding is static and permanent, its value will always be undefined
+  * recall that bindings are mostly static, see section "Lumino Exploration - Access and Spawn bindings are Static"
+* So null bindings are rather useless, and should actually never occur when using higher-order constructs and syntax.
+* with higher-order constructs like static binding, scope, etc, an actor would never be bound to a null address
+
+* i realized that the way lumino works
+* the only way you can get undefined
+* is if inbox next item is undefined
+* propery access and spawn and outbox items should always reference properties that already exist / defined
+
+* so it looks like the only way to get an undefined value is when referencing insertions?
+* so "undefined" basically means nothing has been inserted?
+* maybe we should just call it "no_insertion"?
+
+* actually no, you can also get undefined if you are doing a property access on an insertion
+* and the insertion doesn't have that property defined
+
+* such is the life of dynamically typed systems
