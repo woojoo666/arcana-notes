@@ -105,7 +105,7 @@ class InsertionBinding extends Binding {
     }
     destruct () {
         const target = this.subject;
-        target.removeItem(sourceBinding);
+        target.removeItem(this.sourceValue);
         super.destruct();
     }
 }
@@ -126,10 +126,7 @@ class OrderingBinding extends Binding {
 }
 
 // Null bindings are when a node in the lumino network tries to reference a node that was never defined in the spec.
-// Eg if an actor template looks like `{properties: { 123: {type: spawn, source: 777} }}`, the spawn node accesses address 777,
-//    but 777 was never defined in the template, so it will always be undefined.
-// This should never really happen, since a null binding will always return UNDEFINED so it's rather useless.
-// It can almost be treated as a compiler error.
+// This should rarely happen, since a null binding will always return UNDEFINED, so it's not very useful.
 const NULL_BINDING = new Binding(null, {bindings: new Set()}, null);
 
 
@@ -224,7 +221,6 @@ class Firefly extends Actor {
 
         this.initializeProperties();
         this.resolveReferences();
-        this.deliverOutbox();
     }
     initializeProperties () {
         // create static nodes for each property
@@ -243,9 +239,6 @@ class Firefly extends Actor {
         for (const bindingSpec of this.template.outbox) {
             new InsertionBinding(bindingSpec, this);
         }
-    }
-    // note: should happen after references are resolved, since we are inserting live bindings into other actors
-    deliverOutbox () {
     }
     setNext (inboxItem) {
         this.getBinding(this.inbox_next).setNext(inboxItem);

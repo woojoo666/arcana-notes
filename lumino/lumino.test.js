@@ -42,3 +42,5 @@ test('basic tests', () => {
     expect(eve.inbox_next).toBe('addr_eve_next');
     expect(eve.get(eve.inbox_next).get(eve.inbox_value)).toBe(eve);
 });
+
+// todo: test destructors
