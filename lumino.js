@@ -6,111 +6,116 @@
  *   * Binding: defines the pub-sub framework
  */
 
-class Template {
-    constructor (nodes) {
-
-    }
-}
-
 class Undefined_Class extends Actor {
-    subscribe () {}
-    unsubscribe() {}
-    evaluate() {}
+    isUndefined = true
+    constructor() {}
+    initializeProperties() {}
+    resolveReferences() {}
+    addItem() {}
+    removeItem() {}
+    setNext() {}
+    farewell() {}
 }
 
 const UNDEFINED = new Undefined_Class();
 
 class Binding {
-    constructor (spec, parent, subject) {
+    constructor (spec, parent, subjectAddr) {
         this.spec = spec;
         this.parent = parent;
         this.listeners = new Set();
-        subject.subscribe(this.update);
+        this.subjectAddr = subjectAddr;
+
+        parent.bindings.add(this);
     }
     resolveReferences () {
-		throw Error(`Unimplemented ${this.constructor.name}.resolveReferences() function`);
+        if (!this.subjectAddr)
+            return;
+
+        this.subject = parent.properties[this.subjectAddr];
+        this.subject.subscribe(this.update);
     }
 	subscribe (listener) {
 		this.listeners.add(listener);
 	}
 	unsubscribe (listener) {
 		this.listeners.remove(listener);
-	}
-	// sets the value. Must return a Firefly or undefined
-	evaluate () {
-		throw Error(`Unimplemented ${this.constructor.name}.evaluate() function`);
-	}
-	update () {
-		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
-		const oldValue = this.value;
-		this.value = this.evaluate();
-		if (this.value != oldValue) {	
+    }
+    // optionally returns a value, and will notify listeners if that value changes
+	onChange (oldSubjectValue, newSubjectValue) {
+		throw Error(`Unimplemented ${this.constructor.name}.onChange() function`);
+    }
+	update (oldSubjectValue, newSubjectValue) {
+        console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
+        const newValue = this.onChange(oldSubjectValue, newSubjectValue);
+		if (this.value != newValue) {
+            const oldValue = this.value;
+            this.value = newValue;
 			for (const listener of this.listeners) {
-				listener();
+				listener(oldValue, newValue);
 			}
 		}
 	}
     destruct () {
-        subject.unsubscribe(this.update);
+        if (this.subject) {
+            this.subject.unsubscribe(this.update);
+        }
     }
 }
 
 class AccessBinding extends Binding {
     constructor (spec, parent) {
-        super(spec, parent);
+        super(spec, parent, spec.source);
         this.sourceAddr = spec.source;
         this.accessAddr = spec.address;
+        this.value = UNDEFINED;
     }
-    evaluate () {
-        const prevSourceActor = this.sourceActor;
-        this.sourceActor = this.parent.get(this.sourceAddr);
-        if (this.sourceActor != prevSourceActor) {
-            prevSourceActor
-        }
-        return sourceActor.get(this.accessAddr);
+	onChange (oldSource, newSource) {
+        return newSource.get(this.accessAddr);
     }
 }
 
 class SpawnBinding extends Binding {
     constructor (spec, parent) {
-        super(spec, parent);
-        this.source = spec.source;
+        super(spec, parent, spec.source);
+        this.sourceAddr = spec.source;
+        this.value = UNDEFINED;
     }
-    evaluate () {
-        // TODO: do we need to check if the spec changed? or is that already handled during Binding.update()?
-        // TODO: we need to destruct the prev child if spec changed
-        const template = this.parent.get(this.source);
-        return template ? new Firefly(template) : UNDEFINED;
+	onChange (oldSource, newSource) {
+        this.value.farewell(); // destruct the prev child if spec changed
+        return newSource ? new Firefly(newSource) : UNDEFINED;
     }
     destruct () {
         this.value.farewell();
-        Binding.prototype.destruct.call(this);
+        super.destruct();
     }
 }
 
-// A bit of a hack, subscribes to itself for changes, so that if the target changes it can rebind itself
+// note: this works a bit differently from most bindings
+// nobody listens to it, has no "value", all it does is bind to the target, and rebind to the target if target changes
 class InsertionBinding extends Binding {
     constructor (spec, parent) {
-        super(spec, parent);
-        this.sourceBinding = parent.properties[spec.source]; // TODO: is this safe?
+        super(spec, parent, spec.target);
+
         this.target = spec.target;
-        this.id = OutboxItem.generateId();
-
-        // manually add an eventlistener on update so I can re-bind the target
-        this.addListener(this.onTargetChanged.bind(this));
+        this.id = InsertionBinding.generateId();
     }
-    evaluate () {
-        return this.parent.get(this.target);
-        // should I be creating a InboxItem Actor here?
+    resolveReferences() {
+        super.resolveReferences();
+        this.sourceValue = parent.properties[spec.source];
+        // note: we never addItem() to the initial target since the initial target is guaranteed to be UNDEFINED
     }
-	// re-evaluate and re-bind target
-	onTargetChanged () {
-        console.log(`Re-binding target for InsertionBinding with id ${this.id}`); // for debugging
-        this.oldTargetValue.removeItem(this.sourceBinding);
-        this.target.addItem(this.sourceBinding);
+    onChange (oldTarget, newTarget) {
+        oldTarget.removeItem(this.sourceValue);
+        newTarget.addItem(this.sourceValue);
 
-		this.oldTargetValue = this.parent.get(this.target);
-	}
+        this.subject = newTarget;
+    }
+    destruct () {
+        const target = this.subject;
+        target.removeItem(sourceBinding);
+        super.destruct();
+    }
 }
 
 // every insertion has an id because collectors can contain duplicates,
@@ -120,14 +125,27 @@ InsertionBinding.generateId = function () {
     return InsertionBinding.currentId++;
 }
 
-function createTemplate(nodes) {
-    return spawnTemplate() {
-        // for every nodes
-        // create reactive listeners and such
-
+// this is really just to add a pub-sub mechanism to the next item pointer for each inbox item
+// Unlike other bindings, OrderingBinding doesn't subscribe to a subject since values are manually set.
+class OrderingBinding extends Binding {
+    constructor (parent) {
+        super(null, parent, null); // Parent is passed in so that the OrderingBinding gets destructed when InboxItem gets destroyed
+        this.value = UNDEFINED;
+    }
+    onChange (oldNextItem, newNextItem) {
+        return newNextItem;
+    }
+    setNext (newValue = UNDEFINED) {
+        this.update(this.value, newValue); // manually set value and notify subscribers
     }
 }
 
+// Bindings will reference other bindings in the network, so we create the network in two stages:
+// 1. initialize properties, aka create nodes
+// 2. resolve references, aka bind nodes to each other
+
+// Initially, all values are UNDEFINED, and no bindings are triggered.
+// The network will come alive when the actor starts receiving values via insertions (see Firefly class).
 class Actor {
     constructor () {
         this.properties = {};
@@ -136,53 +154,57 @@ class Actor {
     get (address) {
         return this.properties[address] ? this.properties[address].value : UNDEFINED;
     }
+    // create static nodes for each property
+    // eg 'addr_231': { type: 'spawn', source: 'addr_255' } will create a SpawnNode at address addr_231
+    initializeProperties () {
+		throw Error(`Unimplemented ${this.constructor.name}.initializeProperties() function`);
+    }
+    // resolve references to other addresses and create reactive bindings
+    // eg 'addr_231': { type: 'spawn', source: 'addr_255' } will take the SpawnNode at address addr_231,
+    // and bind it to the value at addr_255, spawning from that value
+    resolveReferences () {
+        for (const binding of this.bindings.values()) {
+            binding.resolveReferences();
+        }
+    }
     farewell () { // destructor
         for (const binding of this.bindings.values()) {
             binding.destruct();
         }
     }
-    setNext () {
-        // throw error
-    }
 }
 
 class InboxItem extends Actor {
-    constructor (insertionBinding, inbox_next, inbox_value) {
+    constructor (value, inbox_next, inbox_value) {
+        this.value = value;
         this.inbox_next = inbox_next;
         this.inbox_value = inbox_value;
-        this.insertionBinding = insertionBinding;
     }
     initializeProperties () {
-        this.properties[this.inbox_value] = this.insertionBinding;
-        this.properties[this.inbox_next] = new NextItemBinding();
-        // TODO: subscribe to updates
-    }
-    resolveReferences () {
-
+        this.properties = {
+            [this.inbox_value]: this.value,
+            [this.inbox_next]: new OrderingBinding(this),
+        };
     }
     setNext (inboxItem) {
-        this.properties[this.inbox_next].set(inboxItem);
-    }
-}
-
-// this is really just to add a pub-sub mechanism to the next item pointer for each inbox item
-class OrderingBinding extends Binding {
-    evaluate () {
-        return this.nextItem;
-    }
-    set (nextItem) {
-        this.nextItem = nextItem || UNDEFINED;
-        this.update(); // notify subscribers
+        this.properties[this.inbox_next].setNext(inboxItem);
     }
 }
 
 // the main actor class
 class Firefly extends Actor {
-    constructor (template, insertionBinding) {
+    constructor (template) {
         super();
         this.template = template;
-        this.inbox = new Set();
-        this.initializeProperties(insertionBinding);
+        this.inbox = new Map(); // a map of <value, inboxitem>. Note: every incoming value has to be wrapped in an InboxItem
+
+        // initialize circular linked list
+        const inboxDummyItem = this;  // use self as a dummy first item
+        inboxDummyItem.next = inboxDummyItem;
+        inboxDummyItem.prev = inboxDummyItem;
+
+        this.initializeProperties();
+        this.resolveReferences();
     }
     initializeProperties () {
         // create static nodes for each property
@@ -192,44 +214,46 @@ class Firefly extends Actor {
                 case 'access': this.properties[address] = new AccessBinding(binding, this); break;
                 case 'spawn': this.properties[address] = new SpawnBinding(binding, this); break;
                 case 'inbox_next': this.inbox_next = address; break;
-                case 'inbox_val': this.inbox_value = address; 
-                    if (insertionBinding) {
-                        this.properties[this.inbox_value] = insertionBinding;
-                    }
-                    break;
+                case 'inbox_val': this.inbox_value = address; break;
                 default: throw Error(`unknown node type "${binding.type}"`);
             }
         }
-        this.properties[this.inbox_next] = new OrderingBinding();
-    }
-    resolveReferences () {
-        // resolve references to other addresses and create reactive bindings
-        // eg 'addr_231': { type: 'spawn', source: 'addr_255' } will take the SpawnNode at address addr_231,
-        // and bind it to the value at addr_255, spawning from that value
-        
+        this.properties[this.inbox_next] = new OrderingBinding(this);
     }
     deliverOutbox () {
         for (const bindingSpec of this.template.outbox) {
-            const binding = new InsertionBinding(bindingSpec, this);
-            this.bindings.add(binding);
+            new InsertionBinding(bindingSpec, this);
         }
     }
     setNext (inboxItem) {
-        this.properties[this.inbox_next].set(inboxItem);
+        this.properties[this.inbox_next].setNext(inboxItem);
     }
-    addItem (insertionBinding) {
-        const item = new InboxItem(insertionBinding);
-        this.inbox.add(item);
-        this.inboxTail.setNext(item);
-        this.inboxTail = item;
+    getTail () {
+        return this.inboxDummyItem.prev;
     }
-    removeItem (insertionBinding) {
-        const item = [...this.inbox].filter(it => it.insertionBinding == insertionBinding)[0];
-        // no need to unsubscribe since the item is about to be destructed anyways
-        if (this.inbox.remove(item)) {
-            this.item.prevItem.setNext(item.nextItem);
+    addItem (value) {
+        const newTail = new InboxItem(value, this.inbox_next, this.inbox_value);
+        const prevTail = this.getTail();
+
+        this.inbox.set(value, newTail); // add item to inbox
+        prevTail.setNext(newTail);      // setNext() is used to set the item's inbox_next property
+        prevTail.next = newTail;        // .next and .prev are for linked-list housekeeping
+        newTail.prev = prevTail;
+    }
+    removeItem (value) {
+        const item = this.inbox.get(value);
+        if (this.inbox.delete(item)) {
+            item.prev.setNext(item.next);
+            item.prev.next = item.next;
+            item.next.prev = item.prev;
+            item.farewell();
         }
-        item.farewell();
+    }
+    farewell () {
+        for (const item of this.inbox.values()) {
+            item.farewell();
+        }
+        super.farewell();
     }
 }
 

@@ -1782,3 +1782,37 @@ previously we argued that
 
 * I think as long as all decryption protocols are pure functional, don't leak data, no side effects
 * then people won't mind custom decryption protocols
+
+### tags and reference equality ?
+
+not sure if this was mentioned before
+since tags rely on hashmaps
+basically relies on equality
+but equality might not be defined for some objects
+what should happen?
+
+### Lumino Exploration - binding types
+
+previously talked about only creating inbox item once per insertion
+and inserting it around
+
+but actually, the receiving actor has to create inbox item
+because the receiving actor knows where the next_addr and val_addr should be defined
+
+interestingly for the bindings:
+* access - has a subject (the readee) and a value (the retrieved property)
+* spawn - has a subject (the template) and a value (the spawned child)
+* insertion - has a subject (the target) but no value (and no subscribers)
+* ordering - has no subject but has a value (points to the next inbox item)
+
+* so why the asymmetry?
+
+* ultimately the subject and subscriber system is _static_
+* during the `resolveReferences` stage, bindings are created between nodes inside an actor
+* but afterwards, those bindings are static
+
+* however, insertions are dynamic, we have no idea where the value is going to be inserted to
+* thus, the insertion binding represents an "exit node", and has to manually send the value to the target
+    * since it has to do so manually, doesn't use subscriber system
+* the ordering binding represents an "enter node", it has to manually receive a value and integrate it into the network
+    * since it has to do so manually, it doesn't have a subject
