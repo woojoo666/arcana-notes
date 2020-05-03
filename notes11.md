@@ -3037,7 +3037,7 @@ accessible by a private key that the "machine" has (aka the machine or server th
 outsiders can't clone the actor
 but any actors created on the same machine, can clone it all they want
 
-### Moving and Re-mapping Properties 2
+### Moving and Re-mapping Properties II
 
 - could an actor turn a public clone() function into a private one themselves?
 - clone an existing object with a public `.clone()` method
@@ -3054,7 +3054,7 @@ outgoing: insertion
 incoming: reads, insertions
 internal: spawn, setspawn
 
-### Cloning and Source Code 2?
+### Cloning and Source Code II?
 
 now that cloning is a behavior exposed by the callee
 the callee doesn't need to expose the source code anymore right?
@@ -3074,7 +3074,7 @@ but then what if you want a template with private behavior
 aka, define a method on an object that is meant to be cloned, but is dormant in the beginning
 has no initial object
 
-### Ordering Sets 2: an alternative to set spawn?
+### Ordering Sets II: an alternative to set spawn?
 
 what if instead of set spawning
 we had a core `order_set` function that converts a set into an array of form `(0: ..., 1: ..., 2: ..., etc)`
@@ -3285,7 +3285,7 @@ but this can happen in a distributed fashion:
 
 ### Set Operations
 
-(continued from Ordering Sets 2)
+(continued from "Ordering Sets II")
 
 earlier we talked about implementing make_ordered using pick_one
 but what if set contains duplicates?
@@ -5639,7 +5639,7 @@ hmmm
 ### 
 
 recall that earlier, I suspected that dynamic property access could compromise anonymity and security
-    see sections "Property Muxers", "Preventing Dynamic Access and Proxies using Encryption", "Ordering Sets 2"
+    see sections "Property Muxers", "Preventing Dynamic Access and Proxies using Encryption", "Ordering Sets II"
 we thought it would allow bad actors to proxy or impersonate other objects,
     or impersonate private properties that it doesn't have access to (see "Property Muxers" section)
 so I thought that we shouldn't have dynamic property access as an axiom

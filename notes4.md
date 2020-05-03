@@ -3253,11 +3253,11 @@ in summary:
 4. inputs != properties
 	* inputs propagate, properties don't
 
--------------------------------
+### random stuff - objects as keys, error codes, etc
 
 nice thing about accepting objects as keys
 	you can implement your own hashing function
-	(in nylo, it used his hashing function)
+	(nylo had a static hashing function, AFAIK the object `(a: 10)` would just be converted to the string "(a: 10)" and use that as the key)
 	but what if you wanted to make a custom one
 	maybe like the method python uses for multidimensional arrays
 

@@ -45,7 +45,7 @@ Mechanics
 
 ### Basic Syntax
 
-The basic syntax is rather intuitive, and looks similar to javascript objects definitions.
+The basic syntax looks similar javascript object definitions:
 
 	x: 10     // define variables using ":"
 	y: x + 3  // math expressions are supported
@@ -173,8 +173,8 @@ We can insert to any object, no restrictions. However, by default, objects ignor
 By leveraging insertion, we can also define object methods (like class methods in Python/Java)
 
 	Library:
-		songs: hashset     // hashsets are simply collectors that filter out duplicates
-		artists: hashset
+		songs: Set()     // Sets are simply collectors that filter out duplicates
+		artists: Set()
 
 		song: name, artist >>
 			songs <: (name, artist)

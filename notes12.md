@@ -936,8 +936,6 @@ const template = {
 * accessing a property on `undefined` returns `undefined`
 * spawning `undefined` returns `undefined`
 
-------------------------------------------------------------------------
-
 ### fdsafdas
 
 access is now static
@@ -953,7 +951,10 @@ no need to unregister listeners anymore, except when de-spawning fireflies
 
 ### insertions is now either outbox or inbox
 
-less confusing
+using the terminology "insertions" is a bit confusing sometimes
+eg if I say "Foo's insertions", does that mean the insertions that Foo is sending or receiving?
+thus, to make it less confusing,
+we'll sometimes refer to insertions as"inbox items" or "outbox items"
 
 eg we'll now use terms like "inbox iteration" and "inbox iterator"
     instead of _insertions iterator, like we used before
@@ -1460,3 +1461,324 @@ else
 * in case we do something that inserts
 * and now, instead of inserting once, it inserted an exponential amount of times
 * but we can design it so it gets collapsed?
+
+### Checking for End of List II
+
+* earlier in section "Checking for End of List" we talked about how we can check for the end of the inbox item list
+* by adding a special property `addr_execute`
+* but this is starting to feel like we are bloating the Inbox Item actor
+
+* in fact, this is not necessary
+* we can define the `ifUndefined` function/template within `Undefined` itself
+
+* so every actor is only responsible for creating a linked-list for the inbox items
+* it's up to the user to iterate through the linked-list using recursion and conditionals
+
+
+* note that it's possible to achieve much functionality without iterating through insertions
+* eg an executor function, that just executes the first insertion
+
+        executeFirstInsertion:
+            result: spawn{_inbox._next}
+
+* does not require any recursion or any conditionals / undefined checking
+
+### Reserved Addresses
+
+* addr_0 reserved for undefined (the `ifUndefined` function)
+* addr_1 reserved for function return
+
+### Global vs Local Undefined
+
+* `undefined` now has to have this special `isUndefined` property
+* where we store a mirror / identity function
+* also feels sort of arbitrary
+
+* if `undefined` is just a default return value for the read operation
+* then maybe every actor can specify their own default return value
+* note that the _reader_ is specifying the default, not the _readee_
+* because recall that the readee should have no idea that they are being read (anonymous reads)
+* so it's up to the reader to say "oh, I can't find a value at this address, i'll just use the default value"
+
+* if every actor defines their own default value
+* this also gives every actor the freedom to store the `isUndefined` identity function
+* in their own secret address
+* so it's impossible to impersonate
+* and it makes it easier for each actor to check if the result was `undefined`
+* without worrying about complex protocols like the one mentioned in "Coercing Defined/Undefined to a Boolean"
+    * that is mainly needed to handle impersonators
+
+* though it also means that `undefined` can't be passed around right?
+* like, you can't insert `undefined` to another actor
+* because every actor has a different notion of `undefined`, a different definition
+
+* is it circular?
+* if every actor has to specify their own default value
+* then that default value has to be passed in somehow right?
+* so who defines the "first" default value
+
+* well we kinda already have this issue
+* if we have a global `undefined` definition (like the `Undefined` actor we currently have in lumino.js)
+* that actor also has properties
+* and those properties can also be undefined (in fact, most are)
+* so this global `undefined` actor, returns itself when a reader tries to access a property on it
+
+
+* maybe this is actually the default behavior
+* every actor returns itself whenever it can't find a value during a read operation
+* that way, an actor can specify `ifUndefined` on itself
+
+        foo:
+            ...
+            ifUndefined: x => x   // identity function
+
+* every actor acts as it's own `undefined`
+* but then, how would an actor know the difference between a reference to `undefined`, and a reference to itself?
+* for example, maybe some actor `foo` happens to pass `bar` to itself
+* now `bar` thinks that it was passed `undefined`
+* since it treats itself as `undefined`
+
+* also, note that defining your own default read value
+* is trivial as a second-order construct
+* every time you do a read operation, just check if the result is `undefined`,
+    * and if so, use a specified default value instead
+
+* however, it doesn't change the fact that our global `undefined` value
+* is starting to feel more and more arbitrary
+
+* also, each actor having it's own default value
+* feels less centralized than a global default value
+    * though note that it isn't a global object that needs to be passed around
+    * it's just an agreed upon template, but any interpreter can create their own `undefined` actor from the template
+* though, certain parts of a language do have to be global
+* eg the address system, and the way inbox items are converted to linked lists, etc
+* aka all language rules are global
+* so should we treat `undefined` as a language rule?
+
+* note that if the definition for `undefined` is treated as a global language rule
+* then the protocal for checking `ifUndefined`, also becomes a global language rule
+    * see section "Coercing Defined/Undefined to a Boolean"
+* because that's currently the only reason for having the identity function defined inside the actor
+* having that arbitrary identity function property, doesn't make sense without the protocol for checking undefinedness
+* they are intertwined
+
+### Global vs Local Undefined II
+
+* i guess a major question still is
+* does `undefined` make sense as a globally understood value
+* does it make sense to pass around `undefined`?
+
+* actually, imagine if we did
+
+        foo:
+            x: input.someProp
+
+* and assume `input.someProp` returns undefined
+* if undefined was a local value
+* then somebody reading `foo.x` would not also see it as `undefined`
+* which is weird...
+
+* i guess this would make more sense if the default object was just an empty object, `()`
+* doesn't matter who reads it or sees it
+* nobody can act on it
+* it's basically a black hole
+
+* it also kinda makes sense because, if an actor doesn't have access to any of the properties of some object
+* it will also look like an empty object
+* kinda like the idea of value-equality in functional
+  * mentioned in section "Reference Equality and Referential Transparency"
+  * in function, the notion of equality is based on if two functions act the same, not based on internal ids or reference equality like in Java/javascript
+* if it looks undefined to you, then it _is_ undefined to you
+* you can't understand it
+* its "virtually undefined"
+
+* but that also makes it virtually useless
+* you can't check for undefined
+* since you can't do anything with it
+
+
+* what is "understanding"?
+* what does it mean for one actor to "understand" an object, and another actor to "not understand" the same object?
+
+
+* note that constants like booleans, numbers
+* are also passed in through scope
+    * mentioned in section "Constants and Static Embedding"
+* what if two environments had different definitions for numbers, or booleans?
+* would they also run into the same issues?
+
+### A Tale of Two Truths
+
+imagine two ways of defining a boolean
+
+        TrueA: trueBranch, falseBranch >>
+            => trueBranch()
+
+        TrueB: ifBranch, elseBranch >>
+            => ifBranch()
+
+(note, they may look the same, but `trueBranch` and `ifBranch` are at different addresses,
+ so if you don't know which address to use, you wouldn't be able to use that boolean)
+
+* now imagine if some object Foo stored `trueA` on some property `bool`
+* and some object `Bar` only knew about `TrueB`
+* if `Bar` looked at property `bool`, he wouldn't understand it and wouldn't know how to use it
+
+
+this goes back to functional and type coercion
+these sorts of complications are why functional doesn't have a primitive concept of equality (eg no reference equality)
+if something acts the same, it _is_ the same
+so instead of worrying about different types of booleans
+a functional program would just treat an input as a boolean and use it as if it were a boolean
+
+### `undefined` is part of Property Access
+
+* undefined only makes sense
+* in the context of our dictionary / address / memory system
+* it is a part of the protocol
+
+* we are defining `undefined` as a part of the protocol
+
+* this is important to recognize
+* because the property access protocol is a fundamental difference between Firefly and other actor / functional languages
+* most actor / functional languages just treat property access as just another function
+* but by defining it as a language rule (like Firefly does), we are also forced to introduce the idea of `undefined`
+* (and recall that we made it a core rule to enforce anonymous reads)
+
+* so basically, the only reason why we have `undefined` is because we want anonymous reads
+
+
+* so maybe we should just make property access functional
+* but a couple problems we mentioned before
+    * functions use prop access, so prop access can't use functions, circular
+    * since actor can have side effects, functional prop access allows for infinite props, potentially infinite actors and side effects
+
+
+* encryption example
+* recall that for property access, we can capture all properties into an encrypted bundle, so property access becomes a matter of decryption using different keys
+  * mentioned in sections "Private Keys and Anonymous Reads, Property Bundles" and "Preventing Dynamic Access and Proxies using Encryption"
+* if you use the wrong key, the decrypted data could look like gibberish
+* but with a "global undefined", the readee would have to tell the reader that it's not just gibberish, it's "undefined"
+* for example, maybe the readee tells the reader that the decrypted data to start with `data-` to be valid
+
+
+* the address protocol
+* forces us to define some addresses, and leave other addresses undefined
+* so the concept of `undefined` does seem built into the protocol
+
+* but the protocol doesn't specify what value to use for undefined?
+
+### Data Persistence Networks and Default Read Values
+
+* data persistence network
+    * (mentioned previously in "Anonymous Reads and Data Persistence Networks")
+* means everybody has to agree on output
+* so readers can't define their own default values
+
+* so that pretty much resolves the issue mentioned in section "Global vs Local Undefined"
+
+### Custom Default Property Values
+
+* however, re-exploring idea that the _readee_ (the object being read) can define it's own default value
+* (previously explored in section "Undefined as a Primitive")
+
+previously we argued that
+1. trivial to just specify a `default_val` property and let the reader do the replacement
+2. prevents anonymous reads, since readee would have to know that the key is not defined, and then return the default value instead
+
+* I realize now that there are a few issues
+
+* for (1) there is a big difference actually
+* who has control
+* reader or readee?
+
+* if readee object itself specifies default val, then reader doesn't have control
+* a reader may not be able to understand / parse the default return value
+* they might not understand that it is "undefined"
+* note that all readers still see the same value, but some readers know how to handle it (eg they know where the `ifUndefined` prop is hidde)
+* a side effect of this could be that, a reader iterating through a list but doesn't know how to parse the list end, will end up recursing infinitely
+
+* if instead all readee objects return a global `undefined` value
+* and the reader retroactively substitutes a default value on top of the `undefined` value returned
+* this gives power to the reader to substitute or not
+* and it actually _takes power away_ from the readee object
+* because the object is now forced to specify to the world what addresses are undefined
+
+* for (2), that's not necessary true
+* it's up to the address-access protocol
+* the reader can execute a property access anonymously
+* but the default value can be embedded in that property access protocol?
+* kinda like, when decrypting some data
+* the readee object can design the encrypted object such that when decrypting with a key that wasn't defined, it returns the default value
+
+### Reads / Property Access as an Interface
+
+* however, if we give control to the readee object, and allow the readee to specify its own default value
+* then why not generalize it all the way
+* and allow dynamic properties and functional property access
+  * mentioned in section "Property Muxers"
+
+* well first of all, not possible, circular, since functions are built on top of prop access
+
+
+* reads as an interface
+  * similar to the idea discussed in "Sets as an Interface"
+* the attributes that we want of property access:
+    1. anonymous
+    2. dynamic
+    3. functional (no side effects)
+* can be achieved at a higher level of abstraction
+* as a second or third order construct
+* at the axiom level, property access is static,
+  but at higher levels we can achieve dynamic property access
+
+* we already kinda demonstrated this
+* in the section "Double-Sided Property Access (The Bilateral Protocol)"
+* where we implemented object-key property access using a complex protocol built on top of the axioms
+
+* address access is static
+* object-key access is dynamic
+
+
+* to prevent infinite behavior
+  * an issue mentioned in "Property Muxers" and "Dynamic Properties - Finite Objects with Infinite Properties?"
+* notice that dynamic property access always ends with an address, to finally retrieve the value at that address
+* so all behavior and children are stored in addresses, which are static
+* dynamic property access is just a dynamic way of getting to an address
+
+### Operating on Undefined II
+
+* if we use a reserved address for `undefined` for the `ifUndefined` function
+    * (mentioned in sections "Handling Undefined" and "Reserved Addresses")
+* that will allow people to override the property
+* but as we showed in the section "`undefined` is part of Property Access"
+* `undefined` is really a special value that is defined as part of the property access mechanism
+
+* so checking for `undefined` is also special
+* thus, we can define a special operator `check_undefined` that takes in three inputs, `input`, `doIfDefined`, `doIfUndefined`
+* and it checks if the `input` is undefined, and if so, spawns `doIfUndefined`, otherwise it spawns `doIfDefined`
+* then we don't need to do any of that funny business we defined in "Coercing Defined/Undefined to a Boolean"
+
+* wait but then we would also have to integrate this special operator in higher level operators too
+* like equality
+  * eg what if I do `if (x = y)` and `x` or `y` is undefined?
+* and truthy-checking
+  * eg what if I do `if (x)` and `x` is undefined?
+* in these cases, wouldn't it be easier to just use conventional methods to define equality (see section "Double-Sided Equality")
+* so that higher level operators automatically work, without adding edge cases specifically for `undefined`?
+
+* also what about adding properties to `undefined`, eg for error messages and such
+* see section "random stuff - objects as keys, error codes, etc"
+* though in later sections, eg "Errors and Virtual Properties" and "Errors and Special Properties"
+* we talk about how this can be achieved using tags instead?
+
+### Preventing Dynamic Access and Proxies using Encryption II
+
+* previously we talked about how we can prevent dynamic property access using encrypted property bundles
+  * see section "Preventing Dynamic Access and Proxies using Encryption"
+* since the property bundle is a static piece of data
+* however, in a sense, pure functional property access methods (like the one mentioned in "Double-Sided Property Access") can be seen as _part_ of the decryption protocol
+* and if you don't use it, you won't be able to read the object
+
+* I think as long as all decryption protocols are pure functional, don't leak data, no side effects
+* then people won't mind custom decryption protocols
