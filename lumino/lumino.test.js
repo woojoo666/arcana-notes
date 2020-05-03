@@ -26,15 +26,19 @@ const eveTemplate = {
     ]
 }
 
-const dummyValueNode = {
-    value: eveTemplate, // note that usually, value contains live Actors, but for now we are using templates as actors as well
-}
 
-const adam = new Firefly(adamTemplate);
-adam.addItem(dummyValueNode);
 
-const eve = adam.get('addr_11');
+test('basic tests', () => {
+    const dummyValueNode = {
+        value: eveTemplate, // note that usually, value contains live Actors, but for now we are using templates as actors as well
+    }
 
-console.assert(eve && eve !== UNDEFINED);
-console.assert(eve.inbox_next == 'addr_eve_next');
-console.assert(eve.get(eve.inbox_next).get(eve.inbox_value) == eve);
+    const adam = new Firefly(adamTemplate);
+    adam.addItem(dummyValueNode);
+
+    const eve = adam.get('addr_11');
+
+	expect(eve).not.toBe(UNDEFINED);
+    expect(eve.inbox_next).toBe('addr_eve_next');
+    expect(eve.get(eve.inbox_next).get(eve.inbox_value)).toBe(eve);
+});
