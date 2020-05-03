@@ -8,17 +8,17 @@ Install dependencies:
 
 Because the interpreter uses ES6 modules, you can't just open the HTML file. First open a webserver using
 
-	npx http-server
+	npx serve
 
 and then point your browser to the server you just created, and open `react-ide.html`.
 
-If you don't want to download `http-server` every time, just install the development environment using
+If you don't want to download `serve` every time, just install the development environment using
 
 	npm install
 
 and use the command below to start the webserver:
 	
-	npm run http-server
+	npm run serve
 
 ### Tests
 
