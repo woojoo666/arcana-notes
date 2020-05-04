@@ -1862,6 +1862,42 @@ const template = {
 
 * such is the life of dynamically typed systems
 
+### 
+
+* now that sets are an interface
+    * see section "Sets as an Interface"
+* and property access is an interface
+    * see section "Reads / Property Access as an Interface"
+
+* do we even need addresses anymore?
+* do we need this special "core" language underneath Firefly?
+* or can we implement the entire interpreter in functional?
+
+* well we needed addresses since we needed a way to reference and destructure insertions
+
+### Serverless Functions, Functions as a Service
+
+* i just learned about FAAS today
+* i guess mine would be Actors as a Service (AAAS)
+
+* but seems a bit too flexible / powerful
+* functional code can be much more efficient and secure
+
+* most of Firefly programs can be designed using the "collector" pattern
+* all insertions go into designated "collectors"
+* basically like databases
+
+* so we basically have two types of actors:
+    1. collectors (only receive, and can be read / iterated across)
+    2. stateless actors (can only insert, does not receive and has no state)
+
+* should we separate these two completely?
+* and make them separate primitives?
+
+* well stateless actors still need scope
+* so we would need to pass that in
+* and if we are passing inputs in
+* then we might as well just allow insertions
 
 ### Primary, Secondary, and Tertiary Forms revisited
 
@@ -1884,6 +1920,7 @@ corollaries (secondary forms, what people would _think_ are primary forms):
 * conditionals
 * sets / collectors
 * set ordering
+* partitions
 
 sugars (tertiary forms, relatively simple to implement using secondary forms):
 * tags
@@ -1901,3 +1938,153 @@ recall that:
   * (eg spawning, addresses, static references)
 * secondary forms are the core syntax of Firefly, constructs used by the programmer that can only be constructed using primary forms
 * tertiary forms are forms that can be constructed via secondary forms
+
+### -------------------------------------------------------------
+
+* how to handle constants and references
+* discussed previously in section "Constants and Static Embedding - a Single Layer of Abstraction"
+* re-formulate using addresses
+
+* handle nested templates
+* parent has to provide constants to the child
+* every reference gets mapped to an address
+* parent knows the mapping, and provides an insertion with values at the right addresses
+* every scope will have it's own custom mapping
+
+* another method
+* every string maps to an address
+* parent provides the string->address mapping to child, gets passed down the line
+* reference `foo` becomes `scope['foo']`
+
+* think about how cloning works
+
+* caller provides arguments object, and keyset
+* callee iterates through keyset, and for each key
+    1. retrieves value from arguments object (using the key->address mapping of the arguments object)
+    2. override the value in the callee (using the key->address mapping of the callee object)
+    3. passes the values as a second initializer
+
+* note: args and keyset are global addresses, everybody knows them
+
+exploration:
+
+        callee:
+            scope: _initializer.next.value
+            for ([args, keyset] of _insertions):
+                for (key of keyset) {
+                    ???
+                }
+                spawn
+
+* scope combining should be abstracted out
+* to a global function `parentScope, childScope => combinedScope`
+
+* clone factories
+* cloning is just a factory that spawns a given template
+
+* we can think of object definitions as just a clone with empty arguments
+
+* shadowing vs cloning
+* whats the diff?
+
+
+* note that even though all references are strings
+* the scope can contain non-string properties
+* since every defined actor puts its property list onto the scope
+* and actors can have computed properties and object-key properties (note: in firefly, not lumino)
+
+* also private props are not strings?
+
+### 
+
+    foo:
+        x: 10
+        bar:
+            y: x*7
+        barClone: bar(x: 20)
+
+scope combining
+how do we dynamic properties
+doesn't seem possible using the current template model
+where address properties are defined staticly
+
+this is actually a huge difference between the clone model and the template+spawn model
+with cloning, we are dynamically defining the properties of the child object
+with 
+
+seems like we have two options
+1. leverage the fact that object-key access is dynamic
+2. generate/manipulate the template itself
+
+for (1) is a bit eh because the result scope object won't be flat
+for (2) would require a template format that is able to be manipulated with lumino itself
+
+(1) seems like the simplest option for now, (2) is a bit complicated
+though perhaps (2) can be as simple as formatting templates as just a linked-list of property definitions
+(and whenever we do overrides, we just add them to the list and filter duplicates)
+
+
+shadowing:
+    scope: parent_scope + child_props
+
+cloning:
+    scope: parent_scope + child_props:
+    child_props: callee_props + arg_props
+
+
+also, how to handle partitions
+cloning isn't as simple as removing and adding properties
+it's removing and adding groups of properties
+
+
+i think for now
+i am just going to write a bunch of template transform nodes
+that just use plain javascript to manipulate templates before spawning them
+since lumino is turing-complete, this should all be technically possible in lumino as well
+but for now, just going to do it in javascript
+
+        
+### 
+
+now that we realize the templates are static
+(the definition doesn't change based on inserted data)
+seems even more similar to functions
+even in functional, one can imagine we can manipulate the function definition before calling it
+
+could we implement actors in functional
+every actor takes in linked-list of insertions as input
+computes a function
+outputs a list of properties and a list of outbox insertions
+a dispatcher checks the difference between the old and new properties+outbox
+and dispatches any changes
+every actor also needs a collector that collects insertions, converts to linked-list, and gives it to evaluation function
+
+this is actually basically the functional model mentioned in section "Combiners, Insertion and Privacy"
+
+		combiner(caller, arguments, allInsertions) => result + insertions
+
+except we should update this to use spawning and templates
+
+		spawn(template) + inbox => properties + outbox
+
+
+note that this actually allows for dynamic definitions!
+though we'll ultimately have to reduce it a bit
+because functional programming is still turing complete
+so it doesn't make sense to have the full power of functional programming within each actor
+
+### 
+
+hacking partitions
+using the current method we already use in interpreter.js
+just combine the templates before resolving references
+
+does have some issues
+* security issues with private properties
+* doesn't support passing in existing object as arguments object
+
+but it will do for now
+
+### 
+
+* also what about adding properties to `undefined`, eg for error messages and such

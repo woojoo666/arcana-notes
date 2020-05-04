@@ -2502,6 +2502,7 @@ hashmaps
 
 
 * this might look like imperative, `execute(state) => next state`
+  * see section "Imperative Style and Global State"
 * however, imperative is ordered and time based
 * doesn't really capture the distributed timeless feedback behaviors in Axis
 
