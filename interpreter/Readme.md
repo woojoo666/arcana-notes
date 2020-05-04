@@ -38,10 +38,10 @@ note that you only need the prefix, so to run `lexer.test.js` use `npm test -- l
 
 ### Compile Grammar
 
-If you make any changes to `grammar.ne`, you'll need to re-compile it. First, make sure you have nearley installed:
+If you make any changes to `grammar.ne`, you'll need to re-compile it. First, make sure environment is installed using:
 
-	npm install -g nearley
+	npm install
 
-Then use:
+and then simply run
 
-	nearleyc grammar.ne -o grammar.js
+	npm run compile-grammar

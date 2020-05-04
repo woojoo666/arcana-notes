@@ -27,13 +27,13 @@ let rules = {
 
 	colon: ':',
 	ternary: '?',
-	propAccess: /\.(?=\w|\#)/,
+	propAccess: /\.(?=\w|\#)/,  // supports numbers for now, eg foo.15
 	period: '.',
 	newline: { match: /\n/, lineBreaks: true },
 	comma: ',',
 	tag: /\#\w+/,
 	identifier: { match: /\w+/ , type: moo.keywords({
-			keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag'],
+			keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag', 'collector'],
 		})},
 };
 

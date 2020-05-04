@@ -96,6 +96,7 @@ Object 		-> "(" Block ")"										{% ([ ,block, ]) => ({type:'create',block}) %
 
 			| "..."													# capture block
 
+			| "collector"											{% ([token]) => ({type:'collector'}) %}
 			| %identifier											{% ([token]) => ({type:'reference', name: token.value}) %}
-			| %string												{% ([token]) => ({type: 'string', value: token.value}) %}
-			| %number												{% ([token]) => ({type: 'number', value: token.value}) %}
+			| %string												{% ([token]) => ({type:'string', value: token.value}) %}
+			| %number												{% ([token]) => ({type:'number', value: token.value}) %}

@@ -1,4 +1,4 @@
-// Generated automatically by nearley, version 2.16.0
+// Generated automatically by nearley, version 2.19.3
 // http://github.com/Hardmath123/nearley
 (function () {
 function id(x) { return x[0]; }
@@ -102,9 +102,10 @@ var grammar = {
     {"name": "Object", "symbols": ["Object", (lexerWrapper.has("propAccess") ? {type: "propAccess"} : propAccess), (lexerWrapper.has("tag") ? {type: "tag"} : tag)]},
     {"name": "Object", "symbols": ["Object", {"literal":"["}, "Block", {"literal":"]"}]},
     {"name": "Object", "symbols": [{"literal":"..."}]},
+    {"name": "Object", "symbols": [{"literal":"collector"}], "postprocess": ([token]) => ({type:'collector'})},
     {"name": "Object", "symbols": [(lexerWrapper.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([token]) => ({type:'reference', name: token.value})},
-    {"name": "Object", "symbols": [(lexerWrapper.has("string") ? {type: "string"} : string)], "postprocess": ([token]) => ({type: 'string', value: token.value})},
-    {"name": "Object", "symbols": [(lexerWrapper.has("number") ? {type: "number"} : number)], "postprocess": ([token]) => ({type: 'number', value: token.value})}
+    {"name": "Object", "symbols": [(lexerWrapper.has("string") ? {type: "string"} : string)], "postprocess": ([token]) => ({type:'string', value: token.value})},
+    {"name": "Object", "symbols": [(lexerWrapper.has("number") ? {type: "number"} : number)], "postprocess": ([token]) => ({type:'number', value: token.value})}
 ]
   , ParserStart: "Block"
 }

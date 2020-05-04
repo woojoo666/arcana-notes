@@ -25,6 +25,10 @@ parse('x y >> foo: a ? b else c\n num: -1+x*2/y', 'Indent');
 
 parse('x y >> foo: (=> x+y)', 'Indent');
 
+parse('foo: collector\n a <: b', 'Indent');
+
+parse('collect: collector, foo: (bar: 5, collect <: bar), clone: foo(bar: 15)', 'Indent');
+
 console.log("next test should fail");
 parse('x y >> foo: bar\n num: -1+x*2/y', 'Braces'); // this should fail
 </script>
