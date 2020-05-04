@@ -54,11 +54,15 @@
 
 	inputScope.input.update(); // initialize number node
 
-	const testCode = 'foo: (bar: -1+x*2/y, x: 10, y: input), clone: foo(x: 15), barAlias: clone.bar';
+	// testing:
+	//   1. cloning
+	//   2. access callee scope in arguments object
+	//   3. changing input should update clone
+	const testCode = 'foo: (bar: -1+x*2/y, x: 10, y: input), clone: foo(x: 5+y), barAlias: clone.bar';
 	const output = new Interpreter(testCode).interpretTest(inputScope, 'Indent');
-	console.log('answer should contain: foo.bar = 0, clone.bar = 0.5, foo.x = 10, clone.x = 15');
+	console.log('answer should contain: foo.bar = 0, clone.bar = 1.5, foo.x = 10, clone.x = 25');
 	console.assert(output.properties.foo.properties.bar.value == 0, 'ERROR');
-	console.assert(output.properties.clone.value.properties.bar.value == 0.5, 'ERROR');
+	console.assert(output.properties.clone.value.properties.bar.value == 1.5, 'ERROR');
 	
 	console.log('----------- updating input node to value 10 ----------------');
 	inputScope.input.syntaxNode.value = 10;
@@ -107,6 +111,32 @@ back to base level`);
 	}
 
 	lexRecursive(preprocessor.rootBlock);
+</script>
+<script type="module">
+	// test that the child created during clone should be using child scope
+	import { Interpreter, NumberNode } from './interpreter.js';
+	const testCode = 'x: 10, foo: (y: 20), clone: foo(x2: x+5, y2: y+5)';
+	const output = new Interpreter(testCode).interpretTest({}, 'Indent');
+
+	console.log('clone.x2 should be NaN, clone.y2 should be 25');
+	console.assert(isNaN(output.properties.clone.value.properties.x2.value, 'ERROR');
+	console.assert(output.properties.clone.value.properties.y2.value == 25, 'ERROR');
+</script>
+<script type="module">
+	import { Interpreter, NumberNode } from './interpreter.js';
+
+	const testCode = 'collect: collector, foo: (bar: 5, collect <: bar, collectAlias: collect), clone: foo(bar: 15, collectAlias <: 7)';
+	const output = new Interpreter(testCode).interpretTest({}, 'Indent');
+
+	// collector should now contain [5, 15, 7]
+	const items = Object.values(output.properties.collect.properties).map(node => node.value);
+	console.assert(items.length == 3, 'ERROR');
+	console.assert(items.includes('5'), 'ERROR');
+	console.assert(items.includes('15'), 'ERROR');
+	console.assert(items.includes('7'), 'ERROR');
+</script>
+<script type="module">
+// test insertion every 10 seconds?
 </script>
 </body>
 </html>

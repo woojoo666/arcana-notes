@@ -47,6 +47,8 @@ function NodeFactory (syntaxNode, parent) {
 		case 'number': return new NumberNode(syntaxNode, parent);
 		case 'create': return NodeFactory(syntaxNode.block, parent); // 'create' nodes contain a 'block' node
 		case 'clone': return new CloneNode(syntaxNode, parent);
+		case 'insertion': return new InsertionNode(syntaxNode, parent);
+		case 'collector': return new CollectorNode(syntaxNode, parent);
 	}
 	throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
 }
@@ -95,7 +97,7 @@ class Node {
 		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
 		const oldValue = this.value;
 		this.value = this.evaluate();
-		if (this.value != oldValue) {	
+		if (this.value != oldValue) {
 			for (const listener of this.listeners) {
 				listener.update();
 			}
@@ -112,7 +114,7 @@ class ObjectNode extends Node {
 		super(syntaxNode, parent);
 		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
 		this.properties = {}; // static properties
-		this.insertions = []; // TODO
+		this.insertions = [];
 		this.value = this;    // ObjectNode are the only nodes where we initialize value at beginning, so cloning doesn't break
 
 		for (const statement of syntaxNode.statements) {
@@ -121,7 +123,7 @@ class ObjectNode extends Node {
 					this.properties[statement.key] = NodeFactory(statement.value, null);
 					break;
 				case 'insertion':
-					throw Error('Unimplemented insertion handling'); // TODO
+					this.insertions.push(NodeFactory(statement, null));
 					break;
 			}
 		}
@@ -131,7 +133,9 @@ class ObjectNode extends Node {
 		for (const [key, valueNode] of Object.entries(this.properties)) {
 			newNode.properties[key] = valueNode.clone(null);
 		}
-		// TODO: clone insertions
+		for (const insertion of this.insertions) {
+			newNode.insertions.push(insertion.clone(null));
+		}
 		return newNode;
 	}
 	// the value of an object node is itself. Note that this means an object node never calls update(),
@@ -151,6 +155,16 @@ class ObjectNode extends Node {
 
 		for (const valueNode of Object.values(this.properties)) {
 			valueNode.resolveReferences(this.scope);
+		}
+
+		for (const insertion of this.insertions) {
+			insertion.resolveReferences(this.scope);
+		}
+	}
+	destruct() {
+		// TODO: remove listeners from children? or are all children getting garbage-collected anyways?
+		for (const insertion of this.insertions) {
+			insertion.destruct();
 		}
 	}
 }
@@ -172,7 +186,9 @@ class ReferenceNode extends Node {
 		//       For example, if we have `source: (x: 10, y: x)`, then during cloning,
 		//       the cloned reference clone.y will point to source.x. Only during reference resolution,
 		//       will the reference be updated to point to clone.x. Can we guarantee that this always happens?
-		this.target.addListener(newNode);
+		if (this.target && !(this.target instanceof ObjectNode)) {
+			this.target.addListener(newNode);
+		}
 		return newNode;
 	}
 	// Reference resolution happens at the end of a cloning operation.
@@ -210,6 +226,17 @@ class CloneNode extends Node {
 		if (!syntaxNode) return; // a hack for cloning
 		this.source = NodeFactory(syntaxNode.source, this);
 		this.arguments = NodeFactory(syntaxNode.block, this);
+
+		// when value changes, destruct previous value
+		this.onChangeListener = {
+			update: () => {
+				if (this.prevValue) {
+					this.prevValue.destruct();
+				}
+				this.prevValue = this.value;
+			}
+		}
+		this.addListener(this.onChangeListener);
 	}
 	clone (parent) {
 		const newNode = new CloneNode(undefined, parent);
@@ -219,7 +246,8 @@ class CloneNode extends Node {
 	}
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
-		this.arguments.resolveReferences(scope);
+		// Note: arguments block is treated as a template, left un-resolved and will not perform any insertions.
+		// During evaluate(), the child object will inherit properties from the arguments block, and resolve references.
 	}
 	// TODO: I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
 	// TODO: this is all really hack, I'm not sure if it will handle certain edge cases like, if a node
@@ -243,6 +271,13 @@ class CloneNode extends Node {
 				// we still have to clone source properties that don't appear in the child object
 				valueNode.clone(combined);
 			}
+		}
+
+		for (const insertion of sourceObject.insertions) {
+			combined.insertions.push(insertion.clone(null));
+		}
+		for (const insertion of argumentsObject.insertions) {
+			combined.insertions.push(insertion.clone(null));
 		}
 
 		const childScope = combined.properties;
@@ -358,6 +393,85 @@ class MemberAccessNode extends Node {
 	}
 	evaluate () {
 		return this.target && this.target.value;
+	}
+}
+
+class InsertionNode extends Node {
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
+		if (!syntaxNode) return; // a hack for cloning
+		this.targetNode = NodeFactory(syntaxNode.target, this);
+		this.valueNode = NodeFactory(syntaxNode.value, this);
+
+		this.targetVal = undefined;
+	}
+	clone (parent) {
+		const newNode = new InsertionNode(null, parent);
+		newNode.targetNode = this.targetNode.clone(newNode);
+		newNode.valueNode = this.valueNode.clone(newNode);
+		return newNode;
+	}
+	resolveReferences (scope) {
+		this.targetNode.resolveReferences(scope);
+		this.valueNode.resolveReferences(scope);
+	}
+	evaluate() {
+		return this.targetNode && this.targetNode.value;
+	}
+	update () {
+		console.log(`updating target for InsertionNode with id ${this.id}`); // for debugging
+		const oldTarget = this.targetVal;
+		this.targetVal = this.evaluate();
+		if (this.targetVal != oldTarget) {	
+			if (oldTarget)
+				oldTarget.removeItem(this.valueNode); // unbind from old target
+
+			this.targetVal.addItem(this.valueNode);  // bind to new target
+		}
+	}
+	destruct () {
+		if (this.targetVal) {
+			this.targetVal.removeItem(this.valueNode);
+		}
+	}
+}
+
+class CollectorNode extends Node {
+	constructor (syntaxNode, parent) {
+		super(syntaxNode, parent);
+		this.items = new Set();
+		this.value = this; // we need an initial value to trigger any reference nodes to update, just like an ObjectNode
+	}
+	clone () {
+		throw Error('unimplemented Collector clone'); // TODO
+	}
+	resolveReferences () {
+		// CollectorNodes act like NumberNodes and call update() during reference resolution
+		// to trigger the initial evaluation pass.
+		this.update();
+	}
+	evaluate () {
+		// re-create properties from scratch every time
+		this.properties = {};
+		for (const [index, valueNode] of [...this.items.values()].entries()) {
+			this.properties[index] = valueNode;
+		}
+		return this;
+	}
+	update () {
+		console.log(`updating CollectorNode with id ${this.id}`); // for debugging
+		this.evaluate();
+		for (const listener of this.listeners) {
+			listener.update(); // since properties re-created every time, always notify listeners
+		}
+	}
+	addItem (valueNode) {
+		this.items.add(valueNode)
+		this.update();
+	}
+	removeItem (valueNode) {
+		this.items.remove(valueNode)
+		this.update();
 	}
 }
 
