@@ -1861,3 +1861,43 @@ const template = {
 * and the insertion doesn't have that property defined
 
 * such is the life of dynamically typed systems
+
+
+### Primary, Secondary, and Tertiary Forms revisited
+
+(revisiting the section "Firefly Model and Syntax - Primary, Secondary, and Tertiary Forms")
+
+axioms (primary forms):
+* addresses (declare and access)
+* actors
+* insertion
+* spawning
+* inbox list
+* undefined
+
+corollaries (secondary forms, what people would _think_ are primary forms):
+* parametized templates (aka static binding)
+* equality
+* object keys
+* scoping
+* cloning
+* conditionals
+* sets / collectors
+* set ordering
+
+sugars (tertiary forms, relatively simple to implement using secondary forms):
+* tags
+* state variables
+* for-loops
+* lists/arrays
+* functions
+* set operations (cardinality/size, collapse)
+* booleans, numbers, strings
+
+
+recall that:
+* the primary forms are necessary, form the foundation for the language
+  * but they are too low level, so they mostly aren't exposed to the programmer
+  * (eg spawning, addresses, static references)
+* secondary forms are the core syntax of Firefly, constructs used by the programmer that can only be constructed using primary forms
+* tertiary forms are forms that can be constructed via secondary forms
