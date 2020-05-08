@@ -119,7 +119,7 @@ back to base level`);
 	const output = new Interpreter(testCode).interpretTest({}, 'Indent');
 
 	console.log('clone.x2 should be NaN, clone.y2 should be 25');
-	console.assert(isNaN(output.properties.clone.value.properties.x2.value, 'ERROR');
+	console.assert(isNaN(output.properties.clone.value.properties.x2.value), 'ERROR');
 	console.assert(output.properties.clone.value.properties.y2.value == 25, 'ERROR');
 </script>
 <script type="module">
