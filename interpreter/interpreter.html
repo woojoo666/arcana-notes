@@ -113,13 +113,13 @@ back to base level`);
 	lexRecursive(preprocessor.rootBlock);
 </script>
 <script type="module">
-	// test that the child created during clone should be using child scope
+	// test that the child created during clone should be using nearest scope
 	import { Interpreter, NumberNode } from './interpreter.js';
 	const testCode = 'x: 10, foo: (y: 20), clone: foo(x2: x+5, y2: y+5)';
 	const output = new Interpreter(testCode).interpretTest({}, 'Indent');
 
-	console.log('clone.x2 should be NaN, clone.y2 should be 25');
-	console.assert(isNaN(output.properties.clone.value.properties.x2.value), 'ERROR');
+	console.log('clone.x2 should be 15, clone.y2 should be 25');
+	console.assert(output.properties.clone.value.properties.x2.value == 15, 'ERROR');
 	console.assert(output.properties.clone.value.properties.y2.value == 25, 'ERROR');
 </script>
 <script type="module">

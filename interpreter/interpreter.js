@@ -145,8 +145,7 @@ class ObjectNode extends Node {
 	}
 	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
 	resolveReferences (scope) {
-		// TODO: we don't need to store scope, it is only used to resolve references before runtime.
-		//       Might be helpful for debugging though
+		// store scope so it can be re-used during cloning (see CloneNode.evaluate())
 		this.scope = Object.create(scope); // leverage javascript inheritance & prototype tree for scopes
 
 		for (const [key, valueNode] of Object.entries(this.properties)) {
@@ -245,9 +244,11 @@ class CloneNode extends Node {
 		return newNode;
 	}
 	resolveReferences (scope) {
-		this.source.resolveReferences(scope);
 		// Note: arguments block is treated as a template, left un-resolved and will not perform any insertions.
 		// During evaluate(), the child object will inherit properties from the arguments block, and resolve references.
+		// All we do is store the current scope so it can be used during reference resolution in evaluate().
+		this.parentScope = scope;
+		this.source.resolveReferences(scope); // this will most likely trigger an update and evaluate(), so make sure this.parentScope is already set before calling this
 	}
 	// TODO: I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
 	// TODO: this is all really hack, I'm not sure if it will handle certain edge cases like, if a node
@@ -258,33 +259,56 @@ class CloneNode extends Node {
 		const sourceObject = this.source.value;
 		const argumentsObject = this.arguments.value;
 
-		const combined = new ObjectNode({statements: []}, null); // temporary object node, so don't attach listeners?
+		// leverage javascript inheritance & prototype tree for scopes
+		const sourceScope = Object.create(sourceObject.scope);
+		const argumentsScope = Object.create(this.parentScope);
+
+		// Mapping between nodes in the child, and the scope that they belong to
+		// (either source or arguments scope, depending on where the node came from)
+		// References in the child will be resolved using whichever scope they belong to (see notes on "Nearest Scope")
+		const scopeMap = new Map();
+
+		const child = new ObjectNode({statements: []}, null); // temporary object node, so don't attach listeners?
 		for (const [key, valueNode] of Object.entries(argumentsObject.properties)) {
-			combined.properties[key] = valueNode.clone(null);
+			const node = valueNode.clone(null);
+			child.properties[key] = node;
+			scopeMap.set(node, argumentsScope);
 		}
 
 		// inherit properties from source if they aren't already in arguments
 		for (const [key, valueNode] of Object.entries(sourceObject.properties)) {
-			if (combined.properties[key] === undefined) {
-				combined.properties[key] = valueNode.clone(null);
+			if (child.properties[key] === undefined) {
+				const node = valueNode.clone(null);
+				child.properties[key] = node;
+				scopeMap.set(node, sourceScope);
 			} else {
-				// we still have to clone source properties that don't appear in the child object
-				valueNode.clone(combined);
+				// we still have to clone source properties that don't appear in the child object (TODO: are we sure?)
+				const node = valueNode.clone(null);
+				scopeMap.set(node, sourceScope); // we also need to resolve references for these dangling nodes
 			}
 		}
 
 		for (const insertion of sourceObject.insertions) {
-			combined.insertions.push(insertion.clone(null));
+			const node = insertion.clone(null);
+			child.insertions.push(node);
+			scopeMap.set(node, sourceScope); // add insertion to scopeMap so it will be resolved during reference resolution
 		}
 		for (const insertion of argumentsObject.insertions) {
-			combined.insertions.push(insertion.clone(null));
+			const node = insertion.clone(null);
+			child.insertions.push(node);
+			scopeMap.set(node, argumentsScope);
 		}
 
-		const childScope = combined.properties;
+		for (const [key, valueNode] of Object.entries(child.properties)) {
+			sourceScope[key] = valueNode;
+			argumentsScope[key] = valueNode;
+		}
 
-		combined.resolveReferences(childScope); // start with empty scope
+		for (const [node, scope] of scopeMap.entries()) {
+			node.resolveReferences(scope);
+		}
 
-		return combined;
+		return child;
 	}
 }
 

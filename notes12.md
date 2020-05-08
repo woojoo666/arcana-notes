@@ -2088,3 +2088,140 @@ but it will do for now
 ### 
 
 * also what about adding properties to `undefined`, eg for error messages and such
+
+
+### Nearest Scope
+
+revisiting ideas explored in section "Child Scope vs Arguments Scope - Passing in Values vs Behaviors"
+
+* right now for cloning, we use "child scope"
+* aka, all references in the argument point to values directly in the child
+* they do not point to values in the arguments scope
+
+        x: 10
+        foo: (x: 20)
+        fooClone: (x2: x*x)   // x references the x within the clone (inherited from foo), so x2 will be 400
+
+* however it's very counter-intuitive to not have any notion of arguments scope
+* eg for something like
+
+        msg: "hi"
+        foo: (x: 10)
+        fooClone: foo(y: msg)
+
+* you would expect `fooClone.y = "hi"`
+* but actually, since `msg` follows child scope, since `fooClone` doesn't have a `msg` property, it will be undefined
+* so `fooClone.y` will actually be undefined
+* which is confusing
+
+* maybe we can design it so
+* child scope takes priority
+* but argument scope is still there
+
+* I call this "nearest scope"
+
+* actually more symmetric
+* since callee basically follows the same pattern
+* where references in the callee point to the callee's scope
+* unless overridden in the child
+
+example of nearest scope:
+
+        XXX:
+            ref1: 10
+            XX:
+                X: (ref2: 11, )
+        YYY:
+            ref3: 12
+            YY:
+                ref2: 13
+                Y: (ref1: 14, => ref1+ref2+ref3)
+
+        XY: combine{X, Y} // aka X(...Y)
+
+the scope diagram looks like
+
+         _____________
+        | XXX ________|
+        |    | XX ____|________
+        |    |   | XY |   |    |
+        |____|___|____| YY|    |
+                 |________| YYY|
+                 |_____________|
+
+* so `XY` will look like `XY: (ref1: 14, ref2: 11, => ref1+ref2+ref3)`
+
+* so in `XY`, the nearest:
+    * `ref1` comes from `XY`
+    * `ref2` comes from `YY`
+    * `ref3` comes from `YYY`
+
+* however what if we had something like
+
+        AA:
+            ref1: 10
+            A: (ref2: ref1 + 11)
+        BB:
+            ref1: 12
+            B: (ref3: ref1 + 13)
+
+        AB: combine{A, B}
+
+* now AB will look like `(ref2: ref1 + 11, ref3: ref1+13)`,
+* but the first `ref1` will point to `AA.ref1`
+* and the second `ref1` will point to `BB.ref1`
+
+* though we will have a similar problem using "child scope"
+* except the second `ref1` will simply be undefined
+* (while the first `ref1` will still point to `AA.ref1`
+
+* well I guess with true "child scope", even the first `ref1` will be undefined
+* but that would basically make scoping quite worthless
+* every reference that the child inherits, would become `undefined`
+
+
+### dynamic address definitions exploration
+
+how would dynamic address definitions work
+
+
+note that this is different from spawning dynamic templates
+    (aka manipulating/modifying a template before spawning it)
+because while spawning a dynamic template could give the appearance of a dynamic definition
+you would have to pass information to whoever is spawning the template
+whereas a true dynamic definition, would be able to _modify itself_ based on insertions made to it
+
+how can we achieve this syntactically?
+you can't have addresses defined on the left-hand side
+since you would only be able to define a static number
+but you also can't reference addresses on the right hand side
+since only values get passed around, not addresses
+
+need a dynamic way of constructing/generating addresses?
+well for scope combination
+the addresses we need to combine are already known
+we just need to merge them
+
+
+
+the way lumino is currently designed is rather clean
+split into actors and operators
+(before I called them bindings and nodes, but i'll call them "operators" now)
+actors are the values that are passed around
+operators take values and "operate" on them to return new values
+eg address/property access, spawning, and insertion
+
+even for insertions, we never modify the object directly
+instead we are spawning new InboxItem actors and appending them to the object
+this means that the pub-sub network is actually solely made up of operator nodes
+actors are just values passed between the nodes, but the nodes themselves are all operators
+
+dynamic object definitions would change that
+if an object could change its definition based on insertions
+then the object itself would have to notify any operators that are currently using it
+actors themselves would become nodes in the pub-sub network
+which feels a bit ugly
+
+I guess the way insertions behave in this pub-sub network isn't that clean to begin with though
+how it generates new actors and then appends it to a linked list
+such that every actor is actually represented by a main actor and a chain of inbox item actors
