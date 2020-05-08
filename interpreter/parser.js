@@ -1,5 +1,8 @@
 import { grammar } from './grammarModule.js';
 
+import { importCommonJS } from './utils.js';
+const nearley = importCommonJS('nearley');
+
 // --------------------------- PARSER ----------------------------
 
 // comparison of parser libraries: https://tomassetti.me/parsing-in-javascript/

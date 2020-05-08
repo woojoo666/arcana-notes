@@ -34,7 +34,11 @@ or to run an individual test file
 
 	npm test -- <filename>
 
-note that you only need the prefix, so to run `lexer.test.js` use `npm test -- lexer`
+note that you only need the prefix, so to run `lexer.test.js` use `npm test -- lexer`.
+
+to debug tests, use
+
+	npm test-debug -- <filename>
 
 ### Compile Grammar
 

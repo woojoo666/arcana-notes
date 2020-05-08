@@ -19,9 +19,10 @@ const matchAll = (text, pattern) => ({
 });
 
 // Utility function for retrieving commonJS or browser objects from ES6 modules
-function importCommonJS (name) {
+// Folder name is for importing local files (etc for './grammar.js', you would call importCommonJS('grammar','./'))
+function importCommonJS (name, folder) {
 	if (typeof module === 'object' && module.exports) {
-		return require(name);
+		return require(folder ? folder + name : name);
 	} else { // if we aren't in Node.js, assume we are in the browser
 		if (!window[name])
 			throw Error('please include the script for ' + name + ' in your html');

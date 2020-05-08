@@ -5,6 +5,7 @@
   "main": "app.js",
   "scripts": {
     "test": "node_modules/.bin/jest",
+    "test-debug": "node --inspect-brk ./node_modules/jest/bin/jest.js --runInBand",
     "serve": "node_modules/.bin/serve",
     "compile-grammar": "node_modules/.bin/nearleyc grammar.ne -o grammar.js"
   },
