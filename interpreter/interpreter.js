@@ -281,10 +281,6 @@ class CloneNode extends Node {
 				const node = valueNode.clone(null);
 				child.properties[key] = node;
 				scopeMap.set(node, sourceScope);
-			} else {
-				// we still have to clone source properties that don't appear in the child object (TODO: are we sure?)
-				const node = valueNode.clone(null);
-				scopeMap.set(node, sourceScope); // we also need to resolve references for these dangling nodes
 			}
 		}
 
