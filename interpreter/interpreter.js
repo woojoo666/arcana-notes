@@ -456,6 +456,8 @@ class InsertionNode extends Node {
 	}
 }
 
+// In lumino, insertions are supposed to be stored in a linked-list structure.
+// However, for simplicity, we define a Collector type that just flattens all insertions into an array-like structure.
 class CollectorNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
@@ -476,6 +478,9 @@ class CollectorNode extends Node {
 		for (const [index, valueNode] of [...this.items.values()].entries()) {
 			this.properties[index] = valueNode;
 		}
+		const lengthNode = new NumberNode({value: this.items.size}, null);
+		lengthNode.update(); // initialize number node
+		this.properties.length = lengthNode;
 		return this;
 	}
 	update () {
