@@ -129,7 +129,9 @@ back to base level`);
 	const output = new Interpreter(testCode).interpretTest({}, 'Indent');
 
 	// collector should now contain [5, 15, 7]
-	const items = Object.entries(output.properties.collect.properties).filter(([key,node]) => key != 'length').map(([key,node]) => node.value);
+	const items = Object.entries(output.properties.collect.properties)
+		.filter(([key,node]) => key != 'length') // filter out the length property
+		.map(([key,node]) => node.value);        // extract values
 	console.assert(items.length == 3, 'ERROR');
 	console.assert(items.includes('5'), 'ERROR');
 	console.assert(items.includes('15'), 'ERROR');

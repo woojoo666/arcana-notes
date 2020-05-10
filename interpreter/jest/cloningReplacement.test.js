@@ -6,7 +6,9 @@ test('behavior overridden during cloning should not be cloned, even if it contai
     const output = new Interpreter(testCode).interpretTest({}, 'Indent');
 
     // collector should now contain [5, 7, 17]
-    const items = Object.values(output.properties.collect.properties).map(node => node.value);
+	const items = Object.entries(output.properties.collect.properties)
+        .filter(([key,node]) => key != 'length') // filter out the length property
+        .map(([key,node]) => node.value);        // extract values
 
     expect(items).toHaveLength(3);
     expect(items).toContain('5');
