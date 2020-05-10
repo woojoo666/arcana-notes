@@ -12,7 +12,7 @@ class IDE extends React.Component {
 
 	parse () {
 		try {
-			const output = new Interpreter(this.state.rawCode).interpretTest({}, 'Indent');
+			const output = new Interpreter(this.state.rawCode).interpretTest();
 			return output;
 		} catch (e) {
 			console.log("Runtime error.");
@@ -34,18 +34,20 @@ class IDE extends React.Component {
 
 // TODO: handle circular references
 class ObjectNodeComponent extends React.Component {
-
 	render () {
+		const propertiesArray = this.props.val ? [...this.props.val.properties.entries()] : [];
+
 		return <div className='axis-object'>
-		{ Object.entries(this.props.val ? this.props.val.properties : []).map(([key,valueNode]) => (
-			<div className='axis-property' key={key}>
-				<span className='axis-property-key'> { key } : </span>
-				{ typeof valueNode.value == 'object'
-					? <ObjectNodeComponent val={valueNode.value}></ObjectNodeComponent>
-					: <span className='axis-raw-value'> { String(valueNode.value) } </span>
-				}
-			</div>
-		))} </div>
+			{ propertiesArray.map(([key,valueNode]) => (
+				<div className='axis-property' key={key}>
+					<span className='axis-property-key'> { key } : </span>
+					{ typeof valueNode.value == 'object'
+						? <ObjectNodeComponent val={valueNode.value}></ObjectNodeComponent>
+						: <span className='axis-raw-value'> { String(valueNode.value) } </span>
+					}
+				</div>
+			))}
+		</div>
 	}
 }
 

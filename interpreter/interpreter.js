@@ -36,6 +36,21 @@ Notice that it is recursive, so every object node contains child object nodes,
 // TODO: I think a cleaner way to implement the interpreter, is to have the grammar post-processors
 //       create Nodes directly, and then in the interpreter, just call rootNode.clone().
 
+class Scope {
+	constructor(parent, map) {
+		this.parent = parent || new Map(); // parent can actually be a Scope or Map. If not provided, use empty map as parent.
+		this.map = map || new Map(); // allow initialization from existing map
+	}
+	set(key, val) { this.map.set(key, val); return this; }
+	get(key) { return this.map.has(key) ? this.map.get(key) : this.parent.get(key); }
+	has(key) { return this.map.has(key) || this.parent.has(key); }
+	extend() { return new Scope(this); }
+	// TODO: should we support deleting properties? If we only delete properties from current scope, subsequent get() requests will just retrieve from parent scopes.
+}
+
+Scope.EMPTY = new Scope();
+Scope.fromObject = obj => new Scope(null, new Map(Object.entries(obj)));
+
 function NodeFactory (syntaxNode, parent) {
 	switch (syntaxNode.type) {
 		case 'block': return new ObjectNode(syntaxNode, parent);
@@ -109,19 +124,23 @@ class Node {
 // represents an object, with properties and insertions
 // Note that ObjectNodes never update, so they should listen to nobody, and have no listeners.
 // This is why we pass "null" as the "parent" argument in calls to clone() and NodeFactory()
+//
+// TODO: support computed properties. This will mean that nodes will have to start listening to object nodes for changes to properties.
+//       We will also have to check for property collisions, and use `overdefined` whenever there are two properties with the same key.
 class ObjectNode extends Node {
 	// TODO: since objects never update(), we don't need to pass in "parent" because there should be no listeners
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
 		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
-		this.properties = {}; // static properties. TODO: support object-key properties
+		this.properties = new Map(); // static properties
 		this.insertions = [];
 		this.value = this;    // ObjectNode are the only nodes where we initialize value at beginning, so cloning doesn't break
 
 		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
 				case 'property':
-					this.properties[statement.key] = NodeFactory(statement.value, null);
+					const key = statement.keyType == 'number' ? Number(statement.key) : statement.key;
+					this.properties.set(key, NodeFactory(statement.value, null));
 					break;
 				case 'insertion':
 					this.insertions.push(NodeFactory(statement, null));
@@ -129,10 +148,16 @@ class ObjectNode extends Node {
 			}
 		}
 	}
+	getNode (key) {
+		return this.properties.get(key);
+	}
+	get (key) {
+		return this.getNode(key) && this.getNode(key).value;
+	}
 	clone (parent) {
 		let newNode = new ObjectNode({statements: []}, null); // use a dummy syntaxNode
-		for (const [key, valueNode] of Object.entries(this.properties)) {
-			newNode.properties[key] = valueNode.clone(null);
+		for (const [key, valueNode] of this.properties.entries()) {
+			newNode.properties.set(key, valueNode.clone(null));
 		}
 		for (const insertion of this.insertions) {
 			newNode.insertions.push(insertion.clone(null));
@@ -147,13 +172,13 @@ class ObjectNode extends Node {
 	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
 	resolveReferences (scope) {
 		// store scope so it can be re-used during cloning (see CloneNode.evaluate())
-		this.scope = Object.create(scope); // leverage javascript inheritance & prototype tree for scopes
+		this.scope = scope.extend(); // leverage javascript inheritance & prototype tree for scopes
 
-		for (const [key, valueNode] of Object.entries(this.properties)) {
-			this.scope[key] = valueNode;
+		for (const [key, valueNode] of this.properties.entries()) {
+			this.scope.set(key, valueNode);
 		}
 
-		for (const valueNode of Object.values(this.properties)) {
+		for (const valueNode of this.properties.values()) {
 			valueNode.resolveReferences(this.scope);
 		}
 
@@ -197,11 +222,11 @@ class ReferenceNode extends Node {
 	// way to the root.
 	// Note that resolveReferences() is also used to override references in a clone operation.
 	resolveReferences (scope) {
-		if (scope[this.targetName]) {
+		if (scope.get(this.targetName)) {
 			if (this.target) {
 				this.target.removeListener(this); // unbind from old target
 			}
-			this.target = scope[this.targetName];
+			this.target = scope.get(this.targetName);
 			if (this.target && !(this.target instanceof ObjectNode)) {
 				// we only need to add a listener if the target is not an ObjectNode
 				this.target.addListener(this);
@@ -261,8 +286,8 @@ class CloneNode extends Node {
 		const argumentsObject = this.arguments.value;
 
 		// leverage javascript inheritance & prototype tree for scopes
-		const sourceScope = Object.create(sourceObject.scope);
-		const argumentsScope = Object.create(this.parentScope);
+		const sourceScope = sourceObject.scope.extend();
+		const argumentsScope = this.parentScope.extend();
 
 		// Mapping between nodes in the child, and the scope that they belong to
 		// (either source or arguments scope, depending on where the node came from)
@@ -270,17 +295,17 @@ class CloneNode extends Node {
 		const scopeMap = new Map();
 
 		const child = new ObjectNode({statements: []}, null); // temporary object node, so don't attach listeners?
-		for (const [key, valueNode] of Object.entries(argumentsObject.properties)) {
+		for (const [key, valueNode] of argumentsObject.properties.entries()) {
 			const node = valueNode.clone(null);
-			child.properties[key] = node;
+			child.properties.set(key, node);
 			scopeMap.set(node, argumentsScope);
 		}
 
 		// inherit properties from source if they aren't already in arguments
-		for (const [key, valueNode] of Object.entries(sourceObject.properties)) {
-			if (child.properties[key] === undefined) {
+		for (const [key, valueNode] of sourceObject.properties.entries()) {
+			if (!child.properties.has(key)) {
 				const node = valueNode.clone(null);
-				child.properties[key] = node;
+				child.properties.set(key, node);
 				scopeMap.set(node, sourceScope);
 			}
 		}
@@ -296,9 +321,9 @@ class CloneNode extends Node {
 			scopeMap.set(node, argumentsScope);
 		}
 
-		for (const [key, valueNode] of Object.entries(child.properties)) {
-			sourceScope[key] = valueNode;
-			argumentsScope[key] = valueNode;
+		for (const [key, valueNode] of child.properties.entries()) {
+			sourceScope.set(key, valueNode);
+			argumentsScope.set(key, valueNode);
 		}
 
 		for (const [node, scope] of scopeMap.entries()) {
@@ -394,12 +419,13 @@ class MemberAccessNode extends Node {
 		this.source.resolveReferences(scope);
 		this.key.resolveReferences(scope);
 	}
+	// Note: target should be a Node, not a value!
 	evaluateTarget() {
 		// TODO: if source is an Undefined object, then member access should return Undefined
 		if (this.source.value === undefined) {
 			throw Error('Interpreter error: trying to access property of a non-object.')
 		}
-		return this.source.value.properties[this.key.value]; // TODO: support object-key access
+		return this.source.value.getNode(this.key.value); // TODO: support object-key access
 	}
 	// re-evaluate and re-bind target
 	updateTarget () {
@@ -480,14 +506,20 @@ class CollectorNode extends Node {
 	}
 	evaluate () {
 		// re-create properties from scratch every time
-		this.properties = {};
+		this.properties = new Map();
 		for (const [index, valueNode] of [...this.items.values()].entries()) {
-			this.properties[index] = valueNode;
+			this.properties.set(index, valueNode);
 		}
 		const lengthNode = new NumberNode({value: this.items.size}, null);
 		lengthNode.update(); // initialize number node
-		this.properties.length = lengthNode;
+		this.properties.set('length', lengthNode);
 		return this;
+	}
+	getNode (key) {
+		return this.properties.get(key);
+	}
+	get (key) {
+		return this.getNode(key).value;
 	}
 	update () {
 		console.log(`updating CollectorNode with id ${this.id}`); // for debugging
@@ -615,7 +647,7 @@ class Interpreter {
 	// pass in a scope, a dictionary of named Node objects that you provide.
 	// This will allow you provide "input" arguments to the program, and change them
 	// dynamically to see how they affect the program output.
-	interpretTest(scope, blockType) {
+	interpretTest(scope = Scope.EMPTY, blockType = 'Indent') {
 		const AST = parse(this.source, blockType);
 		const root = NodeFactory(AST);
 		root.resolveReferences(scope);  // start with empty scope
@@ -624,4 +656,4 @@ class Interpreter {
 	}
 }
 
-export { Interpreter, NumberNode };
+export { Interpreter, NumberNode, Scope };

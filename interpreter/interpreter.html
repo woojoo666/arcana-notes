@@ -42,31 +42,31 @@
 </script>
 <!--script src="tests.js"></script-->
 <script type="module">
-	import { Interpreter, NumberNode } from './interpreter.js';
+	import { Interpreter, NumberNode, Scope } from './interpreter.js';
 
-	const inputScope = {
+	const inputScope = Scope.fromObject({
 		input: new NumberNode({value: 20}, null),
-	}
+	});
 
-	inputScope.input.update(); // initialize number node
+	inputScope.get('input').update(); // initialize number node
 
 	// testing:
 	//   1. cloning
 	//   2. access callee scope in arguments object
 	//   3. changing input should update clone
 	const testCode = 'foo: (bar: -1+x*2/y, x: 10, y: input), clone: foo(x: 5+y), barAlias: clone.bar';
-	const output = new Interpreter(testCode).interpretTest(inputScope, 'Indent');
+	const output = new Interpreter(testCode).interpretTest(inputScope);
 	console.log('answer should contain: foo.bar = 0, clone.bar = 1.5, foo.x = 10, clone.x = 25');
-	console.assert(output.properties.foo.properties.bar.value == 0, 'ERROR');
-	console.assert(output.properties.clone.value.properties.bar.value == 1.5, 'ERROR');
+	console.assert(output.get('foo').get('bar') == 0, 'ERROR');
+	console.assert(output.get('clone').get('bar') == 1.5, 'ERROR');
 	
 	console.log('----------- updating input node to value 10 ----------------');
-	inputScope.input.syntaxNode.value = 10;
-	inputScope.input.update();
+	inputScope.get('input').syntaxNode.value = 10;
+	inputScope.get('input').update();
 	console.log('answer should update to: foo.bar = 1, clone.bar = 2, foo.x = 10, clone.x = 15');
-	console.assert(output.properties.foo.properties.bar.value == 1, 'ERROR');
-	console.assert(output.properties.clone.value.properties.bar.value == 2, 'ERROR');
-	console.assert(output.properties.barAlias.value == 2, 'ERROR');
+	console.assert(output.get('foo').get('bar') == 1, 'ERROR');
+	console.assert(output.get('clone').get('bar') == 2, 'ERROR');
+	console.assert(output.get('barAlias') == 2, 'ERROR');
 
 </script>
 <script type="module">
@@ -112,27 +112,27 @@ back to base level`);
 	// test that the child created during clone should be using nearest scope
 	import { Interpreter, NumberNode } from './interpreter.js';
 	const testCode = 'x: 10, foo: (y: 20), clone: foo(x2: x+5, y2: y+5)';
-	const output = new Interpreter(testCode).interpretTest({}, 'Indent');
+	const output = new Interpreter(testCode).interpretTest();
 
 	console.log('clone.x2 should be 15, clone.y2 should be 25');
-	console.assert(output.properties.clone.value.properties.x2.value == 15, 'ERROR');
-	console.assert(output.properties.clone.value.properties.y2.value == 25, 'ERROR');
+	console.assert(output.get('clone').get('x2') == 15, 'ERROR');
+	console.assert(output.get('clone').get('y2') == 25, 'ERROR');
 </script>
 <script type="module">
 	import { Interpreter, NumberNode } from './interpreter.js';
 
 	const testCode = 'collect: collector, foo: (bar: 5, collect <: bar, collectAlias: collect), clone: foo(bar: 15, collectAlias <: 7)';
-	const output = new Interpreter(testCode).interpretTest({}, 'Indent');
+	const output = new Interpreter(testCode).interpretTest();
 
 	// collector should now contain [5, 15, 7]
-	const items = Object.entries(output.properties.collect.properties)
+	const items = [...output.get('collect').properties.entries()]
 		.filter(([key,node]) => key != 'length') // filter out the length property
 		.map(([key,node]) => node.value);        // extract values
 	console.assert(items.length == 3, 'ERROR');
 	console.assert(items.includes(5), 'ERROR');
 	console.assert(items.includes(15), 'ERROR');
 	console.assert(items.includes(7), 'ERROR');
-	console.assert(output.properties.collect.properties.length.value == 3);
+	console.assert(output.get('collect').get('length') == 3);
 </script>
 <script type="module">
 // test insertion every 10 seconds?
