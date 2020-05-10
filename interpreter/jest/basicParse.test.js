@@ -2,6 +2,13 @@
 import { parse } from '../parser.js';
 
 // todo: add test for all basic syntax, eg unary operators, templates, parameters, @-blocks, cloning, if-else, etc
+test('booleans', () => {
+	const testCode = 'x: true';
+	let parsed = parse(testCode);
+	console.log(JSON.stringify(parsed));
+    expect(parsed.statements[0].value.type).toEqual('boolean');
+    expect(parsed.statements[0].value.value).toEqual('true');
+});
 
 test('numeric keys', () => {
     const testCode = '5: 888';

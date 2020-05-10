@@ -2,6 +2,11 @@ import { importCommonJS } from './utils.js';
 
 const moo = importCommonJS('moo');
 
+let keywords = {
+	keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag', 'collector'],
+	boolean: ['true','false'],
+}
+
 let rules = {
 	WS:      /[^\S\n]+/,
 	comment: /\/\/.*?$/,
@@ -32,9 +37,7 @@ let rules = {
 	newline: { match: /\n/, lineBreaks: true },
 	comma: ',',
 	tag: /\#\w+/,
-	identifier: { match: /\w+/ , type: moo.keywords({
-			keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag', 'collector'],
-		})},
+	identifier: { match: /\w+/ , type: moo.keywords(keywords)},
 };
 
 // these are all the tokens that can precede unary operators at the start of an expression,
@@ -45,7 +48,7 @@ const expressionStartTokens = ['(','[','{',':','<:','=>','\n',',','if','in','?',
 const unaryStartTokens = ['WS','operator','unary_op','spaced_unary'];
 
 class Lexer {
-	
+
 	constructor (blockString, blockType) {
 		this.blockString = blockString;
 		this.blockType = blockType;  // blockType is used to figure out things like, should we ignore newlines
@@ -148,4 +151,4 @@ class Lexer {
 	}
 }
 
-export { Lexer, rules };
+export { Lexer, rules, keywords };

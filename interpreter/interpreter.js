@@ -45,6 +45,7 @@ function NodeFactory (syntaxNode, parent) {
 		case 'reference': return new ReferenceNode(syntaxNode, parent);
 		case 'string': return new StringNode(syntaxNode, parent);
 		case 'number': return new NumberNode(syntaxNode, parent);
+		case 'boolean': return new BooleanNode(syntaxNode, parent);
 		case 'create': return NodeFactory(syntaxNode.block, parent); // 'create' nodes contain a 'block' node
 		case 'clone': return new CloneNode(syntaxNode, parent);
 		case 'insertion': return new InsertionNode(syntaxNode, parent);
@@ -569,6 +570,11 @@ class StringNode extends PrimitiveNode {
 class NumberNode extends PrimitiveNode {
 	getRawValue () { return +this.syntaxNode.value; }
 	clone (parent) { return new NumberNode(this.syntaxNode, parent); }
+}
+
+class BooleanNode extends PrimitiveNode {
+	getRawValue () { return Boolean(this.syntaxNode.value); }
+	clone (parent) { return new BooleanNode(this.syntaxNode, parent); }
 }
 
 class Interpreter {

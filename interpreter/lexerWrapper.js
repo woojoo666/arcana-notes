@@ -1,4 +1,4 @@
-import { Lexer, rules } from './lexer.js';
+import { Lexer, rules, keywords } from './lexer.js';
 
 // wrap my Lexer class to conform to Nearley lexer interface (see https://nearley.js.org/docs/tokenizers)
 // included an additional method, "setBlockType", which should be called before reset()
@@ -24,7 +24,7 @@ const lexerWrapper = {
 		return this.lexer.moo.formatError(token);
 	},
 	has (name) {
-		return rules.hasOwnProperty(name);
+		return rules.hasOwnProperty(name) || keywords.hasOwnProperty(name);
 	}
 };
 

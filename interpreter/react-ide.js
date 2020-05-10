@@ -40,9 +40,9 @@ class ObjectNodeComponent extends React.Component {
 		{ Object.entries(this.props.val ? this.props.val.properties : []).map(([key,valueNode]) => (
 			<div className='axis-property' key={key}>
 				<span className='axis-property-key'> { key } : </span>
-				{ isNaN(valueNode.value)
+				{ typeof valueNode.value == 'object'
 					? <ObjectNodeComponent val={valueNode.value}></ObjectNodeComponent>
-					: <span className='axis-raw-value'> { valueNode.value } </span>
+					: <span className='axis-raw-value'> { String(valueNode.value) } </span>
 				}
 			</div>
 		))} </div>

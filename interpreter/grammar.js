@@ -104,7 +104,8 @@ let ParserRules = [
     {"name": "Object", "symbols": [{"literal":"collector"}], "postprocess": ([token]) => ({type:'collector'})},
     {"name": "Object", "symbols": [(lexerWrapper.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([token]) => ({type:'reference', name: token.value})},
     {"name": "Object", "symbols": [(lexerWrapper.has("string") ? {type: "string"} : string)], "postprocess": ([token]) => ({type:'string', value: token.value})},
-    {"name": "Object", "symbols": [(lexerWrapper.has("number") ? {type: "number"} : number)], "postprocess": ([token]) => ({type:'number', value: token.value})}
+    {"name": "Object", "symbols": [(lexerWrapper.has("number") ? {type: "number"} : number)], "postprocess": ([token]) => ({type:'number', value: token.value})},
+    {"name": "Object", "symbols": [(lexerWrapper.has("boolean") ? {type: "boolean"} : boolean)], "postprocess": ([token]) => ({type:'boolean', value: token.value})}
 ];
 let ParserStart = "Block";
 export default { Lexer, ParserRules, ParserStart };

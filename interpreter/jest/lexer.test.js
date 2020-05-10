@@ -1,11 +1,19 @@
 import { Lexer } from '../lexer';
 
-function getOperatorTypes(source, blockType = 'Braces') {
+function getTokenTypes(source, blockType = 'Braces') {
 	let lexer = new Lexer(source, blockType);
 	return lexer.run().tokens
-		.map(token => token.type)
+		.map(token => token.type);
+}
+
+function getOperatorTypes(source, blockType) {
+	return getTokenTypes(source, blockType)
 		.filter(type => type == 'operator' || type == 'spaced_unary' || type == 'unary_op');
 }
+
+test('basicTypes', () => {
+	expect(getTokenTypes('x: true')).toEqual(['identifier','colon','boolean']);
+})
 
 test('detect unary operators in expressions', () => {
 	expect(getOperatorTypes('1-2')).toEqual(['operator']);

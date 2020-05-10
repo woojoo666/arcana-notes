@@ -6,6 +6,12 @@ test('numbers', () => {
     expect(output.properties.foo.value).toEqual(5);
 });
 
+test('booleans', () => {
+    const testCode = 'foo: true';
+    const output = new Interpreter(testCode).interpretTest({}, 'Indent');
+    expect(output.properties.foo.value).toEqual(true);
+});
+
 test('numeric keys', () => {
     const testCode = '5: 888';
     const output = new Interpreter(testCode).interpretTest({}, 'Indent');
