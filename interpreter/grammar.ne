@@ -26,7 +26,8 @@ Params		-> VarList ">>"											{% ([varlist]) => varlist %}
 VarList		-> (%identifier ",":?):* %identifier					{% ([middle,last]) => [...middle.map(([x])=>x.value),last.value] %} # commas optional, but no trailing commas allowed
 
 Statement	-> %identifier ":" Expression							{% ([token, ,value]) => ({type:'property', key: token.value, value}) %} # (TODO: support destructuring)
-			| %number ":" Expression								{% ([token, ,value]) => ({type:'property', key: token.value, value, keyType: 'number'}) %}
+			| %number ":" Expression								{% ([token, ,value]) => ({type:'property', key: token.value, value, keyType: 'number'}) %} # TODO: invalid numeric keys like "1.2.3" should return syntax error, though perhaps easier to throw in the interpreter
+			| %boolean ":" Expression								{% ([token, ,value]) => ({type:'property', key: token.value, value, keyType: 'boolean'}) %}
 			| "[" %identifier "]" ":" Expression					# dynamic keys / computed properties (TODO: support destructuring)
 			| SpacedItem:+											{% ([items]) => ({type:'subList', items}) %} # one or more space-delimited list items
 			| SpacedUnary											# a single spaced-unary object

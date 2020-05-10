@@ -7,9 +7,10 @@ test('numbers', () => {
 });
 
 test('booleans', () => {
-    const testCode = 'foo: true';
+    const testCode = 'foo: true, bar: false';
     const output = new Interpreter(testCode).interpretTest();
     expect(output.get('foo')).toEqual(true);
+    expect(output.get('bar')).toEqual(false);
 });
 
 test('numeric keys', () => {
@@ -25,6 +26,16 @@ test('numeric vs string keys', () => {
     const output = new Interpreter(testCode).interpretTest();
     expect(output.get('5')).toBeUndefined();
 })
+
+test('boolean keys', () => {
+    const testCode = 'true: 888';
+    const output = new Interpreter(testCode).interpretTest();
+    expect(output.get(true)).toEqual(888);
+
+	const testCode2 = 'conditional: (true: 1, false: 0), cond: true, result: conditional[cond]';
+	const output2 = new Interpreter(testCode2).interpretTest();
+	expect(output2.get('result')).toEqual(1);
+});
 
 test('computed property access', () => {
     // note: in the clone, we override `x` and `y` to make it easier to tell if the clone is re-inserting those values or not.

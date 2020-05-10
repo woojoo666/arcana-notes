@@ -16,6 +16,12 @@ test('numeric keys', () => {
     expect(parsed.statements[0].key).toEqual('5');
 });
 
+test('boolean keys', () => {
+	const testCode = 'true: 888';
+	let parsed = parse(testCode);
+    expect(parsed.statements[0].key).toEqual('true');
+});
+
 test('computed property access', () => {
 	let code = 'a: b[c]';
 	let parsed = parse(code);

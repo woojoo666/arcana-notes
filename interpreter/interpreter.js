@@ -139,7 +139,9 @@ class ObjectNode extends Node {
 		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
 				case 'property':
-					const key = statement.keyType == 'number' ? Number(statement.key) : statement.key;
+					const key = statement.keyType == 'number' ? JSON.parse(statement.key)
+						: statement.keyType == 'boolean' ? JSON.parse(statement.key)
+						: statement.key;
 					this.properties.set(key, NodeFactory(statement.value, null));
 					break;
 				case 'insertion':
@@ -605,7 +607,7 @@ class NumberNode extends PrimitiveNode {
 }
 
 class BooleanNode extends PrimitiveNode {
-	getRawValue () { return Boolean(this.syntaxNode.value); }
+	getRawValue () { return JSON.parse(this.syntaxNode.value); }
 	clone (parent) { return new BooleanNode(this.syntaxNode, parent); }
 }
 
