@@ -378,7 +378,7 @@ class MemberAccessNode extends Node {
 		}
 		this.source = NodeFactory(syntaxNode.source, this.sourceListener);
 		if (typeof syntaxNode.key == 'string') {
-			this.key = new StringNode({value: syntaxNode.key}, null);
+			this.key = new StringNode({value: syntaxNode.key}, this.sourceListener);
 		} else {
 			this.key = NodeFactory(syntaxNode.key, this.sourceListener);
 		}
@@ -532,50 +532,43 @@ class UnaryNode extends Node {
 	}
 }
 
-// StringNodes start with value undefined, and then during reference resolution,
+// These are just wrappers around javascript primitives, eg String, Boolean, Numbers.
+// All of them start with value undefined, and then during reference resolution,
 // will update once with the correct value. Then they will never change value again.
-class StringNode extends Node {
-	constructor (syntaxNode, parent) {
-		super(syntaxNode, parent);
-		this.value = syntaxNode.value; // StringNodes never need to be re-evaluated
+class PrimitiveNode extends Node {
+	// Note that while the AST preserves all primtive values as a strings (eg 5 would be represented as "5"),
+	// the interpreter parses the values to Javascript primitives before returning it.
+	// Other nodes like BinopNode.evaluate() also return raw javascript primitives.
+	//
+	// TODO: perhaps we should wrap raw values in ObjectNodes, so that we can add properties
+	//       and do stuff like `5.type == 'number'`
+	evaluate (scope) {
+		return this.getRawValue();
 	}
-	evaluate (scope) { return this.value }  // this.value will never change
-	// TODO: maybe we should override update() to not do anything, because NumberNodes never change?
-	//       would be a slight optimization.
-
+	getRawValue() {
+		throw Error(`Unimplemented ${this.constructor.name}.getRawValue() function`);
+	}
 	clone (parent) {
-		return new StringNode(this.syntaxNode, parent);
+		throw Error(`Unimplemented ${this.constructor.name}.getRawValue() function`);
 	}
-	// StringNodes act like references to global Number objects, so just like ReferenceNodes,
+	// Primitive nodes act like references to global objects (eg NumberNodes act like
+	// reference to some global library of Number objects), so just like ReferenceNodes,
 	// they call update() during reference resolution to trigger the initial evaluation pass.
 	resolveReferences (scope) {
-		this.update();
+		this.update(); // TODO: maybe we should override update() to not do anything, because NumberNodes never change? would be a slight optimization.
 	}
 }
 
-// NumberNodes start with value undefined, and then during reference resolution,
-// will update once with the correct value. Then they will never change value again.
-class NumberNode extends Node {
-	constructor (syntaxNode, parent) {
-		super(syntaxNode, parent);
+class StringNode extends PrimitiveNode {
+	getRawValue () {
+		return this.syntaxNode.value;
 	}
-	evaluate (scope) {
-		// always returns the same value.
-		// Note that while the AST preserves the value as a string, the interpreter parses the number before returning it.
-		// Note that this also matches the BinopNode.evaluate(), which also returns a number.
-		return +this.syntaxNode.value;
-	}
-	// TODO: maybe we should override update() to not do anything, because NumberNodes never change?
-	//       would be a slight optimization.
+	clone (parent) { return new StringNode(this.syntaxNode, parent); }
+}
 
-	clone (parent) {
-		return new NumberNode(this.syntaxNode, parent);
-	}
-	// NumberNodes act like references to global Number objects, so just like ReferenceNodes,
-	// they call update() during reference resolution to trigger the initial evaluation pass.
-	resolveReferences (scope) {
-		this.update();
-	}
+class NumberNode extends PrimitiveNode {
+	getRawValue () { return +this.syntaxNode.value; }
+	clone (parent) { return new NumberNode(this.syntaxNode, parent); }
 }
 
 class Interpreter {
