@@ -6,12 +6,8 @@
 	<script src="node_modules/moo/moo.js" ></script>
 	<!-- see here(https://stackoverflow.com/a/56070428/1852456) why we use "defer" for the following scripts-->
 	<script src="lexerWrapper.js" type="module" defer></script>
-	<script src="grammar.js" defer></script>
-	<!--script src="parser.js"></script-->
 	<script type="module" defer>
-		import { importCommonJS } from './utils.js';
-
-		let grammar = importCommonJS('grammar');
+		import grammar from './grammar.js';
 
 		const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
 		parser.lexer.setBlockType('Indent');

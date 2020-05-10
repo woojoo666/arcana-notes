@@ -6,6 +6,7 @@ const lexerWrapper = (typeof module === 'object' && module.exports)
 						: window.lexerWrapper;
 %}
 @lexer lexerWrapper
+@preprocessor module # generate grammar as esmodule
 
 # Note that some things are either impossible to check in the grammar (due to modular parsing), or just more difficult.
 # So we defer some of these checks to post-grammar parsing.

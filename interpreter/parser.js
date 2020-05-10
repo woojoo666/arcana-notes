@@ -1,4 +1,4 @@
-import { grammar } from './grammarModule.js';
+import grammar from './grammar.js';
 
 import { importCommonJS } from './utils.js';
 const nearley = importCommonJS('nearley');

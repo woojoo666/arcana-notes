@@ -1,14 +1,12 @@
 // Generated automatically by nearley, version 2.19.3
 // http://github.com/Hardmath123/nearley
-(function () {
 function id(x) { return x[0]; }
 
 const lexerWrapper = (typeof module === 'object' && module.exports)
 						? require('./lexerWrapper.js')
 						: window.lexerWrapper;
-var grammar = {
-    Lexer: lexerWrapper,
-    ParserRules: [
+let Lexer = lexerWrapper;
+let ParserRules = [
     {"name": "Block$ebnf$1", "symbols": ["Params"], "postprocess": id},
     {"name": "Block$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "Block$ebnf$2", "symbols": []},
@@ -106,12 +104,6 @@ var grammar = {
     {"name": "Object", "symbols": [(lexerWrapper.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([token]) => ({type:'reference', name: token.value})},
     {"name": "Object", "symbols": [(lexerWrapper.has("string") ? {type: "string"} : string)], "postprocess": ([token]) => ({type:'string', value: token.value})},
     {"name": "Object", "symbols": [(lexerWrapper.has("number") ? {type: "number"} : number)], "postprocess": ([token]) => ({type:'number', value: token.value})}
-]
-  , ParserStart: "Block"
-}
-if (typeof module !== 'undefined'&& typeof module.exports !== 'undefined') {
-   module.exports = grammar;
-} else {
-   window.grammar = grammar;
-}
-})();
+];
+let ParserStart = "Block";
+export default { Lexer, ParserRules, ParserStart };
