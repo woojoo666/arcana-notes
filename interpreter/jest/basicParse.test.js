@@ -1,0 +1,19 @@
+
+import { parse } from '../parser.js';
+
+// todo: add test for all basic syntax, eg unary operators, templates, parameters, @-blocks, cloning, if-else, etc
+
+test('computed property access', () => {
+	let code = 'a: b[c]';
+	let parsed = parse(code);
+
+	expect(parsed).toMatchSnapshot();
+	expect(parsed.statements[0].value.type).toEqual('memberAccess');
+	expect(parsed.statements[0].value.key.type).toEqual('reference');
+
+	let code2 = 'a: b[c + max(d,e)]';
+	let parsed2 = parse(code2);
+	expect(parsed2).toMatchSnapshot();
+	expect(parsed2.statements[0].value.key.operator).toEqual('+');
+	expect(parsed2.statements[0].value.key.right.type).toEqual('clone');
+});

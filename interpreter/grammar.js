@@ -98,7 +98,7 @@ let ParserRules = [
     {"name": "Object", "symbols": ["Object", {"literal":"->"}], "postprocess": ([source]) => ({type:'callResult',source})},
     {"name": "Object", "symbols": ["Object", (lexerWrapper.has("propAccess") ? {type: "propAccess"} : propAccess), (lexerWrapper.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([source, ,token]) => ({type:'memberAccess',source,key:token.value})},
     {"name": "Object", "symbols": ["Object", (lexerWrapper.has("propAccess") ? {type: "propAccess"} : propAccess), (lexerWrapper.has("tag") ? {type: "tag"} : tag)]},
-    {"name": "Object", "symbols": ["Object", {"literal":"["}, "Block", {"literal":"]"}]},
+    {"name": "Object", "symbols": ["Object", {"literal":"["}, "Expression", {"literal":"]"}], "postprocess": ([source, ,key, ]) => ({type:'memberAccess',source,key})},
     {"name": "Object", "symbols": [{"literal":"..."}]},
     {"name": "Object", "symbols": [{"literal":"collector"}], "postprocess": ([token]) => ({type:'collector'})},
     {"name": "Object", "symbols": [(lexerWrapper.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([token]) => ({type:'reference', name: token.value})},

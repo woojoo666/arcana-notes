@@ -1,0 +1,88 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`computed property access 1`] = `
+Object {
+  "parameters": null,
+  "statements": Array [
+    Object {
+      "key": "a",
+      "type": "property",
+      "value": Object {
+        "key": Object {
+          "name": "c",
+          "type": "reference",
+        },
+        "source": Object {
+          "name": "b",
+          "type": "reference",
+        },
+        "type": "memberAccess",
+      },
+    },
+  ],
+  "type": "block",
+}
+`;
+
+exports[`computed property access 2`] = `
+Object {
+  "parameters": null,
+  "statements": Array [
+    Object {
+      "key": "a",
+      "type": "property",
+      "value": Object {
+        "key": Object {
+          "left": Object {
+            "name": "c",
+            "type": "reference",
+          },
+          "operator": "+",
+          "right": Object {
+            "block": Object {
+              "parameters": null,
+              "statements": Array [
+                Object {
+                  "items": Array [
+                    Array [
+                      Object {
+                        "name": "d",
+                        "type": "reference",
+                      },
+                    ],
+                  ],
+                  "type": "subList",
+                },
+                Object {
+                  "items": Array [
+                    Array [
+                      Object {
+                        "name": "e",
+                        "type": "reference",
+                      },
+                    ],
+                  ],
+                  "type": "subList",
+                },
+              ],
+              "type": "block",
+            },
+            "source": Object {
+              "name": "max",
+              "type": "reference",
+            },
+            "type": "clone",
+          },
+          "type": "binop",
+        },
+        "source": Object {
+          "name": "b",
+          "type": "reference",
+        },
+        "type": "memberAccess",
+      },
+    },
+  ],
+  "type": "block",
+}
+`;

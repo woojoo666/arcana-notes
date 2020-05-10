@@ -93,7 +93,7 @@ Object 		-> "(" Block ")"										{% ([ ,block, ]) => ({type:'create',block}) %
 			| Object "->"											{% ([source]) => ({type:'callResult',source}) %} # calling
 			| Object %propAccess %identifier						{% ([source, ,token]) => ({type:'memberAccess',source,key:token.value}) %}
 			| Object %propAccess %tag
-			| Object "[" Block "]"									# computed property access
+			| Object "[" Expression "]"								{% ([source, ,key, ]) => ({type:'memberAccess',source,key}) %}
 
 			| "..."													# capture block
 
