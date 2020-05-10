@@ -3,6 +3,12 @@ import { parse } from '../parser.js';
 
 // todo: add test for all basic syntax, eg unary operators, templates, parameters, @-blocks, cloning, if-else, etc
 
+test('numeric keys', () => {
+    const testCode = '5: 888';
+	let parsed = parse(testCode);
+    expect(parsed.statements[0].key).toEqual('5');
+});
+
 test('computed property access', () => {
 	let code = 'a: b[c]';
 	let parsed = parse(code);

@@ -11,8 +11,8 @@ test('behavior overridden during cloning should not be cloned, even if it contai
         .map(([key,node]) => node.value);        // extract values
 
     expect(items).toHaveLength(3);
-    expect(items).toContain('5');
-    expect(items).toContain('7');
-    expect(items).toContain('17');
-    expect(items).not.toContain('15');
+    expect(items).toContain(5);
+    expect(items).toContain(7);
+    expect(items).toContain(17);
+    expect(items).not.toContain(15);
 });

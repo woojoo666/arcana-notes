@@ -113,7 +113,7 @@ class ObjectNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
 		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
-		this.properties = {}; // static properties
+		this.properties = {}; // static properties. TODO: support object-key properties
 		this.insertions = [];
 		this.value = this;    // ObjectNode are the only nodes where we initialize value at beginning, so cloning doesn't break
 
@@ -377,30 +377,35 @@ class MemberAccessNode extends Node {
 			}
 		}
 		this.source = NodeFactory(syntaxNode.source, this.sourceListener);
-		this.key = syntaxNode.key;
+		if (typeof syntaxNode.key == 'string') {
+			this.key = new StringNode({value: syntaxNode.key}, null);
+		} else {
+			this.key = NodeFactory(syntaxNode.key, this.sourceListener);
+		}
 	}
 	clone (parent) {
 		const newNode = new MemberAccessNode(null, parent);
 		newNode.source = this.source.clone(newNode);
-		newNode.key = this.key;
+		newNode.key = this.key.clone(newNode);
 		return newNode;
 	}
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
+		this.key.resolveReferences(scope);
 	}
 	evaluateTarget() {
 		// TODO: if source is an Undefined object, then member access should return Undefined
 		if (this.source.value === undefined) {
 			throw Error('Interpreter error: trying to access property of a non-object.')
 		}
-		return this.source.value.properties[this.key];
+		return this.source.value.properties[this.key.value]; // TODO: support object-key access
 	}
 	// re-evaluate and re-bind target
 	updateTarget () {
 		console.log(`updating target for MemberAccessNode with id ${this.id}`); // for debugging
 		const oldTarget = this.target;
 		this.target = this.evaluateTarget();
-		if (this.target != oldTarget) {	
+		if (this.target != oldTarget) {
 			if (oldTarget) {
 				oldTarget.removeListener(this); // unbind from old target
 			}
@@ -554,7 +559,12 @@ class NumberNode extends Node {
 	constructor (syntaxNode, parent) {
 		super(syntaxNode, parent);
 	}
-	evaluate (scope) { return this.syntaxNode.value }  // always returns the same value
+	evaluate (scope) {
+		// always returns the same value.
+		// Note that while the AST preserves the value as a string, the interpreter parses the number before returning it.
+		// Note that this also matches the BinopNode.evaluate(), which also returns a number.
+		return +this.syntaxNode.value;
+	}
 	// TODO: maybe we should override update() to not do anything, because NumberNodes never change?
 	//       would be a slight optimization.
 

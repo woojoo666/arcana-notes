@@ -25,6 +25,7 @@ let ParserRules = [
     {"name": "VarList$ebnf$1", "symbols": ["VarList$ebnf$1", "VarList$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "VarList", "symbols": ["VarList$ebnf$1", (lexerWrapper.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([middle,last]) => [...middle.map(([x])=>x.value),last.value]},
     {"name": "Statement", "symbols": [(lexerWrapper.has("identifier") ? {type: "identifier"} : identifier), {"literal":":"}, "Expression"], "postprocess": ([token, ,value]) => ({type:'property', key: token.value, value})},
+    {"name": "Statement", "symbols": [(lexerWrapper.has("number") ? {type: "number"} : number), {"literal":":"}, "Expression"], "postprocess": ([token, ,value]) => ({type:'property', key: token.value, value})},
     {"name": "Statement", "symbols": [{"literal":"["}, (lexerWrapper.has("identifier") ? {type: "identifier"} : identifier), {"literal":"]"}, {"literal":":"}, "Expression"]},
     {"name": "Statement$ebnf$1", "symbols": ["SpacedItem"]},
     {"name": "Statement$ebnf$1", "symbols": ["Statement$ebnf$1", "SpacedItem"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
