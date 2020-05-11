@@ -2276,3 +2276,98 @@ such that every actor is actually represented by a main actor and a chain of inb
 * I think I previously talked about how it can be confusing if you are bound/referencing a variable in the child scope,
   but then the value becomes undefined so then your ref shifts to a variable in the parent scope
 * // TODO: FIND REFERENCED SECTION (should be somewhere in notes2 to notes4?)
+
+
+
+### File Extension Exploration
+
+.ffly - normal, plain, just a shorted version of "firefly"
+.owo  - awesome, super legit, 3 letters, looks like a pictogram of a flying bug (the "w" is the wings)
+
+```
+~~~owo
+~~owo     ~~owo
+```
+
+* also sort of looks like the face of a firefly looking at the viewer
+
+```
+*\ /*
+(OwO)
+(o o)
+(o o)
+
+```
+
+* alternatives with similar properties: ovo, oxo
+
+
+-------------------------- loose ends below -----------------------
+
+react-ide crashes when you try to insert a collector, eg `myCollector: collector, myCollector <: collector`??
+
+
+todo:
+    recursion
+    test binding to insertion items
+    "this" reference resolution
+    indent syntax
+    collector.order() function that just references a toArray global function?
+        just a hardcoded ReferenceNode with syntaxNode "toArray"
+        should work, because we can pass the toArray global in the outer scope during interpretation, and the ReferenceNode will be able to resolve it
+    equality
+    coercion
+        toBoolean is just `!(x == false || x == "" || x == 0 || x == undefined)`, note the use of `==` since internally we need to use javascripts strict equality `===`
+    test string concat
+
+         const output = interpret('foo: (2: "hi"), bar: foo["2"]');
+
+
+--- computed properties and scope
+
+in something like
+
+        foo:
+            key: "test"
+            [key]: "bla"
+            nested:
+                x: test // should this be "bla"?
+
+--- non-string property definitions
+
+what if you define `true` prop and then reference `true` in nested scope?
+
+
+--- listening to multiple events
+
+often if you don't want your entire data to disappear if other data goes offline
+you would want to use snapshots
+
+instead of binding to data directly
+you have some trigger that snapshots the data
+and you bind to the snapshots
+
+what if you wanted multiple triggers
+like "every hour, or if > 10 changes made to document, create snapshot"
+you would need to combine event lists?
+but how do we do that using the @-block syntax
+
+    onEvent{hour, document_modified}:
+        ...
+
+
+--- mixing scopes
+
+usually you get your scope from the parent
+but what if you want to add soem variables to scope from third party
+use spread operator
+
+recall that spread operator creates a clone
+so you want to make sure that the library you are importing
+is actually just a bunch of references to the actual objects
+so when you create the clone, you are just cloning the references
+and not the actual objects
+
+maybe we should have a special syntax for this
+that takes any object
+and creates a bunch of references to values in the object

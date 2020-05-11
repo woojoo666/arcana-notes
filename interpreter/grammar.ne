@@ -65,9 +65,9 @@ Ternary		-> Or "?" Ternary "else" Ternary						{% ([condition, ,trueBranch, ,fal
 # TODO: we might be able to convert each operator to be like `Or -> (And "|"):* And`
 # that way operator precedence can be handled in post-processing, and we only have a single rule for each operator
 
-Or			-> Or "|" And											{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+Or			-> Or "|" And											{% ([left,op,right]) => ({type:'binop',operator: op.value,left,right}) %}
 			| And													{% id %}
-And			-> And "&" Eq											{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
+And			-> And "&" Eq											{% ([left,op,right]) => ({type:'binop',operator: op.value,left,right}) %}
 			| Eq													{% id %}
 
 Eq			-> Eq ("=="|"="|"!=="|"!=") Compare						{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
@@ -79,7 +79,7 @@ Sum			-> Sum ("+"|"-") Product								{% ([left,op,right]) => ({type:'binop',ope
 			| Product												{% id %}
 Product		-> Product ("*"|"/"|"%") Exp							{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}
 			| Exp													{% id %}
-Exp			-> Unary "**" Exp										{% ([left,op,right]) => ({type:'binop',operator: op[0].value,left,right}) %}	# right associative
+Exp			-> Unary "**" Exp										{% ([left,op,right]) => ({type:'binop',operator: op.value,left,right}) %}	# right associative
 			| Unary													{% id %}
 
 Unary		-> %unary_op Unary										{% ([op,value]) => ({type:'unaryop',operator: op.value,value}) %}

@@ -61,7 +61,7 @@ function NodeFactory (syntaxNode, parent) {
 		case 'string': return new StringNode(syntaxNode, parent);
 		case 'number': return new NumberNode(syntaxNode, parent);
 		case 'boolean': return new BooleanNode(syntaxNode, parent);
-		case 'undefined': return UNDEFINED;
+		case 'undefined': return new UndefinedNode(syntaxNode, parent);
 		case 'create': return NodeFactory(syntaxNode.block, parent); // 'create' nodes contain a 'block' node
 		case 'clone': return new CloneNode(syntaxNode, parent);
 		case 'insertion': return new InsertionNode(syntaxNode, parent);
@@ -273,16 +273,16 @@ class CloneNode extends Node {
 		return newNode;
 	}
 	resolveReferences (scope) {
-		// Note: arguments block is treated as a template, left un-resolved and will not perform any insertions.
-		// During evaluate(), the child object will inherit properties from the arguments block, and resolve references.
-		// All we do is store the current scope so it can be used during reference resolution in evaluate().
-		this.parentScope = scope;
+		// Note: arguments block is treated as a template, should be left un-resolved and should not perform any insertions.
+		//       The arguments block is used during evaluate() to create the child object, and we resolve references on the child.
+		this.parentScope = scope; // store the current scope so it can be used during reference resolution in evaluate().
 		this.source.resolveReferences(scope); // this will most likely trigger an update and evaluate(), so make sure this.parentScope is already set before calling this
 	}
 	// TODO: I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
 	// TODO: this is all really hack, I'm not sure if it will handle certain edge cases like, if a node
 	//       inside the sourceObject changes (but not the sourceObject itself), will it update the corresponding
 	//       node inside the cloned object?
+	// Note: we don't have to account for undefined source, since an undefined source should never trigger an evaluate()
 	evaluate () {
 		// get the values at the source and arguments nodes
 		const sourceObject = this.source.value;
@@ -361,8 +361,9 @@ class BinopNode extends Node {
 		return newNode;
 	}
 	evaluate () {
-		let left = +this.operands[0].value;
-		let right = +this.operands[1].value;
+		// TODO: should not be dependent on javascript's type coercion. Should be using custom defined coercion methods
+		let left = this.operands[0].value;
+		let right = this.operands[1].value;
 
 		switch (this.operator) {
 			case '+': return left + right;
@@ -376,11 +377,12 @@ class BinopNode extends Node {
 			case '<': return left < right;
 			case '>': return left > right;
 			case '==': return left === right; // TODO: reference equality? is this even necessary?
-			case '=': return left == right;
-			case '!=': return left != right;
+			case '=': return left == right;   // TODO: don't use javascript's equality, implement my own type coercion and equality
+			case '!=': return left != right;  // TODO: don't use javascript's equality, implement my own type coercion and equality
 			case '!==': return left !== right;
-			case '&': return left && right;
-			case '|': return left || right;
+			case '&': return left && right;   // TODO: manually coerce to boolean
+			case '|': return left || right;   // TODO: manually coerce t boolean
+
 			// we should never get here because unknown binary operators should be caught in the parser
 			default: throw Error(`Interpreter error: unknown binary operator "${operator}".`);
 		}
@@ -610,15 +612,18 @@ class BooleanNode extends PrimitiveNode {
 	clone (parent) { return new BooleanNode(this.syntaxNode, parent); }
 }
 
-// UndefinedNodes actually never update because they never change value from their initial value of undefined.
-// This is fine though, because any listeners don't need to update either.
+// UndefinedNodes never change value from their initial value of undefined, so we have to manually trigger any updates.
+// TODO: in most cases, we never have to trigger any updates, because most nodes operating on an UndefinedNode would also have a value
+//       of undefined (eg CloneNodes, MemberAccessNodes, etc). The only reason why we manually trigger an update here is because
+//       of Binop and Unary Nodes, which are the only nodes that can return a non-undefined value even when operands are undefined.
+//       A slight optimization would be to have Binop and Unary nodes just check for UndefinedNode operands during reference resolution
+//       and trigger an update themselves. That way, we can actually combine all UndefinedNodes into a single global constant,
+//       UNDEFINED = new UndefinedNode(), which would never update and would never have any listeners.
 class UndefinedNode extends PrimitiveNode {
 	getRawValue () { return undefined; }
-	clone () { return this; }
+	clone (parent) { return new UndefinedNode(null, parent); }
+	update() { this.listeners.forEach(listener => listener.update()) }
 }
-
-// there only needs to be one undefined node in the entire system
-const UNDEFINED = new UndefinedNode();
 
 class Interpreter {
 

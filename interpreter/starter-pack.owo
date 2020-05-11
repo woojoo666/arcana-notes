@@ -1,0 +1,6 @@
+// Contains core functions that correspond to syntax structures
+// See section "Using Core Functions instead of Javascript Transformations" for more details
+// Perhaps some of these should only be exposed to the interpreter though?
+
+toBoolean: (isFalsy: x == false | x == "" | x == 0 | x == undefined, result: !isFalsy)
+ternary: (switch: (true: trueBranch, false: falseBranch), result: switch[toBoolean(condition).result]())

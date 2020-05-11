@@ -77,12 +77,16 @@ test('handling undefined', () => {
     expect(interpret('foo: (), bar: foo[key]').get('bar')).toEqual(undefined); // prop access: undefined key
     expect(interpret('foo: bar[key]').get('foo')).toEqual(undefined);          // prop access: undefined source and key
 
-    expect(interpret('foo: x+y').get('foo')).toEqual(undefined);                     // operators: sum. TODO: right now this just returns undefined, maybe we should return NaN?
+    expect(interpret('foo: x+y').get('foo')).toEqual(undefined);               // operators: sum. TODO: right now this just returns undefined, maybe we should return NaN?
+    expect(interpret('foo: "" == undefined').get('foo')).toEqual(false);       // operators: reference equality
+    expect(interpret('foo: undefined == undefined').get('foo')).toEqual(true); // operators: reference equality
     // TODO: when we support coercing to boolean, test boolean operators, eg `foo: !x` should return `foo = true`
 
     expect(interpret('foo: bar()').get('foo')).toEqual(undefined);                        // cloning: undefined source
     expect(interpret('foo: (), bar: foo(x: y).x').get('bar')).toEqual(undefined);         // cloning: undefined reference in arguments
     expect(interpret('foo: (x: undefined), bar: foo(x: 100).x').get('bar')).toEqual(100); // cloning: replacing undefined literal
+
+    expect(interpret('foo: (res: x == undefined), bar: foo(x: undefined).res').get('bar')).toEqual(true); // special edge case, make sure undefined nodes get cloned properly
 
     // replacing with undefined. See section "Replacement and Undefined Properties"
     expect(interpret('foo: (x: 100), bar: foo(x: undefined).x').get('bar')).toEqual(undefined); // cloning: replacing with undefined literal
@@ -92,7 +96,7 @@ test('handling undefined', () => {
     // TODO: when we support computed properties, test undefined computed prop, eg `[undefined]: 100` and `[foo]: 100` (where foo is undefined)
 });
 
-// TODO: test cloning
+// TODO: test cloning (remember to test cloning primitives)
 // TODO: test insertion and inserting undefined
 // TODO: test binops and unary ops
 // TODO: test feedback

@@ -1,0 +1,31 @@
+<!-- This file just contains a playground and tests for debugging jest tests -->
+
+<html>
+<head>
+	<script src="../node_modules/nearley/lib/nearley.js"></script>
+	<script src="../node_modules/moo/moo.js" ></script>
+	<!-- see here(https://stackoverflow.com/a/56070428/1852456) why we use "defer" for the following scripts-->
+	<script src="../lexerWrapper.js" type="module" defer></script>
+	<script type="module" defer>
+		import { Interpreter, NumberNode, Scope } from '../interpreter.js';
+
+		const interpret = src => new Interpreter(src).interpretTest();
+		const expect = val => ({
+			toEqual: expected => console.assert(val === expected, 'ERROR'),
+			not: { toEqual: expected => console.assert(val !== expected, 'ERROR') }
+		});
+
+		// normal interpreter tests here
+
+		fetch('../starter-pack.owo').then(response => response.text()).then(starterPackSrc => {
+
+			const starterPack = new Interpreter(starterPackSrc).interpretTest();
+			const interpret = src => new Interpreter(src).interpretTest(new Scope(starterPack.properties));
+			
+			// starter pack tests here
+		});
+	</script>
+</head>
+<body>
+</body>
+</html>
