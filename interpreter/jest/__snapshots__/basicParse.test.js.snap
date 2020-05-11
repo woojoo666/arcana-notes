@@ -86,3 +86,31 @@ Object {
   "type": "block",
 }
 `;
+
+exports[`ternary 1`] = `
+Object {
+  "parameters": null,
+  "statements": Array [
+    Object {
+      "key": "foo",
+      "type": "property",
+      "value": Object {
+        "condition": Object {
+          "name": "a",
+          "type": "reference",
+        },
+        "falseBranch": Object {
+          "name": "c",
+          "type": "reference",
+        },
+        "trueBranch": Object {
+          "name": "b",
+          "type": "reference",
+        },
+        "type": "ternary",
+      },
+    },
+  ],
+  "type": "block",
+}
+`;

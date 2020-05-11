@@ -56,3 +56,12 @@ test('computed property access', () => {
     expect(parse('bar: (x: 100)["x"]').statements[0].value.type).toEqual('memberAccess');    // inline computed property access
     expect(parse('bar: foo(x: 100)["x"]').statements[0].value.type).toEqual('memberAccess'); // inline clone + computed property access
 });
+
+test('ternary', () => {
+	let code = 'foo: a ? b else c';
+	let parsed = parse(code);
+
+	expect(parsed).toMatchSnapshot();
+	expect(parsed.statements[0].value.type).toEqual('ternary');
+	expect(parsed.statements[0].value.trueBranch.name).toEqual('b');
+})
