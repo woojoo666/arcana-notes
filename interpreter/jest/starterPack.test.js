@@ -14,14 +14,14 @@ test('test starter pack usage', () => {
 
 test('test coerce to boolean', () => {
     // false
-    expect(interpret('bool: toBoolean(x: false).result').get('bool')).toEqual(false);
-    expect(interpret('bool: toBoolean(x: "").result').get('bool')).toEqual(false);
-    expect(interpret('bool: toBoolean(x: 0).result').get('bool')).toEqual(false);
-    expect(interpret('bool: toBoolean(x: undefined).result').get('bool')).toEqual(false);
+    expect(interpret('bool: toBoolean(x: false)->').get('bool')).toEqual(false);
+    expect(interpret('bool: toBoolean(x: "")->').get('bool')).toEqual(false);
+    expect(interpret('bool: toBoolean(x: 0)->').get('bool')).toEqual(false);
+    expect(interpret('bool: toBoolean(x: undefined)->').get('bool')).toEqual(false);
 
     // true
-    expect(interpret('bool: toBoolean(x: true).result').get('bool')).toEqual(true);
-    expect(interpret('bool: toBoolean(x: "hi").result').get('bool')).toEqual(true);
-    expect(interpret('bool: toBoolean(x: 100).result').get('bool')).toEqual(true);
-    expect(interpret('bool: toBoolean(x: ()).result').get('bool')).toEqual(true);
+    expect(interpret('bool: toBoolean(x: true)->').get('bool')).toEqual(true);
+    expect(interpret('bool: toBoolean(x: "hi")->').get('bool')).toEqual(true);
+    expect(interpret('bool: toBoolean(x: 100)->').get('bool')).toEqual(true);
+    expect(interpret('bool: toBoolean(x: ())->').get('bool')).toEqual(true);
 });
