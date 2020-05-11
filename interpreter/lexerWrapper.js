@@ -28,11 +28,4 @@ const lexerWrapper = {
 	}
 };
 
-// expose lexerWrapper as CommonJS module or browser variable, so it is accessible from grammar.js
-if (typeof module === 'object' && module.exports) {
-	module.exports = lexerWrapper;
-} else { // if we aren't in Node.js, assume we are in the browser
-	window.lexerWrapper = lexerWrapper;
-}
-
 export { lexerWrapper };

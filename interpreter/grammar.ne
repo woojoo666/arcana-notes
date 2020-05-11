@@ -1,9 +1,7 @@
 # indent-width: 4 (for vertical alignment)
 
 @{%
-const lexerWrapper = (typeof module === 'object' && module.exports)
-						? require('./lexerWrapper.js')
-						: window.lexerWrapper;
+import { lexerWrapper } from './lexerWrapper.js';
 %}
 @lexer lexerWrapper
 @preprocessor module # generate grammar as esmodule

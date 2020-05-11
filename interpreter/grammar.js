@@ -2,9 +2,7 @@
 // http://github.com/Hardmath123/nearley
 function id(x) { return x[0]; }
 
-const lexerWrapper = (typeof module === 'object' && module.exports)
-						? require('./lexerWrapper.js')
-						: window.lexerWrapper;
+import { lexerWrapper } from './lexerWrapper.js';
 let Lexer = lexerWrapper;
 let ParserRules = [
     {"name": "Block$ebnf$1", "symbols": ["Params"], "postprocess": id},
