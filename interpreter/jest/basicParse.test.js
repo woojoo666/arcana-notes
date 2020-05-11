@@ -65,3 +65,8 @@ test('ternary', () => {
 	expect(parsed.statements[0].value.type).toEqual('ternary');
 	expect(parsed.statements[0].value.trueBranch.name).toEqual('b');
 })
+
+test('functions', () => {
+	expect(parse('=> x').statements[0].key).toEqual('_return');
+	expect(parse('x: fn()->').statements[0].value.key).toEqual('_return');
+})

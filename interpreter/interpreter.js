@@ -663,11 +663,13 @@ class Interpreter {
 	// pass in a scope, a dictionary of named Node objects that you provide.
 	// This will allow you provide "input" arguments to the program, and change them
 	// dynamically to see how they affect the program output.
-	interpretTest(scope = Scope.EMPTY, blockType = 'Indent') {
+	interpretTest(scope = Scope.EMPTY, blockType = 'Indent', verbose = true) {
 		const AST = parse(this.source, blockType);
 		const root = NodeFactory(AST);
 		root.resolveReferences(scope);  // start with empty scope
-		console.log(root);
+		if (verbose) {
+			console.log(root);
+		};
 		return root;
 	}
 }

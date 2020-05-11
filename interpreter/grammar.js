@@ -97,7 +97,7 @@ let ParserRules = [
     {"name": "Object$ebnf$3", "symbols": [{"literal":"template"}], "postprocess": id},
     {"name": "Object$ebnf$3", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "Object", "symbols": ["Object", "Object$ebnf$3", {"literal":"{"}, "Block", {"literal":"}"}], "postprocess": ([source,templ, ,block, ]) => ({type:'clone',source,block,template: !!templ})},
-    {"name": "Object", "symbols": ["Object", {"literal":"->"}], "postprocess": ([source]) => ({type:'callResult',source})},
+    {"name": "Object", "symbols": ["Object", {"literal":"->"}], "postprocess": ([source]) => ({type:'memberAccess',source,key:'_return'})},
     {"name": "Object", "symbols": ["Object", (lexerWrapper.has("propAccess") ? {type: "propAccess"} : propAccess), (lexerWrapper.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([source, ,token]) => ({type:'memberAccess',source,key:token.value})},
     {"name": "Object", "symbols": ["Object", (lexerWrapper.has("propAccess") ? {type: "propAccess"} : propAccess), (lexerWrapper.has("tag") ? {type: "tag"} : tag)]},
     {"name": "Object", "symbols": ["Object", {"literal":"["}, "Expression", {"literal":"]"}], "postprocess": ([source, ,key, ]) => ({type:'memberAccess',source,key})},

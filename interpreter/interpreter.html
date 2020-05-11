@@ -111,8 +111,12 @@ back to base level`);
 <script type="module">
 	// test that the child created during clone should be using nearest scope
 	import { Interpreter, NumberNode } from './interpreter.js';
-	const testCode = 'x: "", isFalse: x == false || x == 0 || x == "" || x == undefined';
+	const testCode = 'x: 10, foo: (y: 20), clone: foo(x2: x+5, y2: y+5)';
 	const output = new Interpreter(testCode).interpretTest();
+
+	console.log('clone.x2 should be 15, clone.y2 should be 25');
+	console.assert(output.get('clone').get('x2') == 15, 'ERROR');
+	console.assert(output.get('clone').get('y2') == 25, 'ERROR');
 </script>
 <script type="module">
 	import { Interpreter, NumberNode } from './interpreter.js';

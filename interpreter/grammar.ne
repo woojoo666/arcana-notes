@@ -92,7 +92,7 @@ Object 		-> "(" Block ")"										{% ([ ,block, ]) => ({type:'create',block}) %
 			| Object "(" Block ")"									{% ([source, ,block, ]) => ({type:'clone',source,block}) %}
 			| Object "template":? "{" Block "}"						{% ([source,templ, ,block, ]) => ({type:'clone',source,block,template: !!templ}) %}
 
-			| Object "->"											{% ([source]) => ({type:'callResult',source}) %} # calling
+			| Object "->"											{% ([source]) => ({type:'memberAccess',source,key:'_return'}) %} # calling
 			| Object %propAccess %identifier						{% ([source, ,token]) => ({type:'memberAccess',source,key:token.value}) %}
 			| Object %propAccess %tag
 			| Object "[" Expression "]"								{% ([source, ,key, ]) => ({type:'memberAccess',source,key}) %}

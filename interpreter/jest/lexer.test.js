@@ -49,4 +49,9 @@ test('detect unary operators in expressions', () => {
 	expect(getOperatorTypes('! x ? ! x else ! x')).toEqual(['spaced_unary', 'spaced_unary', 'spaced_unary']);
 });
 
+test('functions', () => {
+	expect(getTokenTypes('=> 10')).toEqual(['return','number']);
+	expect(getTokenTypes('x->')).toEqual(['identifier','getReturn']);
+})
+
 // TODO: test how lexer changes based on blockType

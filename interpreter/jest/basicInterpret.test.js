@@ -1,6 +1,6 @@
 import { Interpreter, Scope } from '../interpreter.js';
 
-const interpret = src => new Interpreter(src).interpretTest();
+const interpret = src => new Interpreter(src).interpretTest(undefined, undefined, false);
 
 test('unordered properties', () => {
     expect(interpret('foo: 100, bar: foo').get('bar')).toEqual(100);
@@ -94,6 +94,11 @@ test('handling undefined', () => {
     // TODO: when we support passing in arguments object directly, support undefined arguments object, eg `foo: clone(bar, undefined)`
 
     // TODO: when we support computed properties, test undefined computed prop, eg `[undefined]: 100` and `[foo]: 100` (where foo is undefined)
+});
+
+test('functions', () => {
+    expect(interpret('=> 100').get('_return')).toEqual(100);
+    expect(interpret('x: (=> 100), y: x()->').get('y')).toEqual(100);
 });
 
 // TODO: test cloning (remember to test cloning primitives)
