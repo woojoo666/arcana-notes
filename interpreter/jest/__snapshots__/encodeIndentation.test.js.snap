@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`convert indentation to braces 1`] = `
+"
+foo { 
+	bar(
+		baz
+	) } 
+zed
+"
+`;

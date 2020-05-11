@@ -166,7 +166,7 @@ class Block {
 		}
 
 		// if you have say, 3 children, it should end up something like this
-		// <text> (Block1)  <text> {Block2} <text> {Block3} <text>
+		// <text> (Block1) <text> {Block2} <text> {Block3} <text>
 
 		let str = this.source.slice(this.startOffset, this.children[0].startOffset)
 		for (let i = 0; i < this.children.length; i++) {
@@ -218,6 +218,29 @@ PreProcessor.prototype.constructBlockTree = function (blockBoundaries) {
 	}
 
 	return this;
+}
+
+// Currently our interpreter don't support the recursive block structure created by constructBlockTree().
+// So for now, we use this simple function to just convert indentation into "{" and "}" braces so we can feed it into the parser.
+// Once our interpreting can support block trees, then we can interpret each block individually, and we won't need this function.
+PreProcessor.prototype.encodeIndentation = function () {
+	let blockBoundaries = this.getBlockIterator();
+	let output = '';
+	let lastOffset = 0;
+	for (let { direction, blockType, offset, matchText } of blockBoundaries) {
+		output += this.source.slice(lastOffset, offset);
+		lastOffset = offset;
+		if (blockType == 'Indent') {
+			output += direction == 'start' ? ' { ' : ' } ';
+		}
+	}
+
+	// The parser and interpreter currently expect the outermost block to be a Block of statements, not an Object (see grammar.ne).
+	// However, getBlockIterator() always starts with an "indent start" boundary and ends with an "indent end" boundary,
+	// so we end up with an extra "{" and "}" in the beginning and end. Strip these off.
+	output = output.slice(3, -3);
+
+	return output;
 }
 
 export { PreProcessor, Block };
