@@ -13,6 +13,11 @@ function getOperatorTypes(source, blockType) {
 
 test('basicTypes', () => {
 	expect(getTokenTypes('x: true')).toEqual(['identifier','colon','boolean']);
+	expect(getTokenTypes('x: false')).toEqual(['identifier','colon','boolean']);
+
+	expect(getTokenTypes('x: ""')).toEqual(['identifier','colon','string']);
+	expect(getTokenTypes('x: "test"')).toEqual(['identifier','colon','string']);
+	expect(getTokenTypes('x: "pekora be like \\"ha↑ha↑ha↑\\""')).toEqual(['identifier','colon','string']); // test escaped quotes and special characters
 })
 
 test('detect unary operators in expressions', () => {

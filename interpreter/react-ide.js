@@ -2,7 +2,7 @@ const Interpreter = window.Interpreter;
 
 class IDE extends React.Component {
 	state = {
-		rawCode: 'foo: (bar: -1+x*2/y, x: 10, y: 3)\nclone: foo(x: 15)\nbarAlias: clone.bar\ntrue: false',
+		rawCode: 'foo: (bar: -1+x*2/y, x: 10, y: 3)\nclone: foo(x: 15)\nbarAlias: clone.bar\nmsg: "hi"\ntrue: false',
 	}
 
 	handleChange (event) {
@@ -43,7 +43,7 @@ class ObjectNodeComponent extends React.Component {
 					<span className='axis-property-key'> { String(key) /* TODO: support object keys */ } : </span>
 					{ typeof valueNode.value == 'object'
 						? <ObjectNodeComponent val={valueNode.value}></ObjectNodeComponent>
-						: <span className='axis-raw-value'> { String(valueNode.value) } </span>
+						: <span className='axis-raw-value'> { typeof valueNode.value == 'string' ? `"${valueNode.value}"` : String(valueNode.value) } </span>
 					}
 				</div>
 			))}

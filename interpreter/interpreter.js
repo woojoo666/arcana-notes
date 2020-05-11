@@ -406,7 +406,8 @@ class MemberAccessNode extends Node {
 		}
 		this.source = NodeFactory(syntaxNode.source, this.sourceListener);
 		if (typeof syntaxNode.key == 'string') {
-			this.key = new StringNode({value: syntaxNode.key}, this.sourceListener);
+			const dummySyntaxNode = { value: `\"${syntaxNode.key}\"` }; // convert the key to a string by wrapping in quotes
+			this.key = new StringNode(dummySyntaxNode, this.sourceListener);
 		} else {
 			this.key = NodeFactory(syntaxNode.key, this.sourceListener);
 		}
@@ -595,9 +596,7 @@ class PrimitiveNode extends Node {
 }
 
 class StringNode extends PrimitiveNode {
-	getRawValue () {
-		return this.syntaxNode.value;
-	}
+	getRawValue () { return JSON.parse(this.syntaxNode.value); }
 	clone (parent) { return new StringNode(this.syntaxNode, parent); }
 }
 

@@ -10,12 +10,19 @@ test('booleans', () => {
     expect(parsed.statements[0].value.value).toEqual('true');
 });
 
+test('strings', () => {
+	expect(parse('x: ""').statements[0].value.type).toEqual('string');
+	expect(parse('x: "test"').statements[0].value.value).toEqual('\"test\"'); // notice that the AST preserves the original code of all primitives, including strings
+	expect(parse('x: "pekora be like \\"ha↑ha↑ha↑\\""').statements[0].value.type).toEqual('string'); // test escaped quotes and special characters
+})
+
 test('numeric keys', () => {
     const testCode = '5: 888';
 	let parsed = parse(testCode);
     expect(parsed.statements[0].key).toEqual('5');
 });
 
+// note: boolean keys are useful for implementing ternaries and conditionals
 test('boolean keys', () => {
 	const testCode = 'true: 888';
 	let parsed = parse(testCode);

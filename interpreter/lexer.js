@@ -11,7 +11,7 @@ let rules = {
 	WS:      /[^\S\n]+/,
 	comment: /\/\/.*?$/,
 	number:  /[0-9]+/, // TODO: support decimal numbers
-	string:  /"(?:\\["\\]|[^\n"\\])*"/,
+	string:  /"(?:\\["\\]|[^\n"\\])*"/, // TODO: support single quotes
 	params: '>>',
 	return: '=>',
 	getReturn: '->',
