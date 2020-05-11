@@ -680,4 +680,4 @@ class Interpreter {
 	}
 }
 
-export { Interpreter, NumberNode, Scope };
+export { Interpreter, NumberNode, Node, Scope };

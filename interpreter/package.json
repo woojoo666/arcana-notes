@@ -7,7 +7,8 @@
     "test": "node_modules/.bin/jest",
     "test-debug": "node --inspect-brk ./node_modules/jest/bin/jest.js --runInBand",
     "serve": "node_modules/.bin/serve",
-    "compile-grammar": "node_modules/.bin/nearleyc grammar.ne -o grammar.js"
+    "compile-grammar": "node_modules/.bin/nearleyc grammar.ne -o grammar.js",
+    "start": "node -r esm server/firefly-online.js"
   },
   "keywords": [
     "firefly",
@@ -16,6 +17,7 @@
   "author": "axislang@protonmail.com",
   "license": "ISC",
   "dependencies": {
+    "esm": "^3.2.25",
     "express": "^4.17.1",
     "moo": "^0.5.1",
     "nearley": "^2.19.3",

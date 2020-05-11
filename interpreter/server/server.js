@@ -3,6 +3,8 @@ var http = require("http");
 var express = require("express");
 var port = process.env.PORT || 3000;
 
+const ServerNodeMap = new Map();
+
 var app = express();
 	app.use(express.static(__dirname));
 	app.get('/someGetRequest', function(req, res, next) {
@@ -44,3 +46,12 @@ wss.on("connection", function (ws) {
 });
 
 console.log("websocket server created");
+
+function registerServerNode(route = 'index', serverNode) {
+	if (ServerNodeMap.has(route)) {
+		throw Error('cannot create multiple server nodes with the same route');
+	}
+	ServerNodeMap.set(route, serverNode);
+}
+
+module.exports = registerServerNode;
