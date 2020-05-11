@@ -669,7 +669,8 @@ class Interpreter {
 	// This will allow you provide "input" arguments to the program, and change them
 	// dynamically to see how they affect the program output.
 	interpretTest(scope = Scope.EMPTY, blockType = 'Indent') {
-		const AST = parse(this.source, blockType);
+		const encoded = new PreProcessor(this.source).encodeIndentation();
+		const AST = parse(encoded, blockType);
 		const root = NodeFactory(AST);
 		root.resolveReferences(scope);  // start with empty scope
 	

@@ -131,10 +131,12 @@ class Lexer {
 				case 'WS':
 				case 'comment': continue; // ignore whitespace and comments
 
+				// newlines are preserved in indented blocks to separate statements
 				case 'newline':
 					if (this.blockType == 'Braces') continue;    // ignore newlines in braced blocks
 					if (tokens.length == 0) continue;       // ignore leading newlines
 					if (lastToken().type == 'newline') continue; // ignore multiple newlines
+					if (lastToken().type == 'indent') continue;  // ignore newlines after indent, TODO: not sure if actually needed, was added during a hotfix
 					if (lastToken().type == 'comma') continue;   // newlines are ignored after commas
 					break;
 			}

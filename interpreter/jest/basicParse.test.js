@@ -1,5 +1,15 @@
-
+import { PreProcessor } from '../preprocessor.js';
 import { parse } from '../parser.js';
+
+// TODO: pass blockType into all parse() calls?
+
+test('indentation', () => {
+	let encoded = new PreProcessor('foo:\n\tbar: 100').encodeIndentation();
+	expect(parse(encoded, 'Indent').statements[0].value.block.statements[0].value.value).toEqual('100');
+
+	let encoded2 = new PreProcessor('obj1:\n\tx: 100\nobj2:\n\ty:100').encodeIndentation();
+	expect(parse(encoded2, 'Indent').statements[1].value.block.statements[0].key).toEqual('y');
+});
 
 // todo: add test for all basic syntax, eg unary operators, templates, parameters, @-blocks, cloning, if-else, etc
 test('booleans', () => {

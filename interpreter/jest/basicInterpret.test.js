@@ -7,6 +7,12 @@ test('unordered properties', () => {
     expect(interpret('bar: foo, foo: 100').get('bar')).toEqual(100);
 });
 
+test('indentation', () => {
+    expect(interpret('foo:\n\tbar: 100').get('foo').get('bar')).toEqual(100);
+    expect(interpret('obj1:\n\tx: 100\nobj2:\n\ty:100').get('obj2').get('y')).toEqual(100);
+    // TODO: more indentation tests?
+});
+
 test('numbers', () => {
     const output = interpret('foo: 100');
     expect(output.get('foo')).toEqual(100);

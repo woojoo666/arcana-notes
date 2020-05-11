@@ -9,27 +9,17 @@
 <body>
 <script type="module" defer>
 import grammar from './grammar.js';
+import { PreProcessor } from './preprocessor.js';
+import { Lexer } from './lexer.js';
 
-function parse(text, blockType) {
-	console.log('PARSING: ' + text);
-	const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
-	parser.lexer.setBlockType(blockType);
-	parser.feed(text);
-	console.log(parser.results);
-	console.log(JSON.stringify(parser.results, null, 4));
-}
+let src = `toBoolean:
+	isFalsy: 100
+ternary:
+	switch: 100
+`;
 
-parse('x y >> foo: bar, num: -1+x*2/y, result: sum(a:10,b:20)', 'Indent');
-parse('x y >> foo: a ? b else c\n num: -1+x*2/y', 'Indent');
-
-parse('x y >> foo: (=> x+y)', 'Indent');
-
-parse('foo: collector\n a <: b', 'Indent');
-
-parse('collect: collector, foo: (bar: 5, collect <: bar), clone: foo(bar: 15)', 'Indent');
-
-console.log("next test should fail");
-parse('x y >> foo: bar\n num: -1+x*2/y', 'Braces'); // this should fail
+let encoded = new PreProcessor(src).encodeIndentation();
+console.log(new Lexer(encoded).run().tokens);
 </script>
 </body>
 </html>
