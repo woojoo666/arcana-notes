@@ -16,8 +16,10 @@
   "author": "axislang@protonmail.com",
   "license": "ISC",
   "dependencies": {
+    "express": "^4.17.1",
     "moo": "^0.5.1",
-    "nearley": "^2.19.3"
+    "nearley": "^2.19.3",
+    "ws": "^7.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.9.6",
