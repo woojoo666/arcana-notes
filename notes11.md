@@ -1603,10 +1603,10 @@ Normally the way cloning and overriding works is
 Whatever properties are defined in the arguments, override corresponding properties on the source (aka callee)
 But what if you want to remove a value?
 Override with null?
-But having undefined and null is ugly
+But having both undefined and null in our language is ugly
 Means you often have to do checks like `x == undefined || x == null`
 Better to have a single type for "no value"
-Instead, we can design it so ifyou specify `undefined` in clone arguments, it overrides the source value with `undefined`
+Instead, we can design it so if you specify `undefined` in clone arguments, it overrides the source value with `undefined`
 deletes the source value for that property
 Notice how this is special behavior
 Because technically, for properties not specified as clone arguments, those are undefined as well

@@ -2,12 +2,13 @@ import { importCommonJS } from './utils.js';
 
 const moo = importCommonJS('moo');
 
-let keywords = {
+const keywords = {
 	keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag', 'collector'],
 	boolean: ['true','false'],
-}
+	undefined: ['undefined'],
+};
 
-let rules = {
+const rules = {
 	WS:      /[^\S\n]+/,
 	comment: /\/\/.*?$/,
 	number:  /[0-9]+/, // TODO: support decimal numbers

@@ -61,6 +61,7 @@ function NodeFactory (syntaxNode, parent) {
 		case 'string': return new StringNode(syntaxNode, parent);
 		case 'number': return new NumberNode(syntaxNode, parent);
 		case 'boolean': return new BooleanNode(syntaxNode, parent);
+		case 'undefined': return UNDEFINED;
 		case 'create': return NodeFactory(syntaxNode.block, parent); // 'create' nodes contain a 'block' node
 		case 'clone': return new CloneNode(syntaxNode, parent);
 		case 'insertion': return new InsertionNode(syntaxNode, parent);
@@ -424,11 +425,10 @@ class MemberAccessNode extends Node {
 	}
 	// Note: target should be a Node, not a value!
 	evaluateTarget() {
-		// TODO: if source is an Undefined object, then member access should return Undefined
-		if (this.source.value === undefined) {
-			throw Error('Interpreter error: trying to access property of a non-object.')
+		if (this.source.value instanceof ObjectNode) {
+			return this.source.value.getNode(this.key.value); // TODO: support object-key access
 		}
-		return this.source.value.getNode(this.key.value); // TODO: support object-key access
+		return undefined;
 	}
 	// re-evaluate and re-bind target
 	updateTarget () {
@@ -439,7 +439,7 @@ class MemberAccessNode extends Node {
 			if (oldTarget) {
 				oldTarget.removeListener(this); // unbind from old target
 			}
-			if ( !(this.target instanceof ObjectNode)) {
+			if (this.target && !(this.target instanceof ObjectNode)) {
 				// we only need to add a listener if the target is not an ObjectNode
 				this.target.addListener(this);  // bind to new target
 			}
@@ -609,6 +609,16 @@ class BooleanNode extends PrimitiveNode {
 	getRawValue () { return JSON.parse(this.syntaxNode.value); }
 	clone (parent) { return new BooleanNode(this.syntaxNode, parent); }
 }
+
+// UndefinedNodes actually never update because they never change value from their initial value of undefined.
+// This is fine though, because any listeners don't need to update either.
+class UndefinedNode extends PrimitiveNode {
+	getRawValue () { return undefined; }
+	clone () { return this; }
+}
+
+// there only needs to be one undefined node in the entire system
+const UNDEFINED = new UndefinedNode();
 
 class Interpreter {
 

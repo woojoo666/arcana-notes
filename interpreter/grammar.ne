@@ -104,3 +104,4 @@ Object 		-> "(" Block ")"										{% ([ ,block, ]) => ({type:'create',block}) %
 			| %string												{% ([token]) => ({type:'string', value: token.value}) %}
 			| %number												{% ([token]) => ({type:'number', value: token.value}) %}
 			| %boolean												{% ([token]) => ({type:'boolean', value: token.value}) %}
+			| %undefined											{% ([token]) => ({type:'undefined', value: token.value}) %}

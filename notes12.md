@@ -2225,3 +2225,54 @@ which feels a bit ugly
 I guess the way insertions behave in this pub-sub network isn't that clean to begin with though
 how it generates new actors and then appends it to a linked list
 such that every actor is actually represented by a main actor and a chain of inbox item actors
+
+### Replacement and Undefined Properties
+
+* in many prior sections, I've discussed the idea of overriding properties with undefined
+  * see section "-------- Indexing System", "Proxies", "Deleting Properties"
+* this is a little counter-intuitive because technically every property has a default value of undefined
+* so every property in the arguments object has a value of `undefined` unless otherwise specified
+* but if properties that are undefined can override source properties, then wouldn't every property be overridden?
+
+* I used to have this idea of "bound" vs "unbound"
+  * TODO: FIND REFERENCED SECTION, should be somewhere in notes3, maybe "Cloning Unbound Variables" or "Incomplete vs Complete II"?
+
+* now that I am writing the interpreter
+* one interesting side effect of how my interpreter is currently designed and how `CloneNode.evaluate()` is written,
+* explicitly declaring `undefined` will create an `UndefinedNode`, and when you clone some object, any property with the value of `UndefinedNode`
+  can actually end up replacing the source's property value
+* likewise, for references / member accesses that are returning an `undefined` value, they will also end up replacing the source
+  * eg if you do `foo: (x: 100), bar: foo(x: ref)`, `ref` is undefined but since it will be a `ReferenceNode`, it will end up replacing `foo.x`
+
+* note that, in the previous section "Deleting Properties"
+* we talked about overriding properties by explicitly using the undefined literal `undefined`, eg `someSource(someProp: undefined)`
+* however, we never talked about how it should behave in cases where the property merely has a _value_ of undefined,
+  * eg `someSource(someProp: ref)` where `ref` is undefined
+
+* though it does sorta makes sense for both cases to override the source with `undefined`
+* in javascript, when doing someting like, `foo(x)`, it makes sense to look at the value of the argument when passing it into a function
+* but in Firefly, remember that we actually pass _behavior_ into the clone operation, not just values
+  * see section "Defining Behavior That Should be Duplicated"
+* so we can think of these nodes (`UndefinedNode`, `ReferenceNode`) as representing behavior
+* even though the current value of an argument might be `undefined`, we still want to insert the corresponding behavior into the child
+* its like, we are merging the nodes of two graphs together, without actually looking at the values inside each node
+  * which is an apt comparison because our interpreter is basically a giant graph of nodes
+
+* in addition, remember that replacement acts on "partitions"
+  * see section "Replacement vs Shadowing, Partitions vs Pointers"
+* so for a something like `x: undefined`, one way we can think about it is, while the value of the partion is `undefined`, the partition itself is still like any other partition
+* partions will replace other partitions, regardless of their current value
+* like replacing parts of a car
+
+
+* also note that we are free to choose whatever mechanism we want here
+* since the core model, lumino, doesn't have the concept of replacement or overshadowing
+* the idea of combining objects together to form a child object, is defined in higher-order constructs
+
+
+* hmm perhaps I am mixing replacement and shadowing
+* replacement is for cloning, shadowing is for scoping
+* the whole unbound vs bound thing was for scoping I think
+* I think I previously talked about how it can be confusing if you are bound/referencing a variable in the child scope,
+  but then the value becomes undefined so then your ref shifts to a variable in the parent scope
+* // TODO: FIND REFERENCED SECTION (should be somewhere in notes2 to notes4?)
