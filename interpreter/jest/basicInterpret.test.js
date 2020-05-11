@@ -1,6 +1,6 @@
 import { Interpreter, Scope } from '../interpreter.js';
 
-const interpret = src => new Interpreter(src).interpretTest(undefined, undefined, false);
+const interpret = src => new Interpreter(src).interpretTest();
 
 test('unordered properties', () => {
     expect(interpret('foo: 100, bar: foo').get('bar')).toEqual(100);

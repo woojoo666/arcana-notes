@@ -2,6 +2,7 @@
 
 import { PreProcessor, Block } from './preprocessor.js';
 import { parse } from './parser.js';
+import { VERBOSE } from './utils.js';
 
 /*
 I want the structure of the reactive graph to look like:
@@ -111,7 +112,8 @@ class Node {
 		throw Error(`Unimplemented ${this.constructor.name}.clone() function`);
 	}
 	update () {
-		console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
+		if (VERBOSE) console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
+
 		const oldValue = this.value;
 		this.value = this.evaluate();
 		if (this.value != oldValue) {
@@ -234,7 +236,7 @@ class ReferenceNode extends Node {
 				// we only need to add a listener if the target is not an ObjectNode
 				this.target.addListener(this);
 			} else {
-				console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
+				if (VERBOSE) console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
 			}
 		}
 		this.update();
@@ -434,7 +436,8 @@ class MemberAccessNode extends Node {
 	}
 	// re-evaluate and re-bind target
 	updateTarget () {
-		console.log(`updating target for MemberAccessNode with id ${this.id}`); // for debugging
+		if (VERBOSE) console.log(`updating target for MemberAccessNode with id ${this.id}`); // for debugging
+
 		const oldTarget = this.target;
 		this.target = this.evaluateTarget();
 		if (this.target != oldTarget) {
@@ -476,7 +479,8 @@ class InsertionNode extends Node {
 		return this.targetNode && this.targetNode.value;
 	}
 	update () {
-		console.log(`updating target for InsertionNode with id ${this.id}`); // for debugging
+		if (VERBOSE) console.log(`updating target for InsertionNode with id ${this.id}`); // for debugging
+
 		const oldTarget = this.targetVal;
 		this.targetVal = this.evaluate();
 		if (this.targetVal != oldTarget) {	
@@ -527,7 +531,8 @@ class CollectorNode extends Node {
 		return this.getNode(key).value;
 	}
 	update () {
-		console.log(`updating CollectorNode with id ${this.id}`); // for debugging
+		if (VERBOSE) console.log(`updating CollectorNode with id ${this.id}`); // for debugging
+
 		this.evaluate();
 		for (const listener of this.listeners) {
 			listener.update(); // since properties re-created every time, always notify listeners
@@ -663,13 +668,13 @@ class Interpreter {
 	// pass in a scope, a dictionary of named Node objects that you provide.
 	// This will allow you provide "input" arguments to the program, and change them
 	// dynamically to see how they affect the program output.
-	interpretTest(scope = Scope.EMPTY, blockType = 'Indent', verbose = true) {
+	interpretTest(scope = Scope.EMPTY, blockType = 'Indent') {
 		const AST = parse(this.source, blockType);
 		const root = NodeFactory(AST);
 		root.resolveReferences(scope);  // start with empty scope
-		if (verbose) {
-			console.log(root);
-		};
+	
+		if (VERBOSE) console.log(root);
+
 		return root;
 	}
 }

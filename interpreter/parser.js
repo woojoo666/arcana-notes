@@ -1,6 +1,6 @@
 import grammar from './grammar.js';
 
-import { importCommonJS } from './utils.js';
+import { importCommonJS, VERBOSE } from './utils.js';
 const nearley = importCommonJS('nearley');
 
 // --------------------------- PARSER ----------------------------
@@ -23,7 +23,7 @@ const nearley = importCommonJS('nearley');
 // note: `nearley` and `grammar` objects included by the scripts in the <head> of the html
 
 function parse (text, blockType) {  // TODO: when we write our tokenizer, change this to take in tokens instead of raw text
-	console.log('parsing: \n' + text);
+	if (VERBOSE) console.log('parsing: \n' + text);
 	try {
 		const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
 		parser.lexer.setBlockType(blockType);

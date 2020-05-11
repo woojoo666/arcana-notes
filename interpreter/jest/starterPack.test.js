@@ -3,9 +3,9 @@ import path from 'path';
 import { Interpreter, Scope } from '../interpreter.js';
 
 const starterPackSrc = fs.readFileSync(path.resolve(__dirname, '../starter-pack.owo'), 'utf8');
-let starterPack = new Interpreter(starterPackSrc).interpretTest(undefined, undefined, false);
+let starterPack = new Interpreter(starterPackSrc).interpretTest();
 
-const interpret = src => new Interpreter(src).interpretTest(new Scope(starterPack.properties), undefined, false); // use the starter pack as the outer scope
+const interpret = src => new Interpreter(src).interpretTest(new Scope(starterPack.properties)); // use the starter pack as the outer scope
 
 // simple test to make sure nothing crashes
 test('test starter pack usage', () => {

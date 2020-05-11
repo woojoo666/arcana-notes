@@ -5,7 +5,6 @@ import { parse } from '../parser.js';
 test('booleans', () => {
 	const testCode = 'x: true';
 	let parsed = parse(testCode);
-	console.log(JSON.stringify(parsed));
     expect(parsed.statements[0].value.type).toEqual('boolean');
     expect(parsed.statements[0].value.value).toEqual('true');
 });

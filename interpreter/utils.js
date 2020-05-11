@@ -30,4 +30,8 @@ function importCommonJS (name, folder) {
 	}
 }
 
-export { matchAll, importCommonJS };
+// Note: in order to enable verbose logging in client-side, remember to set window.FIREFLY_VERBOSE before this file gets included on the page.
+//       See interpreter.html for an example.
+const VERBOSE = (typeof(process) !== 'undefined' && process.env.FIREFLY_VERBOSE) || (typeof(window) !== 'undefined' && window.FIREFLY_VERBOSE);
+
+export { matchAll, importCommonJS, VERBOSE };
