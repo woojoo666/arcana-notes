@@ -3,15 +3,14 @@ var http = require("http");
 var express = require("express");
 var port = process.env.PORT || 3000;
 
-const ServerNodeMap = new Map();
+let serverNode = null;
 
 var app = express();
 	app.use(express.static(__dirname));
 	app.get('/:route', function (req, res, next) {
 		const route = req.params.route;
-		const serverNode = ServerNodeMap.get(route);
 		if (serverNode) {
-			console.log('creating new clone of ServerNode ')
+			console.log('creating new clone of ServerNode')
 		} else {
 			res.status(404).send('No ServerNode exists at this route.');
 		}
@@ -50,11 +49,11 @@ wss.on("connection", function (ws) {
 
 console.log("websocket server created");
 
-function registerServerNode(route = 'index', serverNode) {
-	if (ServerNodeMap.has(route)) {
-		throw Error('cannot create multiple server nodes with the same route');
+function registerServerNode(node) {
+	if (node) {
+		throw Error('only one server node allowed');
 	}
-	ServerNodeMap.set(route, serverNode);
+	serverNode = node;
 }
 
 module.exports = registerServerNode;

@@ -2335,7 +2335,6 @@ such that every actor is actually represented by a main actor and a chain of inb
 * the server gets a virtual object
 * that it can interact with
 
-
 ### Firefly Online - Flexible Content Display
 
 
@@ -2386,7 +2385,117 @@ such that every actor is actually represented by a main actor and a chain of inb
 
 * the client is free to apply their own transformations and custom views to the object tree
 
--------------------------- loose ends below -----------------------
+### Anonymous Property Access and Phishing
+
+previously we talked about how anonymous property access
+prevents somebody from exposing their key
+    // TODO: FIND REFERENCED SECTION
+
+a more practical real-life example is phishing
+
+we can view every username+password combo as a unique "key"
+
+anonymous property access would prevent phishing
+since the login portal won't know which username+password the user is trying
+
+this is important because
+in firefly, it's actually very easy to impersonate
+because you can take any object, and just copy all public properties
+
+so the only way to distinguish
+is by private properties
+and it's important for the user to be able to check private properties and check identity
+without giving away what keys are being used to check identity
+
+### Scope and Dependency Injection
+
+* one of issues i ran into in interpreter and firefly-online
+* we need to subclass and modify CloneNode to handle ServerNode,
+  so if the clone source is a ServerNode, it will register a new server and save the client syntaxNode
+* but the `NodeFactory` function is bound to the base CloneNode class
+* so we can't just create our own CloneNode class
+* we need to override `NodeFactory` as well, so that it uses our modified CloneNode class
+* but all the existing Node classes reference `NodeFactory` directly
+* so we would have to modify all base Node classes to reference our modified `NodeFactory` function
+* so we end up overriding every class
+
+* the usual way to solve this
+* is dependency injection
+* every class takes in a `NodeFactory` as input
+
+        class Node {
+            constructor(NodeFactory nf) {
+                this.nodeFactory = nf;
+            }
+        }
+
+* so now we can create a modified `NodeFactory`, and construct an entire graph of nodes that uses the modified `NodeFactory`
+* 
+* however, dependency injection gets ugly if you start having a lot of dependencies
+
+        constructor(dependency1, dependency2, dependency3, ...) {
+            ...
+        }
+
+* so what if instead of injecting dependencies one by one
+* you injected a library of dependencies
+
+        constructor(dependencies) {
+            doSomething(dependencies.dependency1)
+            doAnotherThing(dependencies.dependency2)
+        }
+
+* and that's basically what we have in Firefly!
+* in Firefly, scope is passed in
+* so you can always override any dependency
+
+* I actually mentioned this in an earlier section "Combining/Merging and Security Issues II",
+  where I briefly mentioned Containerization and dependency injection
+
+* what's also nice is that the way scope works in Firefly, it makes dependency injection implicit
+* since _any_ reference inside an object can be re-bound during cloning
+* so basically, all references are dependency injections
+* which makes it really easy to modify and override objects
+
+* actually one of the prime motivations for my language
+* was to make it really easy to "hack", to modify and tweak objects and programs
+  * another example of this is, since functions are made up of properties, you can modify and configure functions (which you can't really do in any other language)
+* Firefly is designed to be "for Hackers"
+
+* compare this with stuff like Java
+* where dependency injection is implicit
+* and its especially annoying in Java, which is statically typed, since you have to inject every dependency separately
+* dependency injection feels like a very abstract and complex pattern
+* so its nice to have it implicit and built-in, so the user doesn't have to worry about it
+
+### Firefly Online - ClientNode class vs NodeFactory Injection
+
+* actually to solve the issue mentioned in `Scope and Dependency Injection`
+* instead of injecting `NodeFactory` into every node (which feels a little ugly),
+
+* maybe we can define a "Client" node type
+* and provide that in the scope
+
+        myProgram:
+            server: Server
+                port: 3000
+                index: Client
+                    <>html
+                        ...
+
+
+* though the NodeFactory injection pattern is more powerful and flexible
+* it allows for modifying nodes and subclassing nodes, without needing to explicitly reference them in the Firefly code
+* like we do here with the `Client` declaration
+* in fact, notice how the `Client` declaration is a bit unnecessary,
+* Firefly is meant to work over distributed networks, no need to declare whats a "client" and what isn't
+
+* the NodeFactory injection pattern can basically be used to create different flavors of interpreters, with specialized nodes
+* and can be useful for creating optimizations (eg if we wanted to create a CloneNode that is optimized whenever acting on Arrays)
+
+
+# --------------------------------------------------- loose ends below --------------------------------------------------
+
 
 react-ide crashes when you try to insert a collector, eg `myCollector: collector, myCollector <: collector`??
     actually this is because it is trying to display a circular reference
@@ -2467,3 +2576,5 @@ all their messages will be un-inserted
 and disappear
 we explored this before
 how did we fix it?
+
+------- anonymous property access and phishing

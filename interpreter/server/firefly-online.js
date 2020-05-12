@@ -8,14 +8,20 @@ class ServerNode extends Node {
     constructor(syntaxNode, parent) {
         super(syntaxNode, parent);
         if (syntaxNode == null) {
-            return; // base server node has no route, no initialization. Merely a template for cloning
+            return; // base client node has no route, no initialization. Merely a template for cloning
         }
-        // we expect a string literal for the route
-        let route = syntaxNode.statements.filter(stmt => stmt.key == 'route').map(stmt => stmt.value.value)[0];
-        registerServerNode(route, this);
+        const extractProperty = name => syntaxNode.statements.find(stmt => stmt.key == name).value
+        // TODO: allow server nodes to specify a port, so we can declare multiple server nodes.
+        //       right now this is difficult because the websocket port is hardcoded in the client html+js.
+        this.clientNode = extractProperty('client');
+        registerServerNode(this);
     }
-    clone() {
-        // TODO
+    clone(syntaxNode) {
+        new ServerNode()
+        this.scope = 
+    }
+    getClient () {
+        return this.clientNode;
     }
     resolveReferences(scope) {
         // send scope to client
