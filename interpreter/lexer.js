@@ -6,6 +6,7 @@ const keywords = {
 	keyword: ['for', 'in', 'if', 'else', 'while', 'template', 'tag', 'collector'],
 	boolean: ['true','false'],
 	undefined: ['undefined'],
+	selfRef: ['this'],
 };
 
 const rules = {

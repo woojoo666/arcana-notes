@@ -2523,6 +2523,19 @@ without giving away what keys are being used to check identity
 * but now that there is no `clone()` function, it kinda follows naturally how it should behave during cloning
 * insertions will naturally _not_ be carried over
 
+### Firefly Online - ServerCollector hack
+
+* actually I think I found a better way to solve the issue mentioned in the beginning of section "Scope and Dependency Injection"
+* that doesn't require a ClientNode class or NodeFactory injection (mentioned in section "Firefly Online - ClientNode class vs NodeFactory Injection")
+
+* we can define a collector `serverCollector`
+* and then define `Server` so that every clone inserts itself into `serverCollector`
+* eg `Server: (serverCollector <: this)`
+* then, we just need to manually inspect the items inside `serverCollector`
+* and we can extract all pages and properties passed into the cloning of `Server`
+* so we had `foo: Server(port: 3000, index: "<html>hello world</html>")`
+* then if we inspect `serverCollector` we should be able to find `foo`, and we can extract the `index` page and serve it using our server
+
 # --------------------------------------------------- loose ends below --------------------------------------------------
 
 

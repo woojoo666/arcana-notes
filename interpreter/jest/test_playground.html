@@ -18,7 +18,7 @@
 		fetch('../starter-pack.owo').then(response => response.text()).then(starterPackSrc => {
 
 			const starterPack = new Interpreter(starterPackSrc).interpretTest();
-			const interpret = src => new Interpreter(src).interpretTest(new Scope(starterPack.properties));
+			const interpret = src => new Interpreter(src).interpretTest(starterPack.scope);
 			
 			// starter pack tests here
 		});

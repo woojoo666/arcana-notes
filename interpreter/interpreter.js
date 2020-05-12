@@ -38,19 +38,22 @@ Notice that it is recursive, so every object node contains child object nodes,
 //       create Nodes directly, and then in the interpreter, just clone the rootNode.
 
 class Scope {
-	constructor (parent, map) {
+	constructor (self, parent, map) {
 		this.parent = parent || new Map(); // parent can actually be a Scope or Map. If not provided, use empty map as parent.
 		this.map = map || new Map(); // allow initialization from existing map
+		this.self = self;
 	}
 	set(key, val) { this.map.set(key, val); return this; }
 	get(key) { return this.map.has(key) ? this.map.get(key) : this.parent.get(key); }
+	getSelf() { return this.self; }
 	has(key) { return this.map.has(key) || this.parent.has(key); }
-	extend() { return new Scope(this); }
+	extend(self) { return new Scope(self, this); }
 	// TODO: should we support deleting properties? If we only delete properties from current scope, subsequent get() requests will just retrieve from parent scopes.
 }
 
+// notice that scopes constructed outside an ObjectNode have no "self" or "this"
 Scope.EMPTY = new Scope();
-Scope.fromObject = obj => new Scope(null, new Map(Object.entries(obj)));
+Scope.fromObject = obj => new Scope(undefined, undefined, new Map(Object.entries(obj)));
 
 class NodeFactory {
 	animate (syntaxNode, parent) {
@@ -167,7 +170,7 @@ class ObjectNode extends Node {
 	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
 	resolveReferences (scope) {
 		// store scope so it can be re-used during cloning (see CloneNode.evaluate())
-		this.scope = scope.extend(); // leverage javascript inheritance & prototype tree for scopes
+		this.scope = scope.extend(this);
 
 		for (const [key, valueNode] of this.properties.entries()) {
 			this.scope.set(key, valueNode);
@@ -203,19 +206,17 @@ class ReferenceNode extends Node {
 	// way to the root.
 	// Note that resolveReferences() is also used to override references in a clone operation.
 	resolveReferences (scope) {
-		if (scope.get(this.targetName)) {
-			if (this.target) {
-				this.target.removeListener(this); // unbind from old target
-			}
-			this.target = scope.get(this.targetName);
-			if (this.target && !(this.target instanceof ObjectNode)) {
-				// we only need to add a listener if the target is not an ObjectNode
-				this.target.addListener(this);
-			} else {
-				if (VERBOSE) console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
-			}
+		if (this.target) {
+			this.target.removeListener(this); // unbind from old target
 		}
-		this.update();
+		this.target = this.syntaxNode.selfRef ? scope.getSelf() : scope.get(this.targetName);
+		if (this.target && !(this.target instanceof ObjectNode)) {
+			// we only need to add a listener if the target is not an ObjectNode
+			this.target.addListener(this);
+		} else {
+			if (VERBOSE) console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
+		}
+		this.update(); // note that we always trigger an update, even if undefined (see description of UndefinedNode to see why)
 	}
 	evaluate () {
 		return this.target && this.target.value;
@@ -256,20 +257,19 @@ class CloneNode extends Node {
 		const sourceObject = this.source.value;
 		const argumentsObject = this.arguments.value;
 
-		// leverage javascript inheritance & prototype tree for scopes
-		const sourceScopeExt = sourceObject.scope.extend();
-		const argumentsScopeExt = this.parentScope.extend();
-
 		// create clones without resolving references, so should be inert and have no side effects yet
 		const sourceClone = this.nodeFactory.animate(sourceObject.syntaxNode, null);
 		const argumentsClone = this.nodeFactory.animate(argumentsObject.syntaxNode, null);
+
+		const child = this.nodeFactory.animate({type: 'block', statements: []}, null); // temporary object node, so don't attach listeners?
 
 		// Mapping between nodes in the child, and the scope that they belong to
 		// (either source or arguments scope, depending on where the node came from)
 		// References in the child will be resolved using whichever scope they belong to (see notes on "Nearest Scope")
 		const scopeMap = new Map();
+		const sourceScopeExt = sourceObject.scope.extend(child); //note: when resolving references, any self references should point to the child
+		const argumentsScopeExt = this.parentScope.extend(child);
 
-		const child = this.nodeFactory.animate({type: 'block', statements: []}, null); // temporary object node, so don't attach listeners?
 		for (const [key, valueNode] of argumentsClone.properties.entries()) {
 			child.properties.set(key, valueNode);
 			scopeMap.set(valueNode, argumentsScopeExt);
@@ -598,16 +598,36 @@ class Interpreter {
 	// pass in a scope, a dictionary of named Node objects that you provide.
 	// This will allow you provide "input" arguments to the program, and change them
 	// dynamically to see how they affect the program output.
+	// note: we assume that the outermost syntax node is of type "block", so that the root is always an ObjectNode. This is important for scoping and resolving self
 	interpretTest(scope = Scope.EMPTY, blockType = 'Indent', nodeFactory = new NodeFactory()) {
 		const encoded = new PreProcessor(this.source).encodeIndentation();
 		const AST = parse(encoded, blockType);
 		const root = nodeFactory.animate(AST, null, nodeFactory);
 		root.resolveReferences(scope);
-	
+
 		if (VERBOSE) console.log(root);
 
 		return root;
 	}
 }
 
-export { Interpreter, NumberNode, Node, Scope };
+export {
+	NodeFactory,
+	Scope,
+
+	ObjectNode,
+	ReferenceNode,
+	CloneNode,
+	BinopNode,
+	MemberAccessNode,
+	InsertionNode,
+	CollectorNode,
+	UnaryNode,
+	PrimitiveNode,
+	StringNode,
+	NumberNode,
+	BooleanNode,
+	UndefinedNode,
+
+	Interpreter,
+};

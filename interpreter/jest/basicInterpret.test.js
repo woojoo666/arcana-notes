@@ -107,6 +107,11 @@ test('functions', () => {
     expect(interpret('x: (=> 100), y: x()->').get('y')).toEqual(100);
 });
 
+test('self reference using "this"', () => {
+    expect(interpret('x: 100, y: this.x').get('y')).toEqual(100);
+    expect(interpret('foo: (x: 100), clone: foo(y: this.x), bar: clone.y').get('bar')).toEqual(100); // test self reference in cloning
+})
+
 // TODO: test cloning (remember to test cloning primitives)
 // TODO: test insertion and inserting undefined
 // TODO: test binops and unary ops
