@@ -52,23 +52,25 @@ class Scope {
 Scope.EMPTY = new Scope();
 Scope.fromObject = obj => new Scope(null, new Map(Object.entries(obj)));
 
-function NodeFactory (syntaxNode, parent, nodeFactory) {
-	switch (syntaxNode.type) {
-		case 'block': return new ObjectNode(syntaxNode, parent, nodeFactory);
-		case 'binop': return new BinopNode(syntaxNode, parent, nodeFactory);
-		case 'unaryop': return new UnaryNode(syntaxNode, parent, nodeFactory);
-		case 'memberAccess': return new MemberAccessNode(syntaxNode, parent, nodeFactory);
-		case 'reference': return new ReferenceNode(syntaxNode, parent, nodeFactory);
-		case 'string': return new StringNode(syntaxNode, parent, nodeFactory);
-		case 'number': return new NumberNode(syntaxNode, parent, nodeFactory);
-		case 'boolean': return new BooleanNode(syntaxNode, parent, nodeFactory);
-		case 'undefined': return new UndefinedNode(syntaxNode, parent, nodeFactory);
-		case 'create': return nodeFactory(syntaxNode.block, parent, nodeFactory); // 'create' nodes contain a 'block' node
-		case 'clone': return new CloneNode(syntaxNode, parent, nodeFactory);
-		case 'insertion': return new InsertionNode(syntaxNode, parent, nodeFactory);
-		case 'collector': return new CollectorNode(syntaxNode, parent, nodeFactory);
+class NodeFactory {
+	animate (syntaxNode, parent) {
+		switch (syntaxNode.type) {
+			case 'block': return new ObjectNode(syntaxNode, parent, this);
+			case 'binop': return new BinopNode(syntaxNode, parent, this);
+			case 'unaryop': return new UnaryNode(syntaxNode, parent, this);
+			case 'memberAccess': return new MemberAccessNode(syntaxNode, parent, this);
+			case 'reference': return new ReferenceNode(syntaxNode, parent, this);
+			case 'string': return new StringNode(syntaxNode, parent, this);
+			case 'number': return new NumberNode(syntaxNode, parent, this);
+			case 'boolean': return new BooleanNode(syntaxNode, parent, this);
+			case 'undefined': return new UndefinedNode(syntaxNode, parent, this);
+			case 'create': return this.animate(syntaxNode.block, parent, this); // 'create' nodes contain a 'block' node
+			case 'clone': return new CloneNode(syntaxNode, parent, this);
+			case 'insertion': return new InsertionNode(syntaxNode, parent, this);
+			case 'collector': return new CollectorNode(syntaxNode, parent, this);
+		}
+		throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
 	}
-	throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
 }
 
 let idCounter = 0;
@@ -143,10 +145,10 @@ class ObjectNode extends Node {
 					const key = statement.keyType == 'number' ? JSON.parse(statement.key)
 						: statement.keyType == 'boolean' ? JSON.parse(statement.key)
 						: statement.key;
-					this.properties.set(key, this.nodeFactory(statement.value, null, this.nodeFactory));
+					this.properties.set(key, this.nodeFactory.animate(statement.value, null));
 					break;
 				case 'insertion':
-					this.insertions.push(this.nodeFactory(statement, null, this.nodeFactory));
+					this.insertions.push(this.nodeFactory.animate(statement, null));
 					break;
 			}
 		}
@@ -224,8 +226,8 @@ class ReferenceNode extends Node {
 class CloneNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		this.source = this.nodeFactory(syntaxNode.source, this, this.nodeFactory);
-		this.arguments = this.nodeFactory(syntaxNode.block, this, this.nodeFactory);
+		this.source = this.nodeFactory.animate(syntaxNode.source, this);
+		this.arguments = this.nodeFactory.animate(syntaxNode.block, this);
 
 		// when value changes, destruct previous value
 		this.onChangeListener = {
@@ -259,15 +261,15 @@ class CloneNode extends Node {
 		const argumentsScopeExt = this.parentScope.extend();
 
 		// create clones without resolving references, so should be inert and have no side effects yet
-		const sourceClone = this.nodeFactory(sourceObject.syntaxNode, null, this.nodeFactory);
-		const argumentsClone = this.nodeFactory(argumentsObject.syntaxNode, null, this.nodeFactory);
+		const sourceClone = this.nodeFactory.animate(sourceObject.syntaxNode, null);
+		const argumentsClone = this.nodeFactory.animate(argumentsObject.syntaxNode, null);
 
 		// Mapping between nodes in the child, and the scope that they belong to
 		// (either source or arguments scope, depending on where the node came from)
 		// References in the child will be resolved using whichever scope they belong to (see notes on "Nearest Scope")
 		const scopeMap = new Map();
 
-		const child = this.nodeFactory({type: 'block', statements: []}, null, this.nodeFactory); // temporary object node, so don't attach listeners?
+		const child = this.nodeFactory.animate({type: 'block', statements: []}, null); // temporary object node, so don't attach listeners?
 		for (const [key, valueNode] of argumentsClone.properties.entries()) {
 			child.properties.set(key, valueNode);
 			scopeMap.set(valueNode, argumentsScopeExt);
@@ -311,7 +313,7 @@ class BinopNode extends Node {
 	// TODO: support more than 2 operands?
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		this.operands = [this.nodeFactory(syntaxNode.left, this, this.nodeFactory), this.nodeFactory(syntaxNode.right, this, this.nodeFactory)];
+		this.operands = [this.nodeFactory.animate(syntaxNode.left, this), this.nodeFactory.animate(syntaxNode.right, this)];
 		this.operator = syntaxNode.operator;
 	}
 
@@ -367,12 +369,12 @@ class MemberAccessNode extends Node {
 				self.updateTarget();
 			}
 		}
-		this.source = this.nodeFactory(syntaxNode.source, this.sourceListener, this.nodeFactory);
+		this.source = this.nodeFactory.animate(syntaxNode.source, this.sourceListener);
 		if (typeof syntaxNode.key == 'string') {
 			const dummySyntaxNode = { type: 'string', value: `\"${syntaxNode.key}\"` }; // convert the key to a string by wrapping in quotes
-			this.key = this.nodeFactory(dummySyntaxNode, this.sourceListener, this.nodeFactory);
+			this.key = this.nodeFactory.animate(dummySyntaxNode, this.sourceListener);
 		} else {
-			this.key = this.nodeFactory(syntaxNode.key, this.sourceListener, this.nodeFactory);
+			this.key = this.nodeFactory.animate(syntaxNode.key, this.sourceListener);
 		}
 	}
 	resolveReferences (scope) {
@@ -411,8 +413,8 @@ class MemberAccessNode extends Node {
 class InsertionNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		this.targetNode = this.nodeFactory(syntaxNode.target, this, this.nodeFactory);
-		this.valueNode = this.nodeFactory(syntaxNode.value, this, this.nodeFactory);
+		this.targetNode = this.nodeFactory.animate(syntaxNode.target, this);
+		this.valueNode = this.nodeFactory.animate(syntaxNode.value, this);
 
 		this.targetVal = undefined;
 	}
@@ -461,7 +463,7 @@ class CollectorNode extends Node {
 		for (const [index, valueNode] of [...this.items.values()].entries()) {
 			this.properties.set(index, valueNode);
 		}
-		const lengthNode = this.nodeFactory({type: 'number', value: this.items.size}, null, this.nodeFactory);
+		const lengthNode = this.nodeFactory.animate({type: 'number', value: this.items.size}, null);
 		lengthNode.update(); // initialize number node
 		this.properties.set('length', lengthNode);
 		return this;
@@ -493,7 +495,7 @@ class CollectorNode extends Node {
 class UnaryNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		this.operand = this.nodeFactory(syntaxNode.value, this, this.nodeFactory);
+		this.operand = this.nodeFactory.animate(syntaxNode.value, this);
 		this.operator = syntaxNode.operator;
 	}
 	resolveReferences (scope) {
@@ -596,10 +598,10 @@ class Interpreter {
 	// pass in a scope, a dictionary of named Node objects that you provide.
 	// This will allow you provide "input" arguments to the program, and change them
 	// dynamically to see how they affect the program output.
-	interpretTest(scope = Scope.EMPTY, blockType = 'Indent', nodeFactory = NodeFactory) {
+	interpretTest(scope = Scope.EMPTY, blockType = 'Indent', nodeFactory = new NodeFactory()) {
 		const encoded = new PreProcessor(this.source).encodeIndentation();
 		const AST = parse(encoded, blockType);
-		const root = nodeFactory(AST, null, nodeFactory);
+		const root = nodeFactory.animate(AST, null, nodeFactory);
 		root.resolveReferences(scope);
 	
 		if (VERBOSE) console.log(root);
