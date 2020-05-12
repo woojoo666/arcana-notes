@@ -2493,6 +2493,35 @@ without giving away what keys are being used to check identity
 * the NodeFactory injection pattern can basically be used to create different flavors of interpreters, with specialized nodes
 * and can be useful for creating optimizations (eg if we wanted to create a CloneNode that is optimized whenever acting on Arrays)
 
+### Interpreter Implementation - Cloning Revisited
+
+* instead of the complex mechanism we had before
+* where each node has to provide a method for cloning itself
+* we simply take the syntax nodes of the source and arguments objects
+* and re-create them (aka feed them back into interpreter)
+* but make sure not to resolve references, because we don't want to actually execute any behavior yet
+
+* after cloning/re-creating the source and arguments
+* we merge them (this is basically the partitions-replacement step) into a single child object
+* and then resolve references
+    * (using source scope for partitions that came from the source, and arguments scope for partitions that came from the arguments)
+
+* this ends up being a whole lot cleaner and less hacky
+* than what we had before
+* and I could get rid of the `clone()` method in every Node
+
+* also, originally we had soem special hacky logic in ReferenceNode `clone()`
+* where we preserved the original target, and only re-binded if the arguments scope replaced the reference
+* (see commit 4177cff532e1098b328df15921ee02cc05d175f8 to see what we had before)
+* now we don't need that anymore
+* we don't need to preserve the original target when creating new reference nodes
+* because during reference resolution, we can just take the original scope used for the original reference node
+* and use it on the new reference node
+
+* it also kinda tells us how cloning collectors should work
+* originally we had left the `clone()` function un-implemented
+* but now that there is no `clone()` function, it kinda follows naturally how it should behave during cloning
+* insertions will naturally _not_ be carried over
 
 # --------------------------------------------------- loose ends below --------------------------------------------------
 

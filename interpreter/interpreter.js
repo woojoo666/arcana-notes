@@ -35,7 +35,7 @@ Notice that it is recursive, so every object node contains child object nodes,
 // see section "interpreter mechanism and implementation brainstorm" to see how all this works
 
 // TODO: I think a cleaner way to implement the interpreter, is to have the grammar post-processors
-//       create Nodes directly, and then in the interpreter, just call rootNode.clone().
+//       create Nodes directly, and then in the interpreter, just clone the rootNode.
 
 class Scope {
 	constructor (parent, map) {
@@ -109,9 +109,6 @@ class Node {
 	evaluate () {
 		throw Error(`Unimplemented ${this.constructor.name}.evaluate() function`);
 	}
-	clone (parent) {
-		throw Error(`Unimplemented ${this.constructor.name}.clone() function`);
-	}
 	update () {
 		if (VERBOSE) console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
 
@@ -127,7 +124,7 @@ class Node {
 
 // represents an object, with properties and insertions
 // Note that ObjectNodes never update, so they should listen to nobody, and have no listeners.
-// This is why we pass "null" as the "parent" argument in calls to clone() and NodeFactory()
+// This is why we pass "null" as the "parent" argument in calls to NodeFactory()
 //
 // TODO: support computed properties. This will mean that nodes will have to start listening to object nodes for changes to properties.
 //       We will also have to check for property collisions, and use `overdefined` whenever there are two properties with the same key.
@@ -159,16 +156,6 @@ class ObjectNode extends Node {
 	}
 	get (key) {
 		return this.getNode(key) && this.getNode(key).value;
-	}
-	clone (parent) {
-		let newNode = this.nodeFactory({type: 'block', statements: []}, null, this.nodeFactory); // create ObjectNode using a dummy syntaxNode
-		for (const [key, valueNode] of this.properties.entries()) {
-			newNode.properties.set(key, valueNode.clone(null));
-		}
-		for (const insertion of this.insertions) {
-			newNode.insertions.push(insertion.clone(null));
-		}
-		return newNode;
 	}
 	// the value of an object node is itself. Note that this means an object node never calls update(),
 	// which is fine.
@@ -208,20 +195,6 @@ class ReferenceNode extends Node {
 		super(syntaxNode, parent, nodeFactory);
 		this.targetName = syntaxNode.name;
 	}
-	// Note that a cloned reference node will point to the original target.
-	// The function resolveReferences() will rebind the target if necessary.
-	clone (parent, scope) {
-		let newNode = this.nodeFactory(this.syntaxNode, parent, this.nodeFactory); // create reference node using a dummy syntaxNode
-		newNode.target = this.target; // preserve the original target
-		// TODO: feels ugly to manually add listeners here, esp. if the target is inside the source.
-		//       For example, if we have `source: (x: 10, y: x)`, then during cloning,
-		//       the cloned reference clone.y will point to source.x. Only during reference resolution,
-		//       will the reference be updated to point to clone.x. Can we guarantee that this always happens?
-		if (this.target && !(this.target instanceof ObjectNode)) {
-			this.target.addListener(newNode);
-		}
-		return newNode;
-	}
 	// Reference resolution happens at the end of a cloning operation.
 	// So we also use it to trigger evaluation, because the Reference nodes
 	// are at the "leaves" of the clone, so the evaluation will ripple all the
@@ -247,15 +220,10 @@ class ReferenceNode extends Node {
 	}
 }
 
-// TODO: can we represent Node as simply a CloneNode without a source?
-// Note: don't confuse CloneNode and clone(), they are completely separate things.
-// CloneNodes represent the clone operation in the language. clone() is a function
-// used in the interpreter to create a copy of a Node.
+// TODO: can we represent ObjectNode as simply a CloneNode without a source?
 class CloneNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		if (syntaxNode.isClone) return; // a hack for cloning
-
 		this.source = this.nodeFactory(syntaxNode.source, this, this.nodeFactory);
 		this.arguments = this.nodeFactory(syntaxNode.block, this, this.nodeFactory);
 
@@ -270,20 +238,14 @@ class CloneNode extends Node {
 		}
 		this.addListener(this.onChangeListener);
 	}
-	clone (parent) {
-		const newNode = this.nodeFactory({type: 'clone', isClone: true}, parent, this.nodeFactory);
-		newNode.source = this.source.clone(newNode);
-		newNode.arguments = this.arguments.clone(newNode);
-		return newNode;
-	}
 	resolveReferences (scope) {
 		// Note: arguments block is treated as a template, should be left un-resolved and should not perform any insertions.
 		//       The arguments block is used during evaluate() to create the child object, and we resolve references on the child.
 		this.parentScope = scope; // store the current scope so it can be used during reference resolution in evaluate().
 		this.source.resolveReferences(scope); // this will most likely trigger an update and evaluate(), so make sure this.parentScope is already set before calling this
 	}
-	// TODO: I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
-	// TODO: this is all really hack, I'm not sure if it will handle certain edge cases like, if a node
+	// TODO: account for cloning primitives? I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
+	// TODO: this is all really hacky, I'm not sure if it will handle certain edge cases like, if a node
 	//       inside the sourceObject changes (but not the sourceObject itself), will it update the corresponding
 	//       node inside the cloned object?
 	// Note: we don't have to account for undefined source, since an undefined source should never trigger an evaluate()
@@ -293,8 +255,12 @@ class CloneNode extends Node {
 		const argumentsObject = this.arguments.value;
 
 		// leverage javascript inheritance & prototype tree for scopes
-		const sourceScope = sourceObject.scope.extend();
-		const argumentsScope = this.parentScope.extend();
+		const sourceScopeExt = sourceObject.scope.extend();
+		const argumentsScopeExt = this.parentScope.extend();
+
+		// create clones without resolving references, so should be inert and have no side effects yet
+		const sourceClone = this.nodeFactory(sourceObject.syntaxNode, null, this.nodeFactory);
+		const argumentsClone = this.nodeFactory(argumentsObject.syntaxNode, null, this.nodeFactory);
 
 		// Mapping between nodes in the child, and the scope that they belong to
 		// (either source or arguments scope, depending on where the node came from)
@@ -302,35 +268,32 @@ class CloneNode extends Node {
 		const scopeMap = new Map();
 
 		const child = this.nodeFactory({type: 'block', statements: []}, null, this.nodeFactory); // temporary object node, so don't attach listeners?
-		for (const [key, valueNode] of argumentsObject.properties.entries()) {
-			const node = valueNode.clone(null);
-			child.properties.set(key, node);
-			scopeMap.set(node, argumentsScope);
+		for (const [key, valueNode] of argumentsClone.properties.entries()) {
+			child.properties.set(key, valueNode);
+			scopeMap.set(valueNode, argumentsScopeExt);
 		}
 
 		// inherit properties from source if they aren't already in arguments
-		for (const [key, valueNode] of sourceObject.properties.entries()) {
+		for (const [key, valueNode] of sourceClone.properties.entries()) {
 			if (!child.properties.has(key)) {
-				const node = valueNode.clone(null);
-				child.properties.set(key, node);
-				scopeMap.set(node, sourceScope);
+				child.properties.set(key, valueNode);
+				scopeMap.set(valueNode, sourceScopeExt);
 			}
 		}
 
-		for (const insertion of sourceObject.insertions) {
-			const node = insertion.clone(null);
-			child.insertions.push(node);
-			scopeMap.set(node, sourceScope); // add insertion to scopeMap so it will be resolved during reference resolution
+		// add insertions to child, and also add them to scopeMap so they will be resolved during reference resolution
+		for (const insertion of sourceClone.insertions) {
+			child.insertions.push(insertion);
+			scopeMap.set(insertion, sourceScopeExt);
 		}
-		for (const insertion of argumentsObject.insertions) {
-			const node = insertion.clone(null);
-			child.insertions.push(node);
-			scopeMap.set(node, argumentsScope);
+		for (const insertion of argumentsClone.insertions) {
+			child.insertions.push(insertion);
+			scopeMap.set(insertion, argumentsScopeExt);
 		}
 
 		for (const [key, valueNode] of child.properties.entries()) {
-			sourceScope.set(key, valueNode);
-			argumentsScope.set(key, valueNode);
+			sourceScopeExt.set(key, valueNode);
+			argumentsScopeExt.set(key, valueNode);
 		}
 
 		for (const [node, scope] of scopeMap.entries()) {
@@ -348,7 +311,6 @@ class BinopNode extends Node {
 	// TODO: support more than 2 operands?
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		if (syntaxNode.isClone) return; // a hack for cloning
 		this.operands = [this.nodeFactory(syntaxNode.left, this, this.nodeFactory), this.nodeFactory(syntaxNode.right, this, this.nodeFactory)];
 		this.operator = syntaxNode.operator;
 	}
@@ -357,12 +319,6 @@ class BinopNode extends Node {
 		for (const operand of this.operands) {
 			operand.resolveReferences(scope);
 		}
-	}
-	clone(parent) {
-		const newNode = this.nodeFactory({type: 'binop', isClone: true}, parent, this.nodeFactory); // create new empty binop node
-		newNode.operands = this.operands.map(operand => operand.clone(newNode));
-		newNode.operator = this.operator;
-		return newNode;
 	}
 	evaluate () {
 		// TODO: should not be dependent on javascript's type coercion. Should be using custom defined coercion methods
@@ -403,7 +359,6 @@ class BinopNode extends Node {
 class MemberAccessNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		if (syntaxNode.isClone) return; // a hack for cloning
 
 		const self = this;
 		// a fake node to listen to source changes and forward updates to updateTarget()
@@ -419,12 +374,6 @@ class MemberAccessNode extends Node {
 		} else {
 			this.key = this.nodeFactory(syntaxNode.key, this.sourceListener, this.nodeFactory);
 		}
-	}
-	clone (parent) {
-		const newNode = this.nodeFactory({type: 'memberAccess', isClone: true}, parent, this.nodeFactory);
-		newNode.source = this.source.clone(newNode);
-		newNode.key = this.key.clone(newNode);
-		return newNode;
 	}
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
@@ -462,17 +411,10 @@ class MemberAccessNode extends Node {
 class InsertionNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		if (syntaxNode.isClone) return; // a hack for cloning
 		this.targetNode = this.nodeFactory(syntaxNode.target, this, this.nodeFactory);
 		this.valueNode = this.nodeFactory(syntaxNode.value, this, this.nodeFactory);
 
 		this.targetVal = undefined;
-	}
-	clone (parent) {
-		const newNode = this.nodeFactory({type: 'insertion', isClone: true}, parent, this.nodeFactory);
-		newNode.targetNode = this.targetNode.clone(newNode);
-		newNode.valueNode = this.valueNode.clone(newNode);
-		return newNode;
 	}
 	resolveReferences (scope) {
 		this.targetNode.resolveReferences(scope);
@@ -507,9 +449,6 @@ class CollectorNode extends Node {
 		super(syntaxNode, parent, nodeFactory);
 		this.items = new Set();
 		this.value = this; // we need an initial value to trigger any reference nodes to update, just like an ObjectNode
-	}
-	clone () {
-		throw Error('unimplemented Collector clone'); // TODO
 	}
 	resolveReferences () {
 		// CollectorNodes act like NumberNodes and call update() during reference resolution
@@ -554,15 +493,8 @@ class CollectorNode extends Node {
 class UnaryNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		if (syntaxNode.isClone) return; // a hack for cloning
 		this.operand = this.nodeFactory(syntaxNode.value, this, this.nodeFactory);
 		this.operator = syntaxNode.operator;
-	}
-	clone (parent) {
-		const newNode = this.nodeFactory({type: 'unaryop', isClone: true}, parent, this.nodeFactory);
-		newNode.operand = this.operand.clone(newNode);
-		newNode.operator = this.operator;
-		return newNode;
 	}
 	resolveReferences (scope) {
 		this.operand.resolveReferences(scope);
@@ -594,9 +526,6 @@ class PrimitiveNode extends Node {
 	getRawValue() {
 		throw Error(`Unimplemented ${this.constructor.name}.getRawValue() function`);
 	}
-	clone (parent) {
-		throw Error(`Unimplemented ${this.constructor.name}.getRawValue() function`);
-	}
 	// Primitive nodes act like references to global objects (eg NumberNodes act like
 	// reference to some global library of Number objects), so just like ReferenceNodes,
 	// they call update() during reference resolution to trigger the initial evaluation pass.
@@ -607,17 +536,14 @@ class PrimitiveNode extends Node {
 
 class StringNode extends PrimitiveNode {
 	getRawValue () { return JSON.parse(this.syntaxNode.value); }
-	clone (parent) { return this.nodeFactory(this.syntaxNode, parent, this.nodeFactory); }
 }
 
 class NumberNode extends PrimitiveNode {
 	getRawValue () { return +this.syntaxNode.value; }
-	clone (parent) { return this.nodeFactory(this.syntaxNode, parent, this.nodeFactory); }
 }
 
 class BooleanNode extends PrimitiveNode {
 	getRawValue () { return JSON.parse(this.syntaxNode.value); }
-	clone (parent) { return this.nodeFactory(this.syntaxNode, parent, this.nodeFactory); }
 }
 
 // UndefinedNodes never change value from their initial value of undefined, so we have to manually trigger any updates.
@@ -629,7 +555,6 @@ class BooleanNode extends PrimitiveNode {
 //       UNDEFINED = new UndefinedNode(), which would never update and would never have any listeners.
 class UndefinedNode extends PrimitiveNode {
 	getRawValue () { return undefined; }
-	clone (parent) { return this.nodeFactory(this.syntaxNode, parent, this.nodeFactory); }
 	update() { this.listeners.forEach(listener => listener.update()) }
 }
 
