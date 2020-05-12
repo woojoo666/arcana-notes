@@ -2292,20 +2292,106 @@ such that every actor is actually represented by a main actor and a chain of inb
 * also sort of looks like the face of a firefly looking at the viewer
 
 ```
-*\ /*
-(OwO)
-(o o)
-(o o)
-
+			*\ /*
+			(OwO)
+			/o o\
+			\o o/
+			 '^'
 ```
 
 * alternatives with similar properties: ovo, oxo
 
 
+### Firefly Online - Server Nodes and Virtual Objects
+
+* declare a new node type ServerNode
+* and add it to the base scope
+* so during interpretation, any references to a `Server` will reference the server node
+* though the only time a `Server` should be referenced is when you are cloning it
+* eg
+
+        Server:
+            index:
+                <>html
+                    ...
+
+* rather, whenever a client tries to connect to the host computer, it will just be cloning the server, `Server(params)`
+* (note that we currently only support one Server node per interpeter)
+
+
+* then what happens is
+* the server sends the client the syntax node of the Server object
+* the client has its own interpreter, and constructs the graph for all nodes inside the Server object
+* the server also sends over a "Virtual Scope" for the reference resolution phase
+* any time a child pulls from the virtual scope, they actually retrieve a "virtual object" node
+* that corresponds to an actual ObjectNode inside the server
+* any time the child performs operations on a virtual object, it returns another virtual object
+* eg if a child tries to access `foo` and it only exists in the server scope, then the child will get a virtual `foo` node
+* then if the child tries to access `foo.bar`, it will get a virtual node corresponding to the value at `foo.bar`
+* if the value returned from the operation is a primitive (eg string, number), only then will it actually send it to the client as a primitive, and not a virtual node
+
+* it works both ways too
+* if the client inserts one of its object into the server
+* the server gets a virtual object
+* that it can interact with
+
+
+### Firefly Online - Flexible Content Display
+
+
+* if the server is serving a raw object, you can view it in raw object mode (tree-style object view, kinda like chrome dev tools)
+* if server serves an html file, will view it in html mode
+  
+* url paths is the same as chaining property access
+* we talked about this before (// TODO: FIND REFERENCED SECTION)
+* so going to `somehost.com/foo/bar/baz` is the same as going to `somehost.com` node and accessing `foo.bar.baz`
+
+* we can make it so that you can even mix and match html and object view
+* so for something like
+
+        somePage: <>html
+            <>body
+                <>div('hello')
+                <>button(onClick: (=> alert('clicked')), text: 'click me')
+        someObj:
+            x: 10
+            inputValue: state
+            someComponent: <>div
+                <>input(onChange: (val => state := val))
+
+* you would get
+
+        somePage: linkView
+        someObj: rawView
+            x: rawView
+            inputValue: rawView
+            someComponent: componentView
+
+* `linkView` is for handling full page html (aka if it contains the `<html>` tag), and just displays a url to the page
+  * in this case will redirect you to `somehost.com/somePage`
+* `rawView` is just the default raw object view
+* `componentView` lets you view inline html components
+
+* in a sense, we can think of the browser as a function wrapper around whatever is returned by the server
+* eg
+
+        url, params >>
+            server: get(url)->
+            serverResponse: server(params)->
+
+            => BrowserView(serverResponse)->
+
+* really, all the ServerNode does is send the object tree and virtual scope
+* its up to the browser to choose how to handle and display the contents
+
+* the client is free to apply their own transformations and custom views to the object tree
+
 -------------------------- loose ends below -----------------------
 
 react-ide crashes when you try to insert a collector, eg `myCollector: collector, myCollector <: collector`??
-
+    actually this is because it is trying to display a circular reference
+    we should instead display objects like chrome dev tools
+    where you have to manually expand each level
 
 todo:
     recursion
@@ -2371,3 +2457,13 @@ and not the actual objects
 maybe we should have a special syntax for this
 that takes any object
 and creates a bunch of references to values in the object
+
+
+---- persistent insertions
+
+one of the problems with the chat exampleif 
+chat client disconnects
+all their messages will be un-inserted
+and disappear
+we explored this before
+how did we fix it?
