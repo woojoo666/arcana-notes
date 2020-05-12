@@ -84,8 +84,24 @@ class Node {
 		this.listeners = [];
 		this.syntaxNode = syntaxNode;
 		this.nodeFactory = nodeFactory;
-		// TODO: a special Undefined object for representing undefined values
-		this.value = undefined; // initialize all nodes to undefined.
+
+// Note that even if all references and primitives are undefined, we still need to do an initial evaluation pass.
+// This may seem counter-intuitive because it might be simpler to just initialize all nodes to undefined, and then
+// only update if they update to a non-undefined value (eg if a reference node gets a value during reference resolution).
+// However, note that Binop and Unary Nodes can return a non-undefined value even when operands are undefined. Eg
+// `undefined == undefined` should return `true`.
+//
+// TODO: Right now we are forcing every node to update during the reference resolution pass, but this can cause many nodes
+//       to update multiple times. Each node technically only needs to update once during the initial evaluation pass.
+//       To optimize this, maybe we can start the initial evaluation pass at the "leaves" of the graph, aka the reference
+//       nodes and primitives, and then work our way towards the root.
+// 
+// TODO: A slight optimization would be to have Binop and Unary nodes just check for undefined operands during
+//       reference resolution and trigger an update themselves. That way, we can initialize all other nodes to undefined
+//       and save a lot of updates. As a bonus, this will allow us to combine all UndefinedNodes into a single global constant,
+//       UNDEFINED = new UndefinedNode(), which would never update and would never have any listeners.
+
+		this.value = undefined;
 
 		if (parent) {
 			this.addListener(parent);
@@ -140,7 +156,7 @@ class ObjectNode extends Node {
 		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
 		this.properties = new Map(); // static properties
 		this.insertions = [];
-		this.value = this;    // ObjectNode are the only nodes where we initialize value at beginning, so cloning doesn't break
+		this.value = this;    // ObjectNode initialize to themselves at the beginning, so cloning doesn't break
 
 		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
@@ -162,8 +178,7 @@ class ObjectNode extends Node {
 	get (key) {
 		return this.getNode(key) && this.getNode(key).value;
 	}
-	// the value of an object node is itself. Note that this means an object node never calls update(),
-	// which is fine.
+	// the value of an object node is itself.
 	evaluate() {
 		return this;
 	}
@@ -183,6 +198,7 @@ class ObjectNode extends Node {
 		for (const insertion of this.insertions) {
 			insertion.resolveReferences(this.scope);
 		}
+		this.update();
 	}
 	destruct() {
 		// TODO: remove listeners from children? or are all children getting garbage-collected anyways?
@@ -200,12 +216,12 @@ class ReferenceNode extends Node {
 		super(syntaxNode, parent, nodeFactory);
 		this.targetName = syntaxNode.name;
 	}
-	// Reference resolution happens at the end of a cloning operation.
-	// So we also use it to trigger evaluation, because the Reference nodes
+	// TODO: Reference resolution happens at the end of a cloning operation.
+	// So we should use it to trigger evaluation, because the Reference nodes
 	// are at the "leaves" of the clone, so the evaluation will ripple all the
 	// way to the root.
-	// Note that resolveReferences() is also used to override references in a clone operation.
 	resolveReferences (scope) {
+		// TODO: we should only unbind and re-bind if the target changes?
 		if (this.target) {
 			this.target.removeListener(this); // unbind from old target
 		}
@@ -216,7 +232,7 @@ class ReferenceNode extends Node {
 		} else {
 			if (VERBOSE) console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
 		}
-		this.update(); // note that we always trigger an update, even if undefined (see description of UndefinedNode to see why)
+		this.update();
 	}
 	evaluate () {
 		return this.target && this.target.value;
@@ -246,16 +262,20 @@ class CloneNode extends Node {
 		//       The arguments block is used during evaluate() to create the child object, and we resolve references on the child.
 		this.parentScope = scope; // store the current scope so it can be used during reference resolution in evaluate().
 		this.source.resolveReferences(scope); // this will most likely trigger an update and evaluate(), so make sure this.parentScope is already set before calling this
+		this.update();
 	}
 	// TODO: account for cloning primitives? I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
 	// TODO: this is all really hacky, I'm not sure if it will handle certain edge cases like, if a node
 	//       inside the sourceObject changes (but not the sourceObject itself), will it update the corresponding
 	//       node inside the cloned object?
-	// Note: we don't have to account for undefined source, since an undefined source should never trigger an evaluate()
 	evaluate () {
 		// get the values at the source and arguments nodes
 		const sourceObject = this.source.value;
 		const argumentsObject = this.arguments.value;
+
+		if (!(sourceObject instanceof ObjectNode) || !(argumentsObject instanceof ObjectNode)) {
+			return undefined;
+		}
 
 		// create clones without resolving references, so should be inert and have no side effects yet
 		const sourceClone = this.nodeFactory.animate(sourceObject.syntaxNode, null);
@@ -321,6 +341,7 @@ class BinopNode extends Node {
 		for (const operand of this.operands) {
 			operand.resolveReferences(scope);
 		}
+		this.update();
 	}
 	evaluate () {
 		// TODO: should not be dependent on javascript's type coercion. Should be using custom defined coercion methods
@@ -365,9 +386,7 @@ class MemberAccessNode extends Node {
 		const self = this;
 		// a fake node to listen to source changes and forward updates to updateTarget()
 		this.sourceListener = {
-			update() {
-				self.updateTarget();
-			}
+			update: () => this.updateTarget(),
 		}
 		this.source = this.nodeFactory.animate(syntaxNode.source, this.sourceListener);
 		if (typeof syntaxNode.key == 'string') {
@@ -380,6 +399,7 @@ class MemberAccessNode extends Node {
 	resolveReferences (scope) {
 		this.source.resolveReferences(scope);
 		this.key.resolveReferences(scope);
+		this.update();
 	}
 	// Note: target should be a Node, not a value!
 	evaluateTarget() {
@@ -421,6 +441,7 @@ class InsertionNode extends Node {
 	resolveReferences (scope) {
 		this.targetNode.resolveReferences(scope);
 		this.valueNode.resolveReferences(scope);
+		this.update();
 	}
 	evaluate() {
 		return this.targetNode && this.targetNode.value;
@@ -487,7 +508,7 @@ class CollectorNode extends Node {
 		this.update();
 	}
 	removeItem (valueNode) {
-		this.items.remove(valueNode)
+		this.items.delete(valueNode)
 		this.update();
 	}
 }
@@ -500,6 +521,7 @@ class UnaryNode extends Node {
 	}
 	resolveReferences (scope) {
 		this.operand.resolveReferences(scope);
+		this.update();
 	}
 	evaluate () {
 		switch (this.operator) {
@@ -515,7 +537,16 @@ class UnaryNode extends Node {
 // These are just wrappers around javascript primitives, eg String, Boolean, Numbers.
 // All of them start with value undefined, and then during reference resolution,
 // will update once with the correct value. Then they will never change value again.
+//
+// Primitives act like references (eg we can think of all NumberNodes as a reference to some
+// global library of number objects). Thus, PrimitiveNodes act like ReferenceNodes:
+//  1. call update() during reference resolution to start initial evaluation pass
+//  2. listeners are triggered on first update() call
 class PrimitiveNode extends Node {
+	constructor(syntaxNode, parent, nodeFactory) {
+		super(syntaxNode, parent, nodeFactory);
+		this.value = {}; // a hack to guarantee that listeners are triggered on first update() call
+	}
 	// Note that while the AST preserves all primtive values as a strings (eg 5 would be represented as "5"),
 	// the interpreter parses the values to Javascript primitives before returning it.
 	// Other nodes like BinopNode.evaluate() also return raw javascript primitives.
@@ -528,9 +559,6 @@ class PrimitiveNode extends Node {
 	getRawValue() {
 		throw Error(`Unimplemented ${this.constructor.name}.getRawValue() function`);
 	}
-	// Primitive nodes act like references to global objects (eg NumberNodes act like
-	// reference to some global library of Number objects), so just like ReferenceNodes,
-	// they call update() during reference resolution to trigger the initial evaluation pass.
 	resolveReferences (scope) {
 		this.update(); // TODO: maybe we should override update() to not do anything, because NumberNodes never change? would be a slight optimization.
 	}
@@ -548,16 +576,8 @@ class BooleanNode extends PrimitiveNode {
 	getRawValue () { return JSON.parse(this.syntaxNode.value); }
 }
 
-// UndefinedNodes never change value from their initial value of undefined, so we have to manually trigger any updates.
-// TODO: in most cases, we never have to trigger any updates, because most nodes operating on an UndefinedNode would also have a value
-//       of undefined (eg CloneNodes, MemberAccessNodes, etc). The only reason why we manually trigger an update here is because
-//       of Binop and Unary Nodes, which are the only nodes that can return a non-undefined value even when operands are undefined.
-//       A slight optimization would be to have Binop and Unary nodes just check for UndefinedNode operands during reference resolution
-//       and trigger an update themselves. That way, we can actually combine all UndefinedNodes into a single global constant,
-//       UNDEFINED = new UndefinedNode(), which would never update and would never have any listeners.
 class UndefinedNode extends PrimitiveNode {
 	getRawValue () { return undefined; }
-	update() { this.listeners.forEach(listener => listener.update()) }
 }
 
 class Interpreter {

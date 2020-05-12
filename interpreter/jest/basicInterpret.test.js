@@ -83,7 +83,7 @@ test('handling undefined', () => {
     expect(interpret('foo: (), bar: foo[key]').get('bar')).toEqual(undefined); // prop access: undefined key
     expect(interpret('foo: bar[key]').get('foo')).toEqual(undefined);          // prop access: undefined source and key
 
-    expect(interpret('foo: x+y').get('foo')).toEqual(undefined);               // operators: sum. TODO: right now this just returns undefined, maybe we should return NaN?
+    expect(interpret('foo: x+y').get('foo')).toEqual(NaN);                     // operators: sum. TODO: right now this just returns NaN, maybe we should return undefined?
     expect(interpret('foo: "" == undefined').get('foo')).toEqual(false);       // operators: reference equality
     expect(interpret('foo: undefined == undefined').get('foo')).toEqual(true); // operators: reference equality
     // TODO: when we support coercing to boolean, test boolean operators, eg `foo: !x` should return `foo = true`
@@ -102,6 +102,13 @@ test('handling undefined', () => {
     // TODO: when we support computed properties, test undefined computed prop, eg `[undefined]: 100` and `[foo]: 100` (where foo is undefined)
 });
 
+// make sure all nodes evaluate at least once, even if all references are undefined.
+test('initial evaluation pass', () => {
+    expect(interpret('foo: x == y').get('foo')).toEqual(true);                 // make sure reference nodes send updates even when undefined
+    expect(interpret('foo: x.y == a.b').get('foo')).toEqual(true);
+    expect(interpret('foo: () == ()').get('foo')).toEqual(false);              // make sure objects can trigger initial evaluate pass
+})
+
 test('functions', () => {
     expect(interpret('=> 100').get('_return')).toEqual(100);
     expect(interpret('x: (=> 100), y: x()->').get('y')).toEqual(100);
@@ -111,6 +118,12 @@ test('self reference using "this"', () => {
     expect(interpret('x: 100, y: this.x').get('y')).toEqual(100);
     expect(interpret('foo: (x: 100), clone: foo(y: this.x), bar: clone.y').get('bar')).toEqual(100); // test self reference in cloning
 })
+
+test('collectors and insertion', () => {
+    // TODO
+    // TODO: test un-insertions
+    // TODO: test inserting "this"
+});
 
 // TODO: test cloning (remember to test cloning primitives)
 // TODO: test insertion and inserting undefined
