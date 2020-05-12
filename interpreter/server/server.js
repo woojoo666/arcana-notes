@@ -7,11 +7,14 @@ const ServerNodeMap = new Map();
 
 var app = express();
 	app.use(express.static(__dirname));
-	app.get('/someGetRequest', function(req, res, next) {
-	   console.log('receiving get request');
-	});
-	app.post('/somePostRequest', function(req, res, next) {
-	   console.log('receiving post request');
+	app.get('/:route', function (req, res, next) {
+		const route = req.params.route;
+		const serverNode = ServerNodeMap.get(route);
+		if (serverNode) {
+			console.log('creating new clone of ServerNode ')
+		} else {
+			res.status(404).send('No ServerNode exists at this route.');
+		}
 	});
 	app.listen(80); //port 80 need to run as root
 
