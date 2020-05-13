@@ -2536,6 +2536,39 @@ without giving away what keys are being used to check identity
 * so we had `foo: Server(port: 3000, index: "<html>hello world</html>")`
 * then if we inspect `serverCollector` we should be able to find `foo`, and we can extract the `index` page and serve it using our server
 
+### Cloning SyntaxNodes vs Live Nodes
+
+* in section "Interpreter Implementation - Cloning Revisited"
+* we talked about how I moved away from cloning nodes directly
+* and instead retrieving the original syntax node for the source
+* and re-creating it from scratch
+
+* this was a lot simpler and cleaner
+
+* however, actually this may have dropped performance
+* for example, if the source was actually the result of a giant computation
+* eg `src: someHugeFn(100)->`
+* if we clone the syntax node, we end up re-computing the entire thing
+* but if we just clone the live node, we only clone the result value
+
+### Cloning Clones and Scope Trees
+
+I am running into issues with cloning clones
+usually an object stores a scope
+and that scope is used during cloning (when looking for sourceScope)
+
+recall that cloning just re-creates the original syntax node
+and then resolves references from scratch
+
+during cloning, we resolve each property based on their original scope,
+so either source scope or argument scope
+
+but what if you clone a clone
+what scope should you give the child?
+
+you would somehow have to remember the original property-to-scope mappings for each property in the source
+so we can resolve the re-created source object
+
 # --------------------------------------------------- loose ends below --------------------------------------------------
 
 
@@ -2618,5 +2651,3 @@ all their messages will be un-inserted
 and disappear
 we explored this before
 how did we fix it?
-
-------- anonymous property access and phishing

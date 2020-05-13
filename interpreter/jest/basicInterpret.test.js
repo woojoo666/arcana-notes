@@ -125,6 +125,22 @@ test('collectors and insertion', () => {
     // TODO: test inserting "this"
 });
 
+test('cloning', () => {
+    expect(() => interpret('foo: (), bar: foo()')).not.toThrow();        // sanity check
+    expect(() => interpret('foo: ()()')).not.toThrow();                  // inline cloning
+    
+    expect(interpret('foo: (x: 100), bar: foo().x').get('bar')).toEqual(100);
+    expect(interpret('foo: ()(x: 100), bar: foo.x').get('bar')).toEqual(100);  // clone empty object
+    expect(interpret('foo: (x: 100)(y: x), bar: foo.y').get('bar')).toEqual(100);
+    expect(interpret('foo: (x: 100)(y: x), bar: foo.y').get('bar')).toEqual(100);
+    
+    // FAILING TEST, see section "Cloning Clones and SCope Trees"
+    // expect(interpret('foo: (x: 100)(), bar: foo().x').get('bar')).toEqual(100);  // clone a clone
+
+
+    // TODO: more tests ? test scoping (source scope and argument scope and child scope) ? cloning primitives ?
+})
+
 // TODO: test cloning (remember to test cloning primitives)
 // TODO: test insertion and inserting undefined
 // TODO: test binops and unary ops
