@@ -91,7 +91,7 @@ let idCounter = 0;
 class Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		this.id = idCounter++;
-		this.listeners = [];
+		this.listeners = new Set();
 		this.syntaxNode = syntaxNode;
 		this.nodeFactory = nodeFactory;
 		this.children = new Set();
@@ -130,15 +130,10 @@ class Node {
 		this.children.delete(node);
 	}
 	addListener (listener) {
-		if (this.listeners.indexOf(listener) < 0)
-			this.listeners.push(listener);
+		this.listeners.add(listener);
 	}
 	removeListener (listener) {
-		// removes one instance of listener
-		const index = this.listeners.indexOf(listener)
-		if (index >= 0) {
-			this.listeners.splice(index, 1);
-		}
+		this.listeners.delete(listener);
 	}
 	resolveReferences (scope) {
 		this.children.forEach(child => child.resolveReferences(scope));
@@ -148,16 +143,12 @@ class Node {
 	evaluate () {
 		throw Error(`Unimplemented ${this.constructor.name}.evaluate() function`);
 	}
-	queueNotify () { // call this during evaluate() to force listeners to update
-		this.forceNotifyFlag = true;
-	}
 	update () {
 		if (VERBOSE) console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
 
 		const oldValue = this.value;
 		this.value = this.evaluate();
-		if (this.value != oldValue || this.forceNotifyFlag) {
-			this.forceNotifyFlag = false;
+		if (this.value != oldValue) {
 			for (const listener of this.listeners) {
 				listener.update();
 			}
@@ -529,6 +520,10 @@ class CollectorNode extends ObjectNode {
 		this.update();
 	}
 	getNode (key) {
+		if (key != 'length' || typeof(key) != 'number' || key < 0) {
+			// we can safely ignore these requests since they should never return a value, so we never have to update the reader
+			return undefined;
+		}
 		// note that we never resolve references on these generated references
 		// Instead we just directly set the target value and force them to update()
 		if (!this.properties.has(key)) {
