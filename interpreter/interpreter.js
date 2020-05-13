@@ -182,6 +182,10 @@ class ObjectNode extends Node {
 			return; // CollectorNode extends ObjectNode but has no statements, so exit
 		}
 
+		if (syntaxNode.statements.find(statement => statement.key == '_return') && !syntaxNode.isClone) {
+			return; // temporarily make functions inert until cloned. TODO: remove this
+		}
+
 		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
 				case 'property':
@@ -294,8 +298,12 @@ class CloneNode extends Node {
 			return undefined;
 		}
 
+		//  // temporarily make functions inert until cloned. TODO: remove this
+		let sourceSyntaxNode = sourceObject.syntaxNode;
+		sourceSyntaxNode.isClone = true;
+
 		// create clones without resolving references, so should be inert and have no side effects yet
-		const sourceClone = this.nodeFactory.animate(sourceObject.syntaxNode, null);
+		const sourceClone = this.nodeFactory.animate(sourceSyntaxNode, null);
 		const argumentsClone = this.nodeFactory.animate(argumentsObject.syntaxNode, null);
 
 		const child = this.nodeFactory.animate({type: 'block', statements: []}, null); // temporary object node, so don't attach listeners?
