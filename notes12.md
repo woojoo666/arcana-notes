@@ -2591,7 +2591,7 @@ so we can resolve the re-created source object
 * this is just how flexible and powerful Firefly is
 * firefly's scope mechanism makes it really easy to configure / modify anything
 
-### Interpreter Implementation - problems with collectors and propagating updates
+### Interpreter Implementation - collectors and propagating updates
 
 * was having trouble reading properties from collectors
 * realized that the problem was that the collector never updating listeners
