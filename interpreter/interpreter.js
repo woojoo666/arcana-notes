@@ -47,7 +47,7 @@ class Scope {
 	get(key) { return this.map.has(key) ? this.map.get(key) : this.parent.get(key); }
 	getSelf() { return this.self; }
 	has(key) { return this.map.has(key) || this.parent.has(key); }
-	extend(self) { return new Scope(self, this); }
+	extend(self, map) { return new Scope(self, this, map); } // you can optionally provide a `map` of initial key-value pairs
 	// TODO: should we support deleting properties? If we only delete properties from current scope, subsequent get() requests will just retrieve from parent scopes.
 }
 
@@ -84,6 +84,7 @@ class Node {
 		this.listeners = [];
 		this.syntaxNode = syntaxNode;
 		this.nodeFactory = nodeFactory;
+		this.children = new Set();
 
 // Note that even if all references and primitives are undefined, we still need to do an initial evaluation pass.
 // This may seem counter-intuitive because it might be simpler to just initialize all nodes to undefined, and then
@@ -111,6 +112,13 @@ class Node {
 			throw Error('Do not instantiate the abstract Node class');
 		}
 	}
+	registerChildren(...nodes) {
+		nodes.forEach(node => this.children.add(node));
+		// every node is responsible for resolving references on their children, and calling the destructor of their children
+	}
+	unregisterChild(node) {
+		this.children.delete(node);
+	}
 	addListener (listener) {
 		if (this.listeners.indexOf(listener) < 0)
 			this.listeners.push(listener);
@@ -123,7 +131,7 @@ class Node {
 		}
 	}
 	resolveReferences (scope) {
-		throw Error(`Unimplemented ${this.constructor.name}.resolveReferences() function`);
+		this.children.forEach(child => child.resolveReferences(scope));
 	}
 	// sets the value.
 	// Value should always be an ObjectNode or CloneNode (TODO: make sure this is followed for all Nodes) 
@@ -141,6 +149,9 @@ class Node {
 			}
 		}
 	}
+	destruct () {
+		this.children.forEach(child => child.destruct());
+	}
 }
 
 // represents an object, with properties and insertions
@@ -153,7 +164,6 @@ class ObjectNode extends Node {
 	// TODO: since objects never update(), we don't need to pass in "parent" because there should be no listeners
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
-		this.children = [];   // TODO: should we keep references to children (aka nested blocks)?
 		this.properties = new Map(); // static properties
 		this.insertions = [];
 		this.value = this;    // ObjectNode initialize to themselves at the beginning, so cloning doesn't break
@@ -171,6 +181,8 @@ class ObjectNode extends Node {
 					break;
 			}
 		}
+
+		this.registerChildren(...this.properties.values(), ...this.insertions);
 	}
 	getNode (key) {
 		return this.properties.get(key);
@@ -185,26 +197,10 @@ class ObjectNode extends Node {
 	// recursively called on neighbor nodes, finds and resolves ReferenceNode nodes
 	resolveReferences (scope) {
 		// store scope so it can be re-used during cloning (see CloneNode.evaluate())
-		this.scope = scope.extend(this);
+		this.scope = scope.extend(this, this.properties);
 
-		for (const [key, valueNode] of this.properties.entries()) {
-			this.scope.set(key, valueNode);
-		}
-
-		for (const valueNode of this.properties.values()) {
-			valueNode.resolveReferences(this.scope);
-		}
-
-		for (const insertion of this.insertions) {
-			insertion.resolveReferences(this.scope);
-		}
+		super.resolveReferences(this.scope);
 		this.update();
-	}
-	destruct() {
-		// TODO: remove listeners from children? or are all children getting garbage-collected anyways?
-		for (const insertion of this.insertions) {
-			insertion.destruct();
-		}
 	}
 }
 
@@ -232,6 +228,7 @@ class ReferenceNode extends Node {
 		} else {
 			if (VERBOSE) console.log(`ReferenceNode with undefined target ${this.targetName}, possibly an implicit input?`);
 		}
+		super.resolveReferences(scope); // technically un-necessary because reference nodes have no children
 		this.update();
 	}
 	evaluate () {
@@ -246,11 +243,17 @@ class CloneNode extends Node {
 		this.source = this.nodeFactory.animate(syntaxNode.source, this);
 		this.arguments = this.nodeFactory.animate(syntaxNode.block, this);
 
+		this.registerChildren(this.source);
+		// notice that we _do not_ register the arguments obj as a child. That's because arguments is treated as a template,
+		//       should be left un-resolved and should not perform any insertions. The arguments block is only used during
+		//       evaluate() to create the child object, and we resolve references on the child.
+
 		// when value changes, destruct previous value
 		this.onChangeListener = {
 			update: () => {
 				if (this.prevValue) {
 					this.prevValue.destruct();
+					this.unregisterChild(this.prevValue);
 				}
 				this.prevValue = this.value;
 			}
@@ -258,10 +261,8 @@ class CloneNode extends Node {
 		this.addListener(this.onChangeListener);
 	}
 	resolveReferences (scope) {
-		// Note: arguments block is treated as a template, should be left un-resolved and should not perform any insertions.
-		//       The arguments block is used during evaluate() to create the child object, and we resolve references on the child.
 		this.parentScope = scope; // store the current scope so it can be used during reference resolution in evaluate().
-		this.source.resolveReferences(scope); // this will most likely trigger an update and evaluate(), so make sure this.parentScope is already set before calling this
+		super.resolveReferences(scope);
 		this.update();
 	}
 	// TODO: account for cloning primitives? I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
@@ -322,6 +323,11 @@ class CloneNode extends Node {
 			node.resolveReferences(scope);
 		}
 
+		// since we are manually creating properties+insertions, we have to manually register them
+		child.registerChildren(...child.properties.values(), ...child.insertions);
+
+		this.registerChildren(child);
+
 		return child;
 	}
 }
@@ -335,6 +341,7 @@ class BinopNode extends Node {
 		super(syntaxNode, parent, nodeFactory);
 		this.operands = [this.nodeFactory.animate(syntaxNode.left, this), this.nodeFactory.animate(syntaxNode.right, this)];
 		this.operator = syntaxNode.operator;
+		this.registerChildren(...this.operands);
 	}
 
 	resolveReferences (scope) {
@@ -383,7 +390,6 @@ class MemberAccessNode extends Node {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
 
-		const self = this;
 		// a fake node to listen to source changes and forward updates to updateTarget()
 		this.sourceListener = {
 			update: () => this.updateTarget(),
@@ -395,10 +401,11 @@ class MemberAccessNode extends Node {
 		} else {
 			this.key = this.nodeFactory.animate(syntaxNode.key, this.sourceListener);
 		}
+
+		this.registerChildren(this.source, this.key);
 	}
 	resolveReferences (scope) {
-		this.source.resolveReferences(scope);
-		this.key.resolveReferences(scope);
+		super.resolveReferences(scope);
 		this.update();
 	}
 	// Note: target should be a Node, not a value!
@@ -437,10 +444,10 @@ class InsertionNode extends Node {
 		this.valueNode = this.nodeFactory.animate(syntaxNode.value, this);
 
 		this.targetVal = undefined;
+		this.registerChildren(this.targetNode, this.valueNode);
 	}
 	resolveReferences (scope) {
-		this.targetNode.resolveReferences(scope);
-		this.valueNode.resolveReferences(scope);
+		super.resolveReferences(scope);
 		this.update();
 	}
 	evaluate() {
@@ -473,7 +480,8 @@ class CollectorNode extends Node {
 		this.items = new Set();
 		this.value = this; // we need an initial value to trigger any reference nodes to update, just like an ObjectNode
 	}
-	resolveReferences () {
+	resolveReferences (scope) {
+		super.resolveReferences(scope); // technically un-necessary because collector nodes have no children
 		// CollectorNodes act like NumberNodes and call update() during reference resolution
 		// to trigger the initial evaluation pass.
 		this.update();
@@ -518,9 +526,10 @@ class UnaryNode extends Node {
 		super(syntaxNode, parent, nodeFactory);
 		this.operand = this.nodeFactory.animate(syntaxNode.value, this);
 		this.operator = syntaxNode.operator;
+		this.registerChildren(this.operand);
 	}
 	resolveReferences (scope) {
-		this.operand.resolveReferences(scope);
+		super.resolveReferences(scope);
 		this.update();
 	}
 	evaluate () {
@@ -560,6 +569,7 @@ class PrimitiveNode extends Node {
 		throw Error(`Unimplemented ${this.constructor.name}.getRawValue() function`);
 	}
 	resolveReferences (scope) {
+		super.resolveReferences(scope); // technically un-necessary because primitive nodes have no children
 		this.update(); // TODO: maybe we should override update() to not do anything, because NumberNodes never change? would be a slight optimization.
 	}
 }

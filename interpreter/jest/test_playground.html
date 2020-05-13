@@ -4,13 +4,16 @@
 <head>
 	<script src="../node_modules/nearley/lib/nearley.js"></script>
 	<script src="../node_modules/moo/moo.js" ></script>
+	<script>window.FIREFLY_VERBOSE = true</script>
 	<script type="module" defer>
 		import { Interpreter, NumberNode, Scope } from '../interpreter.js';
 
 		const interpret = src => new Interpreter(src).interpretTest();
 		const expect = val => ({
 			toEqual: expected => console.assert(val === expected, 'ERROR'),
-			not: { toEqual: expected => console.assert(val !== expected, 'ERROR') }
+			not: { toEqual: expected => console.assert(val !== expected, 'ERROR'), toContain: expected => console.assert(!val.includes(expected), 'ERROR') },
+			toContain: expected => console.assert(val.includes(expected), 'ERROR'),
+			toHaveLength: expected => console.assert(val.length == expected, 'ERROR'),
 		});
 
 		// normal interpreter tests here
