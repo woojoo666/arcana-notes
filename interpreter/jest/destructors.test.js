@@ -1,10 +1,6 @@
 import { Interpreter, Scope, ObjectNode, ReferenceNode } from '../interpreter.js';
 
-function extractItems (collector) {
-    return [...collector.properties.entries()]
-        .filter(([key,node]) => key != 'length') // filter out the length property
-        .map(([key,node]) => node.value);        // extract values
-}
+import { validateCollector, getItems } from './utils.js';
 
 // when a clone is re-evaluated, the previous child should be destroyed, and propagate the destruction to all descendents
 test('destructor calls should propagate when clone node re-evaluates', () => {
@@ -25,14 +21,17 @@ test('destructor calls should propagate when clone node re-evaluates', () => {
             f: (collect <: 7).foo       // insertion within member access
             g: foo[(collect <: 8)]      // insertion within computed property access
 
+            collect <: undefinedRef  // insert undefined
+
             // todo: test insertions within list items
     `;
     const output = new Interpreter(testCode).interpretTest();
 
     // collector should contain [1, 2, 3, 4, 4, 5, 6, 7, 8]
-	let items = extractItems(output.get('collect'));
+    validateCollector(output.get('collect'));
+    let items = getItems(output.get('collect'));
 
-    expect(items).toHaveLength(9);
+    expect(items).toHaveLength(10);
     expect(items).toContain(1);
     expect(items).toContain(2);
     expect(items).toContain(3);
@@ -41,22 +40,25 @@ test('destructor calls should propagate when clone node re-evaluates', () => {
     expect(items).toContain(6);
     expect(items).toContain(7);
     expect(items).toContain(8);
+    expect(items).toContain(undefined);
 
     const inputRef = output.getNode('input'); // get reference node
 	inputRef.target = undefined;
     inputRef.update();
 
     // items should be empty now
-	items = extractItems(output.get('collect'));
+    validateCollector(output.get('collect'));
+    items = getItems(output.get('collect'));
 
     expect(items).toHaveLength(0);
 
     inputRef.target = output.get('EMPTY_OBJ');
     inputRef.update();
 
-	items = extractItems(output.get('collect'));
+    validateCollector(output.get('collect'));
+    items = getItems(output.get('collect'));
 
-    expect(items).toHaveLength(9); // test that items have been restored
+    expect(items).toHaveLength(10); // test that items have been restored
 });
 
 // test switching the clone source to a different object with different insertions

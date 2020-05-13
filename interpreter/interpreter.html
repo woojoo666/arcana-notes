@@ -119,14 +119,13 @@ back to base level`);
 </script>
 <script type="module">
 	import { Interpreter, NumberNode } from './interpreter.js';
+	import { getItems } from './jest/utils.js';
 
 	const testCode = 'collect: collector, foo: (bar: 5, collect <: bar, collectAlias: collect), clone: foo(bar: 15, collectAlias <: 7)';
 	const output = new Interpreter(testCode).interpretTest();
 
 	// collector should now contain [5, 15, 7]
-	const items = [...output.get('collect').properties.entries()]
-		.filter(([key,node]) => key != 'length') // filter out the length property
-		.map(([key,node]) => node.value);        // extract values
+	const items = getItems(output.get('collect'));
 	console.assert(items.length == 3, 'ERROR');
 	console.assert(items.includes(5), 'ERROR');
 	console.assert(items.includes(15), 'ERROR');

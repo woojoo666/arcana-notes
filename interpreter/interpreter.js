@@ -134,9 +134,9 @@ class Node {
 			this.listeners.push(listener);
 	}
 	removeListener (listener) {
-		// removes all instances of listener
+		// removes one instance of listener
 		const index = this.listeners.indexOf(listener)
-		if (index > 0) {
+		if (index >= 0) {
 			this.listeners.splice(index, 1);
 		}
 	}
@@ -181,6 +181,10 @@ class ObjectNode extends Node {
 		this.properties = new Map(); // static properties
 		this.insertions = [];
 		this.value = this;    // ObjectNode initialize to themselves at the beginning, so cloning doesn't break
+
+		if (!syntaxNode.statements) {
+			return; // CollectorNode extends ObjectNode but has no statements, so exit
+		}
 
 		for (const statement of syntaxNode.statements) {
 			switch (statement.type) {
@@ -479,26 +483,57 @@ class InsertionNode extends Node {
 
 // In lumino, insertions are supposed to be stored in a linked-list structure.
 // However, for simplicity, we define a Collector type that just flattens all insertions into an array-like structure.
-class CollectorNode extends Node {
+
+// CollectorNodes only add properties, never remove them. Instead of removing, sets them to undefined. This is so that
+// we never lose any listeners. See notes section "Interpreter Implementation - collectors and propagating updates" for details
+class CollectorNode extends ObjectNode {
 	constructor (syntaxNode, parent, nodeFactory) {
 		super(syntaxNode, parent, nodeFactory);
 		this.items = new Set();
 		this.value = this; // we need an initial value to trigger any reference nodes to update, just like an ObjectNode
 	}
 	evaluate () {
+		const remainingKeys = new Set(this.properties.keys());
 		// re-create properties from scratch every time
-		this.properties = new Map();
 		for (const [index, valueNode] of [...this.items.values()].entries()) {
-			this.properties.set(index, valueNode);
+			const itemRefNode = this.getNode(index);
+			if (itemRefNode.target !== valueNode) {
+				if (itemRefNode.target)
+					itemRefNode.target.removeListener(itemRefNode); // unregister from old target
+				itemRefNode.target = valueNode;
+				itemRefNode.target.addListener(itemRefNode); // register to new target
+				itemRefNode.update();
+			}
+			remainingKeys.delete(index);
 		}
-		const lengthNode = this.nodeFactory.animate({type: 'number', value: this.items.size}, null);
-		lengthNode.update(); // initialize number node
-		this.properties.set('length', lengthNode);
+		const lengthNode = this.getNode('length');
+		if (lengthNode.value !== this.items.size) {
+			lengthNode.target = { value: this.items.size };
+			lengthNode.update();
+		}
+		remainingKeys.delete('length');
 
-		this.queueNotify(); // queue a forced notify
+		for (const key of remainingKeys.values()) {
+			const refNode = this.getNode(key);
+			if (refNode.target) {
+				refNode.target.removeListener(refNode);
+				refNode.target = undefined;
+				refNode.update();
+			}
+		}
+
 		return this;
 	}
+	resolveReferences (scope) {
+		super.resolveReferences(scope);
+		this.update();
+	}
 	getNode (key) {
+		// note that we never resolve references on these generated references
+		// Instead we just directly set the target value and force them to update()
+		if (!this.properties.has(key)) {
+			this.properties.set(key, this.nodeFactory.animate({type: 'reference'}));
+		}
 		return this.properties.get(key);
 	}
 	get (key) {

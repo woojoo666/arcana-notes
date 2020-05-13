@@ -2591,6 +2591,82 @@ so we can resolve the re-created source object
 * this is just how flexible and powerful Firefly is
 * firefly's scope mechanism makes it really easy to configure / modify anything
 
+### Interpreter Implementation - problems with collectors and propagating updates
+
+* was having trouble reading properties from collectors
+* realized that the problem was that the collector never updating listeners
+* the collector value always pointed to itself (just like ObjectNodes)
+* except CollectorNodes can actually change their properties internally, so they have to force listeners to update
+* however, they can't do that if the value doesn't change (which is how I designed the update() function to work)
+
+* I tried to force it using a `queueNotify` flag
+* when raise, it would cause the update() function to automatically send updates to listeners
+* however, I ran into issues with listeners that were ReferenceNodes
+* because I could force them to update, but they would re-evaluate, see that the value hadn't changed (still pointed to the collector), and wouldn't propagate the update
+
+* not to mention, you could technically have an entire chain of reference nodes
+* so it's not enough to just force an update $N$ nodes deep
+
+* a fix I tried was during CollectorNode.evaluate(), instead of returning itself
+* I tried returning a new ObjectNode() every time
+* something like
+
+```js
+let objectNode = this.nodeFactory({type: 'block'});
+for (const [index, valueNode] of Object.entries([...this.items])) {
+    objectNode.properties.set(index, valueNode);
+}
+
+objectNode.addItem = item => this.addItem(item);
+objectNode.removeItem = item => this.removeItem(item);
+
+return objectNode;
+```
+
+* notice how I had to inject the `addItem` and `removeItem` functions
+* because InsertionNodes would be often be inserting into the value of the CollectorNode
+* so I needed to redirect the the calls to the CollectorNode
+
+* in essence, this objectNode acts like a proxy to the CollectorNode
+
+* however this ended up causing an infinite loop
+* since for something like `myCollector <: 100`
+* the `myCollector` reference node would get the value of the collector, a proxy objectNode
+* and see that it changed, and notify the InsertionNode,
+* the InsertionNode would remove its item from the old proxy objectNode and add it to the new proxy objectNode
+* that would trigger the collector to update again, which would notify the reference node
+* the reference node would get the new proxy objectNode, notify the InsertionNode,
+* ad infinitum
+
+* there were a couple hacky solutions I came up with
+* but ultimately what I decided to do was
+* to make it so, instead of adding and removing properties depending on the items
+* I would make the collector act as if it has infinite properties, where each property holds a ReferenceNode
+* by default, these ReferenceNodes simply have a value of `undefined`
+* but an actor inserts to the collector, the collector starts manually setting the values of these ReferenceNodes to inserted values
+
+* now when actors read from the collector, they will always get a ReferenceNode
+* which is useful because they can bind to the referenceNode
+* and if the collector ever gets enough items that that property gets a value, then it can simple update the actor that is bound there
+
+* this is also nice because it reduces the number of updates
+* just like with an ObjectNode, any MemberAccessNodes only bind to the CollectorNode once
+* and they will get notified if the ReferenceNode ever changes value
+
+* of course, we can't actually create infinite properties
+* instead we simulate it, by auto-creating properties whenever an actor tries to access a property that doesn't exist yet
+
+
+* something slightly related that I want to mention
+* currently we don't have to worry about handling duplicate insertions
+* recall that we allow duplicate insertions in our language
+* but in the collector, we use a javascript `Set()` to store inserted values, so wouldn't we lose duplicate values?
+* no, because InsertionNodes don't just insert values
+* they insert the Node containing the value, and that Node corresponds to the right-hand-side of the insertion statement
+* eg in `collect <: foo.bar`, the thing being inserted into `collect` is actually a member-access node
+* thus, if we do `collect <: foo.bar, collect <: foo.bar`, there are two different member access nodes being inserted into `collect`
+  * (even though both member access nodes store the same value)
+* same goes for references: `collect <: x, collect <: x` inserts two different reference nodes that both point to `x`
 
 # --------------------------------------------------- loose ends below --------------------------------------------------
 

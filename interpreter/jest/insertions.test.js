@@ -1,10 +1,6 @@
 import { Interpreter, Scope } from '../interpreter.js';
 
-function extractItems (collector) {
-    return [...collector.properties.entries()]
-        .filter(([key,node]) => key != 'length') // filter out the length property
-        .map(([key,node]) => node.value);        // extract values
-}
+import { validateCollector, getItems } from './utils.js';
 
 test('insertions', () => {
     const testCode = `
@@ -19,15 +15,18 @@ test('insertions', () => {
         f: (collect <: 7).foo       // insertion within member access
         g: foo[(collect <: 8)]      // insertion within computed property access
 
+        collect <: undefinedRef  // insert undefined
+
         // todo: test insertions within list items
     `;
 
     const output = new Interpreter(testCode).interpretTest();
 
     // collector should contain [1, 2, 3, 4, 4, 5, 6, 7, 8]
-	let items = extractItems(output.get('collect'));
+    validateCollector(output.get('collect'));
+    let items = getItems(output.get('collect'));
 
-    expect(items).toHaveLength(9);
+    expect(items).toHaveLength(10);
     expect(items).toContain(1);
     expect(items).toContain(2);
     expect(items).toContain(3);
@@ -36,6 +35,7 @@ test('insertions', () => {
     expect(items).toContain(6);
     expect(items).toContain(7);
     expect(items).toContain(8);
+    expect(items).toContain(undefined);
 });
 
 test('duplicate insertions', () => {
@@ -50,7 +50,27 @@ test('duplicate insertions', () => {
     const output = new Interpreter(testCode).interpretTest();
 
     // collector should contain [1, 2, 3, 4, 4, 5, 6, 7, 8]
-	let items = extractItems(output.get('collect'));
+    validateCollector(output.get('collect'));
+    let items = getItems(output.get('collect'));
 
     expect(items).toHaveLength(2);
+});
+
+test('reading collector', () => {
+    
+    const testCode = `
+        collect: collector
+        collect <: (x: 100)
+        bar: collect[0].x
+        collectLength: collect.length
+    `;
+
+    const output = new Interpreter(testCode).interpretTest();
+
+    validateCollector(output.get('collect'));
+    let items = getItems(output.get('collect'));
+
+    expect(items).toHaveLength(1);
+    expect(output.get('bar')).toEqual(100);
+    expect(output.get('collectLength')).toEqual(1);
 });
