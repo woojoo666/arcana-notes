@@ -520,7 +520,8 @@ class CollectorNode extends ObjectNode {
 		this.update();
 	}
 	getNode (key) {
-		if (key != 'length' || typeof(key) != 'number' || key < 0) {
+		let isValidKey = key == 'length' || (typeof(key) == 'number' && key >= 0);
+		if (!isValidKey) {
 			// we can safely ignore these requests since they should never return a value, so we never have to update the reader
 			return undefined;
 		}
@@ -668,6 +669,7 @@ export {
 	NodeFactory,
 	Scope,
 
+	Node,
 	ObjectNode,
 	ReferenceNode,
 	CloneNode,
