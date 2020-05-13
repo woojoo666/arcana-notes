@@ -8,4 +8,4 @@ toBoolean:
 
 ternary:
 	switch: (true: trueBranch, false: falseBranch)
-	=> switch[toBoolean(condition)->]()
+	=> switch[toBoolean(x: condition)->]()

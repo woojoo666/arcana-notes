@@ -28,7 +28,7 @@ let ParserRules = [
     {"name": "Statement", "symbols": [{"literal":"["}, (lexerWrapper.has("identifier") ? {type: "identifier"} : identifier), {"literal":"]"}, {"literal":":"}, "Expression"]},
     {"name": "Statement$ebnf$1", "symbols": ["SpacedItem"]},
     {"name": "Statement$ebnf$1", "symbols": ["Statement$ebnf$1", "SpacedItem"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "Statement", "symbols": ["Statement$ebnf$1"], "postprocess": ([items]) => ({type:'subList', items})},
+    {"name": "Statement", "symbols": ["Statement$ebnf$1"], "postprocess": ([nodes]) => ({type:'subList', items: nodes.map(x=>x[0])})},
     {"name": "Statement", "symbols": ["SpacedUnary"]},
     {"name": "Statement", "symbols": [{"literal":"tag"}, (lexerWrapper.has("tag") ? {type: "tag"} : tag)]},
     {"name": "Statement", "symbols": ["Object", (lexerWrapper.has("propAccess") ? {type: "propAccess"} : propAccess), (lexerWrapper.has("tag") ? {type: "tag"} : tag), {"literal":":"}, "Expression"]},

@@ -176,6 +176,8 @@ class ObjectNode extends Node {
 		this.insertions = [];
 		this.value = this;    // ObjectNode initialize to themselves at the beginning, so cloning doesn't break
 
+		this.listItems = new Set();
+
 		if (!syntaxNode.statements) {
 			return; // CollectorNode extends ObjectNode but has no statements, so exit
 		}
@@ -191,10 +193,13 @@ class ObjectNode extends Node {
 				case 'insertion':
 					this.insertions.push(this.nodeFactory.animate(statement, null));
 					break;
+				case 'subList':
+					[...statement.items.map(item => this.nodeFactory.animate(item))].forEach(itemNode => this.listItems.add(itemNode));
+					break;
 			}
 		}
 
-		this.registerChildren(...this.properties.values(), ...this.insertions);
+		this.registerChildren(...this.properties.values(), ...this.insertions, ...this.listItems);
 	}
 	getNode (key) {
 		return this.properties.get(key);
