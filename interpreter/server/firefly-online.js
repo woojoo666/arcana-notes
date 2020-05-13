@@ -8,11 +8,7 @@ import { registerServerNode } from './server.js';
 const starterPackSrc = fs.readFileSync(path.resolve(__dirname, '../starter-pack.owo'), 'utf8');
 
 const webUtilsSrc = `
-serverCollector: collector
-serve: (x: this.enable(serverCollector <: self), self: this)
-
-numServers: serverCollector.length
-firstServer: serverCollector[0]
+serve: ()
 `;
 
 class VirtualObject extends Node {
@@ -24,33 +20,20 @@ let webStarterPack = new Interpreter(webUtilsSrc).interpretTest(starterPack.scop
 
 let environment = webStarterPack.scope; // use the starter pack as the outer scope
 
-webStarterPack.get('serverCollector');
-
-function bootstrapListener(node, listener) {
-	let oldFn = node.notifyListeners.bind(node);
-	node.notifyListeners = () => {
-		listener(node);
-		oldFn();
-	}
-}
-
 function interpret (src) {
-	new Interpreter(src).interpretTest(environment, 'Indent');
-	let numServers = webStarterPack.get('numServers');
+	const output = new Interpreter(src).interpretTest(environment, 'Indent');
+	let numServers = output.listItems.size;
 	if (numServers != 1) {
 		throw Error(`please define exactly one server. Got ${numServers}`); // currently we only support one server
 	} else {
-		registerServerNode(webStarterPack.get('firstServer'));
+		let firstServer = [...output.listItems][0];
+		registerServerNode(firstServer);
 	}
 }
 
 interpret(`
-	client: serve
-		enable: ()
-
+	serve
 		index: "foo"
 `)
-
-console.log(webStarterPack.get('firstServer').syntaxNode);
 
 export { interpret };
