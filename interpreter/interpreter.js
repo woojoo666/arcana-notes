@@ -138,6 +138,11 @@ class Node {
 	resolveReferences (scope) {
 		this.children.forEach(child => child.resolveReferences(scope));
 	}
+	notifyListeners () {
+		for (const listener of this.listeners) {
+			listener.update();
+		}
+	}
 	// sets the value.
 	// Value should always be an ObjectNode or CloneNode (TODO: make sure this is followed for all Nodes) 
 	evaluate () {
@@ -149,9 +154,7 @@ class Node {
 		const oldValue = this.value;
 		this.value = this.evaluate();
 		if (this.value != oldValue) {
-			for (const listener of this.listeners) {
-				listener.update();
-			}
+			this.notifyListeners();
 		}
 	}
 	destruct () {

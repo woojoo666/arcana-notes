@@ -50,10 +50,8 @@ wss.on("connection", function (ws) {
 console.log("websocket server created");
 
 function registerServerNode(node) {
-	if (node) {
-		throw Error('only one server node allowed');
-	}
 	serverNode = node;
+	console.log('registered server');
 }
 
-module.exports = registerServerNode;
+module.exports = { registerServerNode };

@@ -1,38 +1,57 @@
 // this module is the firefly interpreter extended with server capabilities
 
-import { Interpreter, Node, Scope } from '../interpreter.js';
+import fs from 'fs';
+import path from 'path';
+import { Interpreter, Node, Scope, ObjectNode, CollectorNode } from '../interpreter.js';
 import { registerServerNode } from './server.js';
 
-// whenever this is cloned, it 
-class ServerNode extends Node {
-    constructor(syntaxNode, parent) {
-        super(syntaxNode, parent);
-        if (syntaxNode == null) {
-            return; // base client node has no route, no initialization. Merely a template for cloning
-        }
-        const extractProperty = name => syntaxNode.statements.find(stmt => stmt.key == name).value
-        // TODO: allow server nodes to specify a port, so we can declare multiple server nodes.
-        //       right now this is difficult because the websocket port is hardcoded in the client html+js.
-        this.clientNode = extractProperty('client');
-        registerServerNode(this);
-    }
-    clone(syntaxNode) {
-        new ServerNode()
-        this.scope = 
-    }
-    getClient () {
-        return this.clientNode;
-    }
-    resolveReferences(scope) {
-        // send scope to client
-    }
-}
+const starterPackSrc = fs.readFileSync(path.resolve(__dirname, '../starter-pack.owo'), 'utf8');
+
+const webUtilsSrc = `
+serverCollector: collector
+Server: (serverCollector <: this)
+
+numServers: serverCollector.length
+firstServer: serverCollector[0]
+`;
 
 class VirtualObject extends Node {
     
 }
 
-let baseServerNode = new ServerNode(null, parent);
+let starterPack = new Interpreter(starterPackSrc).interpretTest();
+let webStarterPack = new Interpreter(webUtilsSrc).interpretTest(starterPack.scope);
 
-webScope = new Scope();
-Scope.set('Server', ServerNode)
+let environment = webStarterPack.scope; // use the starter pack as the outer scope
+
+webStarterPack.get('serverCollector');
+
+function bootstrapListener(node, listener) {
+	let oldFn = node.notifyListeners.bind(node);
+	node.notifyListeners = () => {
+		listener(node);
+		oldFn();
+	}
+}
+
+bootstrapListener(webStarterPack.getNode('numServers'), (node) => {
+	if (node.value > 1)
+		console.error('only one server allowed!'); // currently we only support one server
+});
+bootstrapListener(webStarterPack.getNode('firstServer'), (node) => {
+	// registerServerNode(node);
+});
+
+function interpret (src) {
+	new Interpreter(src).interpretTest(environment, 'Indent');
+}
+
+interpret(`
+	myServer: Server
+		port: undefined
+		enable: ()
+		client:
+			index: "foo"
+`)
+
+export { interpret };
