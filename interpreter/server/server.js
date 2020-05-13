@@ -31,16 +31,18 @@ var wss = new WebSocketServer({server: server});
 
 wss.on("connection", function (ws) {
 	const { sendMessage, onMessage, onClose } = getWSServerUtils(ws);
-		
+
 	onClose(() => {
 		console.log("websocket connection close");
 	});
 
-	onMessage('heartbeat', (data) => {
-		console.log(`got heartbeat at t=${data.time}`);
-		sendMessage('heartbeat-response', { time: Date.now() });
+	onMessage('init', () => {
+		if (serverNode) {
+			sendMessage('starter-pack', { syntaxNode:  serverNode.syntaxNode });
+		} else {
+			sendMessage('no-server');
+		}
 	})
-
 });
 
 console.log("websocket server created");

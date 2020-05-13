@@ -2801,3 +2801,20 @@ all their messages will be un-inserted
 and disappear
 we explored this before
 how did we fix it?
+
+-------
+
+instead of syntax like
+
+        myServer: Server
+            port: 3000
+            client:
+                ...
+
+using simpler syntax
+
+        serve
+            ...
+
+stuff like `port` is configured beforehand by whoever is running the firefly file
+but for the firefly file, all you need to worry about is the client

@@ -9,7 +9,7 @@ const starterPackSrc = fs.readFileSync(path.resolve(__dirname, '../starter-pack.
 
 const webUtilsSrc = `
 serverCollector: collector
-Server: (x: this.enable(serverCollector <: self), self: this)
+serve: (x: this.enable(serverCollector <: self), self: this)
 
 numServers: serverCollector.length
 firstServer: serverCollector[0]
@@ -45,11 +45,12 @@ function interpret (src) {
 }
 
 interpret(`
-	myServer: Server
-		port: undefined
+	client: serve
 		enable: ()
-		client:
-			index: "foo"
+
+		index: "foo"
 `)
+
+console.log(webStarterPack.get('firstServer').syntaxNode);
 
 export { interpret };
