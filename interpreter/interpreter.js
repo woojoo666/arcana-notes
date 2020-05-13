@@ -214,7 +214,6 @@ class ObjectNode extends Node {
 		this.scope = scope.extend(this, this.properties);
 
 		super.resolveReferences(this.scope);
-		this.update();
 	}
 }
 
@@ -277,7 +276,7 @@ class CloneNode extends Node {
 	resolveReferences (scope) {
 		this.parentScope = scope; // store the current scope so it can be used during reference resolution in evaluate().
 		super.resolveReferences(scope);
-		this.update();
+		this.update(); // CloneNodes need to evaluate even if all operands are undefined, so force update during reference resolution
 	}
 	// TODO: account for cloning primitives? I think this would be a lot cleaner if all Nodes returned a Node as their evaluated value
 	// TODO: this is all really hacky, I'm not sure if it will handle certain edge cases like, if a node
@@ -362,7 +361,7 @@ class BinopNode extends Node {
 		for (const operand of this.operands) {
 			operand.resolveReferences(scope);
 		}
-		this.update();
+		this.update(); // BinopNodes need to evaluate even if all operands are undefined, so force update during reference resolution
 	}
 	evaluate () {
 		// TODO: should not be dependent on javascript's type coercion. Should be using custom defined coercion methods
@@ -418,10 +417,6 @@ class MemberAccessNode extends Node {
 
 		this.registerChildren(this.source, this.key);
 	}
-	resolveReferences (scope) {
-		super.resolveReferences(scope);
-		this.update();
-	}
 	// Note: target should be a Node, not a value!
 	evaluateTarget() {
 		if (this.source.value instanceof ObjectNode) {
@@ -460,10 +455,6 @@ class InsertionNode extends Node {
 		this.targetVal = undefined;
 		this.registerChildren(this.targetNode, this.valueNode);
 	}
-	resolveReferences (scope) {
-		super.resolveReferences(scope);
-		this.update();
-	}
 	evaluate() {
 		return this.targetNode && this.targetNode.value;
 	}
@@ -493,12 +484,6 @@ class CollectorNode extends Node {
 		super(syntaxNode, parent, nodeFactory);
 		this.items = new Set();
 		this.value = this; // we need an initial value to trigger any reference nodes to update, just like an ObjectNode
-	}
-	resolveReferences (scope) {
-		super.resolveReferences(scope); // technically un-necessary because collector nodes have no children
-		// CollectorNodes act like NumberNodes and call update() during reference resolution
-		// to trigger the initial evaluation pass.
-		this.update();
 	}
 	evaluate () {
 		// re-create properties from scratch every time
@@ -538,7 +523,7 @@ class UnaryNode extends Node {
 	}
 	resolveReferences (scope) {
 		super.resolveReferences(scope);
-		this.update();
+		this.update(); // UnaryNodes need to evaluate even if all operands are undefined, so force update during reference resolution
 	}
 	evaluate () {
 		switch (this.operator) {

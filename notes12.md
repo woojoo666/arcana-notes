@@ -2578,7 +2578,7 @@ so we can resolve the re-created source object
 * however, that actually would't work, since all the subclasses would still use the original `Node` class
 
 * so I ended up doing some weird hacky stuff
-* see commit ____fill this in after committing____
+* see commit fe08acc618dfdf1f0250495173647822c6853920
 
 * the tricky part is
 * when we modify the base class
