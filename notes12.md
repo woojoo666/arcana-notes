@@ -2668,6 +2668,57 @@ return objectNode;
   * (even though both member access nodes store the same value)
 * same goes for references: `collect <: x, collect <: x` inserts two different reference nodes that both point to `x`
 
+### Interpreter Implementation - propagating updates and object hashing
+
+(continued from prev section "Interpreter Implementation - collectors and propagating updates")
+
+* another possible way of implementing CollectorNode is to modify the system to support dynamic object definitions
+  * mentioned previous in section "dynamic address definitions exploration"
+* basically, whenever update() checks to see if the evaluated value changed, for ObjectNodes it does a deep-comparison one level deep
+* and compares the properties of the ObjectNode to a saved copy of the properties of the ObjectNode
+* every node that evaluates to an ObjectNode value, does this semi-deep-comparison whenever
+
+
+* note that this means, whenever an ObjectNode re-assigns one of its properties
+* the update will propagate through any reference node accessing that object
+  * even if there is a long chain of reference nodes, a->b->c->d->e, the update has to propagate through the chain
+* this is to guarantee that everybody that sees the ObjectNode, gets updated
+* which is less efficient than the alias binding method we had before
+
+* though the alias binding mechanism still works
+* if the values inside the property change, it will directly notify any listeners bound to that property
+* only when the property itself changes, does it need to update all references to that object,
+  * and in turn, any member access nodes reading from that object
+
+
+* we still need to be careful for circular updates and infinite loops, as mentioned in the previous section
+* Collectors are object nodes, but we don't want to trigger an infinite update loop between a collector and an insertion node
+  * discussed previously, see "Interpreter Implementation - collectors and propagating updates"
+* so we need to handle it separately
+
+* to handle this issue, insertion nodes should use reference equality when checking the target
+* because the insertion node isn't actually reading properties of the target
+* it is just sending data to the object as a whole
+* so it doesn't need to know when the object properties change
+
+* binop and unary nodes can probably just use reference equality as well
+* however, reference nodes, member access nodes, and clone nodes all need to use semi-deep value equality
+
+
+* something else I should mention
+* if everybody saves a copy of their ObjectNode
+* and every has to do this semi-deep-comparison
+* seems very slow
+* especially since this update needs to propagate throughout entire chains of references
+* instead, we can have the ObjectNode itself store a "hash" of its properties
+* a "property-list-hash"
+* a raw string containing a key-value pair for every property, where the value is the *id* of the property's valueNode
+* since the property list is un-ordered, we should sort these property lists when comparing them
+* we can add prefixes for every type of key, eg boolean keys look like `b_true` and `b_false`
+* object keys use their id and the prefix "o", so something like `o_123`
+* then we can sort the keys when hashing the property list
+
+
 # --------------------------------------------------- loose ends below --------------------------------------------------
 
 
