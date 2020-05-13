@@ -27,7 +27,7 @@ Statement	-> %identifier ":" Expression							{% ([token, ,value]) => ({type:'pr
 			| %number ":" Expression								{% ([token, ,value]) => ({type:'property', key: token.value, value, keyType: 'number'}) %} # TODO: invalid numeric keys like "1.2.3" should return syntax error, though perhaps easier to throw in the interpreter
 			| %boolean ":" Expression								{% ([token, ,value]) => ({type:'property', key: token.value, value, keyType: 'boolean'}) %}
 			| "[" %identifier "]" ":" Expression					# dynamic keys / computed properties (TODO: support destructuring)
-			| SpacedItem:+											{% ([nodes]) => ({type:'subList', items: nodes.map(x=>x[0])}) %} # one or more space-delimited list items
+			| Object												{% (items) => ({type:'subList', items}) %} # TODO: hack for now, since list items and cloning are ambiguous (from parser's point of view, "x(y)" can be two list items or one clone)
 																	# TODO: spaced items are not allowed to be full expressions, but we should allow a single expression as a list item
 			| SpacedUnary											# a single spaced-unary object
 			| "tag" %tag											# declaring tags
