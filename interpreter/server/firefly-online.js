@@ -9,7 +9,7 @@ const starterPackSrc = fs.readFileSync(path.resolve(__dirname, '../starter-pack.
 
 const webUtilsSrc = `
 serverCollector: collector
-Server: (serverCollector <: this)
+Server: (x: this.enable(serverCollector <: self), self: this)
 
 numServers: serverCollector.length
 firstServer: serverCollector[0]
@@ -34,16 +34,14 @@ function bootstrapListener(node, listener) {
 	}
 }
 
-bootstrapListener(webStarterPack.getNode('numServers'), (node) => {
-	if (node.value > 1)
-		console.error('only one server allowed!'); // currently we only support one server
-});
-bootstrapListener(webStarterPack.getNode('firstServer'), (node) => {
-	// registerServerNode(node);
-});
-
 function interpret (src) {
 	new Interpreter(src).interpretTest(environment, 'Indent');
+	let numServers = webStarterPack.get('numServers');
+	if (numServers != 1) {
+		throw Error(`please define exactly one server. Got ${numServers}`); // currently we only support one server
+	} else {
+		registerServerNode(webStarterPack.get('firstServer'));
+	}
 }
 
 interpret(`
