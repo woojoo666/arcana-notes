@@ -2569,6 +2569,29 @@ what scope should you give the child?
 you would somehow have to remember the original property-to-scope mappings for each property in the source
 so we can resolve the re-created source object
 
+### Cloning Entire Groups of Classes
+
+* when I wanted to add performance tracking
+* got really complicated
+* all I wanted to do was modify the base `Node` class to add some tracking to the `update()` function
+* so that all subclasses (CloneNode, BinopNode, etc) would automatically inherit the tracking
+* however, that actually would't work, since all the subclasses would still use the original `Node` class
+
+* so I ended up doing some weird hacky stuff
+* see commit ____fill this in after committing____
+
+* the tricky part is
+* when we modify the base class
+* we have to create new version of every single subclass
+* type systems like Java and Javascript does not support that
+
+* but firefly does
+* we can just clone the entire environment, including NodeFactory and all Node subclasses
+* so when we override the `Node` class, all the other subclass would change too
+* this is just how flexible and powerful Firefly is
+* firefly's scope mechanism makes it really easy to configure / modify anything
+
+
 # --------------------------------------------------- loose ends below --------------------------------------------------
 
 

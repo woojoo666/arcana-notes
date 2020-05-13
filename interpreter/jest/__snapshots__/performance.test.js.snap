@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`performance test 1`] = `
+Object {
+  "initialPass": 116,
+  "testCode": "foo: (bar: -1+x*2/y, x: 10, y: input), clone: foo(x: 5+y), barAlias: clone.bar",
+  "updatePass": 26,
+}
+`;

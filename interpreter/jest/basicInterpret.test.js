@@ -107,6 +107,7 @@ test('initial evaluation pass', () => {
     expect(interpret('foo: x == y').get('foo')).toEqual(true);                 // make sure reference nodes send updates even when undefined
     expect(interpret('foo: x.y == a.b').get('foo')).toEqual(true);
     expect(interpret('foo: () == ()').get('foo')).toEqual(false);              // make sure objects can trigger initial evaluate pass
+    expect(interpret('foo: !x').get('foo')).toEqual(true);                    // make sure unary operator also operates on undefined references
 })
 
 test('functions', () => {

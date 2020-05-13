@@ -57,22 +57,32 @@ Scope.fromObject = obj => new Scope(undefined, undefined, new Map(Object.entries
 
 class NodeFactory {
 	animate (syntaxNode, parent) {
+		if (syntaxNode.type == 'create') {
+			syntaxNode = syntaxNode.block; // 'create' nodes contain a 'block' node
+		}
+		let NodeClass = this.getNodeClass(syntaxNode);
+		let node = new NodeClass(syntaxNode, parent, this);
+		return this.postTransform(node);
+	}
+	getNodeClass (syntaxNode, parent) {
 		switch (syntaxNode.type) {
-			case 'block': return new ObjectNode(syntaxNode, parent, this);
-			case 'binop': return new BinopNode(syntaxNode, parent, this);
-			case 'unaryop': return new UnaryNode(syntaxNode, parent, this);
-			case 'memberAccess': return new MemberAccessNode(syntaxNode, parent, this);
-			case 'reference': return new ReferenceNode(syntaxNode, parent, this);
-			case 'string': return new StringNode(syntaxNode, parent, this);
-			case 'number': return new NumberNode(syntaxNode, parent, this);
-			case 'boolean': return new BooleanNode(syntaxNode, parent, this);
-			case 'undefined': return new UndefinedNode(syntaxNode, parent, this);
-			case 'create': return this.animate(syntaxNode.block, parent, this); // 'create' nodes contain a 'block' node
-			case 'clone': return new CloneNode(syntaxNode, parent, this);
-			case 'insertion': return new InsertionNode(syntaxNode, parent, this);
-			case 'collector': return new CollectorNode(syntaxNode, parent, this);
+			case 'block': return ObjectNode;
+			case 'binop': return BinopNode;
+			case 'unaryop': return UnaryNode;
+			case 'memberAccess': return MemberAccessNode;
+			case 'reference': return ReferenceNode;
+			case 'string': return StringNode;
+			case 'number': return NumberNode;
+			case 'boolean': return BooleanNode;
+			case 'undefined': return UndefinedNode;
+			case 'clone': return CloneNode;
+			case 'insertion': return InsertionNode;
+			case 'collector': return CollectorNode;
 		}
 		throw Error('No handler for syntaxNode of type ' + syntaxNode.type);
+	}
+	postTransform (node) {
+		return node; // by default, no transformation
 	}
 }
 
@@ -138,12 +148,16 @@ class Node {
 	evaluate () {
 		throw Error(`Unimplemented ${this.constructor.name}.evaluate() function`);
 	}
+	queueNotify () { // call this during evaluate() to force listeners to update
+		this.forceNotifyFlag = true;
+	}
 	update () {
 		if (VERBOSE) console.log(`updating ${this.constructor.name} with id ${this.id}`); // for debugging
 
 		const oldValue = this.value;
 		this.value = this.evaluate();
-		if (this.value != oldValue) {
+		if (this.value != oldValue || this.forceNotifyFlag) {
+			this.forceNotifyFlag = false;
 			for (const listener of this.listeners) {
 				listener.update();
 			}
@@ -495,6 +509,8 @@ class CollectorNode extends Node {
 		const lengthNode = this.nodeFactory.animate({type: 'number', value: this.items.size}, null);
 		lengthNode.update(); // initialize number node
 		this.properties.set('length', lengthNode);
+
+		this.queueNotify(); // queue a forced notify
 		return this;
 	}
 	getNode (key) {
@@ -502,14 +518,6 @@ class CollectorNode extends Node {
 	}
 	get (key) {
 		return this.getNode(key).value;
-	}
-	update () {
-		if (VERBOSE) console.log(`updating CollectorNode with id ${this.id}`); // for debugging
-
-		this.evaluate();
-		for (const listener of this.listeners) {
-			listener.update(); // since properties re-created every time, always notify listeners
-		}
 	}
 	addItem (valueNode) {
 		this.items.add(valueNode)
