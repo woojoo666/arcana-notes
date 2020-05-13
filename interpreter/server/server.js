@@ -1,3 +1,5 @@
+import { getWSServerUtils } from './ws-utils.js';
+
 var WebSocketServer = require("ws").Server;
 var http = require("http");
 var express = require("express");
@@ -28,23 +30,17 @@ var userId;
 var wss = new WebSocketServer({server: server});
 
 wss.on("connection", function (ws) {
-	console.info("websocket connection open");
-
-	var timestamp = new Date().getTime();
-	userId = timestamp;
-
-	ws.send(JSON.stringify({msgType:"onOpenConnection", msg:{connectionId:timestamp}}));
-
-	ws.on("message", function (data, flags) {
-		console.log("websocket received a message");
-		var clientMsg = data;
-
-		ws.send(JSON.stringify({msg:{connectionId:userId}}));
-	});
-
-	ws.on("close", function () {
+	const { sendMessage, onMessage, onClose } = getWSServerUtils(ws);
+		
+	onClose(() => {
 		console.log("websocket connection close");
 	});
+
+	onMessage('heartbeat', (data) => {
+		console.log(`got heartbeat at t=${data.time}`);
+		sendMessage('heartbeat-response', { time: Date.now() });
+	})
+
 });
 
 console.log("websocket server created");
@@ -54,4 +50,4 @@ function registerServerNode(node) {
 	console.log('registered server');
 }
 
-module.exports = { registerServerNode };
+export { registerServerNode };
